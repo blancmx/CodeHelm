@@ -1,32 +1,10 @@
-﻿<template>
+<template>
   <div
     class="h-8 w-full select-none flex items-center justify-between flex-shrink-0 z-50 transition-colors duration-200 drag-header"
     :class="themeStore.isDark ? 'bg-[#0f0f12] border-b border-[#27272a] text-zinc-400' : 'bg-[#f4f4f5] border-b border-[#e4e4e7] text-zinc-600'"
     @dblclick="handleToggleMaximize"
   >
-    <!-- Left: App Title & Branding -->
-    <div class="flex items-center gap-2 px-3 no-drag">
-      <div
-        class="w-4 h-4 rounded flex items-center justify-center border font-bold text-[10px]"
-        :class="themeStore.isDark ? 'bg-[#18181b] border-[#3f3f46] text-white' : 'bg-white border-zinc-300 text-zinc-950'"
-      >
-        <span class="font-mono text-[9px] leading-none">C</span>
-      </div>
-      <span
-        class="text-xs font-semibold tracking-tight"
-        :class="themeStore.isDark ? 'text-zinc-200' : 'text-zinc-800'"
-      >
-        CodeHelm
-      </span>
-      <span
-        class="text-[9px] font-mono font-medium px-1.5 py-0.2 rounded border"
-        :class="themeStore.isDark ? 'bg-[#18181b] text-zinc-400 border-[#27272a]' : 'bg-zinc-100 text-zinc-500 border-zinc-200'"
-      >
-        v0.1
-      </span>
-    </div>
-
-    <!-- Center: Transparent Draggable Spacer -->
+    <!-- Full Draggable Titlebar Spacer -->
     <div class="flex-1 h-full min-w-0" />
 
     <!-- Right: Windows 11 Native Style Window Controls -->

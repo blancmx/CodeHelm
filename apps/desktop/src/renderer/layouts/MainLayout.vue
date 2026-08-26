@@ -15,46 +15,44 @@
     >
       <!-- Top Brand & Navigation -->
       <div class="overflow-hidden">
-        <!-- Brand Header (Compact & Clean) -->
+        <!-- Brand Header (Left: Collapse Toggle, Right: Quick Search) -->
         <div
           class="h-14 px-2 flex items-center border-b transition-colors duration-200 overflow-hidden flex-shrink-0"
           :class="themeStore.isDark ? 'border-[#27272a]' : 'border-[#e4e4e7]'"
         >
-          <!-- Left: Brand Logo & Title Container -->
-          <div
-            class="flex items-center min-w-0 flex-1 overflow-hidden"
-            :class="isCollapsed ? 'cursor-pointer' : ''"
-            :title="isCollapsed ? '点击展开侧边栏' : ''"
-            @click.stop="isCollapsed ? expandSidebar() : null"
-          >
-            <!-- Logo Icon: Fixed 40px container, icon centered at exactly 28px -->
-            <div class="w-10 h-10 flex items-center justify-center flex-shrink-0">
-              <div
-                class="w-8 h-8 rounded-lg border flex items-center justify-center shadow-xs flex-shrink-0 transition-colors"
-                :class="[
-                  themeStore.isDark ? 'bg-[#18181b] border-[#3f3f46] text-white' : 'bg-white border-zinc-300 text-zinc-950',
-                  isCollapsed ? 'hover:border-zinc-400' : ''
-                ]"
-              >
-                <IconCodeHelmLogo :size="18" stroke-width="1.9" />
-              </div>
-            </div>
-
-            <!-- Brand Text: Smooth fade & slide without affecting logo -->
-            <div
-              class="min-w-0 overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out"
-              :class="isCollapsed ? 'max-w-0 opacity-0 pointer-events-none p-0 m-0' : 'max-w-[115px] opacity-100 pl-1.5 translate-x-0'"
+          <!-- Left: Collapse / Expand Toggle Button -->
+          <div class="w-10 h-10 flex items-center justify-center flex-shrink-0">
+            <button
+              type="button"
+              class="w-8 h-8 rounded-lg border flex items-center justify-center shadow-xs flex-shrink-0 transition-all duration-200 cursor-pointer"
+              :class="[
+                themeStore.isDark
+                  ? 'bg-[#18181b] border-[#3f3f46] text-zinc-400 hover:text-white hover:border-zinc-400 hover:bg-[#27272a]'
+                  : 'bg-white border-zinc-300 text-zinc-600 hover:text-zinc-950 hover:border-zinc-400 hover:bg-zinc-100'
+              ]"
+              :title="isCollapsed ? '展开侧边栏' : '折叠侧边栏'"
+              @click.stop="toggleCollapse"
             >
-              <h1 class="font-bold text-xs tracking-tight truncate" :class="themeStore.isDark ? 'text-white' : 'text-zinc-950'">
-                CodeHelm
-              </h1>
-              <p class="text-[9px] font-medium truncate" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
-                本地多项目控制台
-              </p>
-            </div>
+              <IconPanelLeftOpen v-if="isCollapsed" :size="16" />
+              <IconPanelLeftClose v-else :size="16" />
+            </button>
           </div>
 
-          <!-- Right: Collapse Toggle Button -->
+          <!-- Brand Text: Smooth fade & slide without affecting toggle -->
+          <div
+            class="min-w-0 overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out flex-1 pl-1 cursor-pointer"
+            :class="isCollapsed ? 'max-w-0 opacity-0 pointer-events-none p-0 m-0' : 'max-w-[110px] opacity-100 translate-x-0'"
+            @click.stop="toggleCollapse"
+          >
+            <h1 class="font-bold text-xs tracking-tight truncate" :class="themeStore.isDark ? 'text-white' : 'text-zinc-950'">
+              CodeHelm
+            </h1>
+            <p class="text-[9px] font-medium truncate" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
+              本地多项目控制台
+            </p>
+          </div>
+
+          <!-- Right: Quick Search Button -->
           <button
             type="button"
             class="h-6.5 rounded-md flex items-center justify-center transition-all duration-300 ease-in-out cursor-pointer flex-shrink-0"
@@ -64,10 +62,10 @@
                 ? 'hover:bg-[#18181b] text-zinc-400 hover:text-white border border-transparent hover:border-[#27272a] hover:scale-105 active:scale-95'
                 : 'hover:bg-zinc-200/70 text-zinc-500 hover:text-zinc-900 border border-transparent hover:border-zinc-300 hover:scale-105 active:scale-95'
             ]"
-            title="折叠侧边栏"
-            @click.stop="toggleCollapse"
+            title="搜索项目 (Ctrl+K)"
+            @click.stop="handleQuickSearch"
           >
-            <IconPanelLeftClose :size="15" />
+            <IconSearch :size="15" />
           </button>
         </div>
 
@@ -234,7 +232,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
+import { useRouter, useRoute } from 'vue-router';
 import { useProjectStore } from '../stores/projectStore.js';
 import { useRunnerStore } from '../stores/runnerStore.js';
 import { useThemeStore } from '../stores/themeStore.js';
@@ -243,10 +242,13 @@ import {
   IconProjectGrid,
   IconRunnerZap,
   IconSettings,
-  IconCodeHelmLogo,
   IconPanelLeftClose,
+  IconPanelLeftOpen,
+  IconSearch,
 } from '../components/icons/index.js';
 
+const router = useRouter();
+const route = useRoute();
 const projectStore = useProjectStore();
 const runnerStore = useRunnerStore();
 const themeStore = useThemeStore();
@@ -277,9 +279,36 @@ function handleSidebarBlankClick() {
   }
 }
 
+function handleQuickSearch() {
+  if (route.name !== 'overview') {
+    router.push('/');
+  }
+  setTimeout(() => {
+    const searchInput =
+      document.querySelector<HTMLInputElement>('input[placeholder*="搜索项目"]') ||
+      document.querySelector<HTMLInputElement>('input[placeholder*="搜索"]');
+    if (searchInput) {
+      searchInput.focus();
+      searchInput.select();
+    }
+  }, 80);
+}
+
+function handleGlobalKeydown(e: KeyboardEvent) {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+    e.preventDefault();
+    handleQuickSearch();
+  }
+}
+
 onMounted(() => {
   projectStore.fetchProjects();
   runnerStore.setupListeners();
+  window.addEventListener('keydown', handleGlobalKeydown);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleGlobalKeydown);
 });
 </script>
 
