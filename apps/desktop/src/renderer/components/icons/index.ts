@@ -112,10 +112,10 @@ export const IconFolder = createIcon('IconFolder', () => [
 
 export const IconFolderOpen = createIcon('IconFolderOpen', () => [
   h('path', {
-    d: 'M2 11V6a2 2 0 0 1 2-2h4.5a2 2 0 0 1 1.4.6L11.5 6H20a2 2 0 0 1 2 2v3',
+    d: 'M3 11V6a2 2 0 0 1 2-2h4.5a2 2 0 0 1 1.4.6L12 6H19a2 2 0 0 1 2 2v3',
   }),
   h('path', {
-    d: 'M2 11l2.2 9.2A2 2 0 0 0 6.1 22h11.8a2 2 0 0 0 1.9-1.4L22 11H2z',
+    d: 'M3 11.5a1.2 1.2 0 0 1 1-.5h16.8a1.2 1.2 0 0 1 1.1 1.6l-2.6 7.2A2 2 0 0 1 17.4 21H5.8a2 2 0 0 1-1.9-1.4L2.3 12.6a1.2 1.2 0 0 1 .7-1.1z',
   }),
 ]);
 
