@@ -42,8 +42,8 @@
 
             <!-- Brand Text: Smooth fade & slide without affecting logo -->
             <div
-              class="min-w-0 overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out pl-1.5"
-              :class="isCollapsed ? 'max-w-0 opacity-0 -translate-x-2 pointer-events-none' : 'max-w-[115px] opacity-100 translate-x-0'"
+              class="min-w-0 overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out"
+              :class="isCollapsed ? 'max-w-0 opacity-0 pointer-events-none p-0 m-0' : 'max-w-[115px] opacity-100 pl-1.5 translate-x-0'"
             >
               <h1 class="font-bold text-xs tracking-tight truncate" :class="themeStore.isDark ? 'text-white' : 'text-zinc-950'">
                 CodeHelm
@@ -57,9 +57,9 @@
           <!-- Right: Collapse Toggle Button -->
           <button
             type="button"
-            class="w-6.5 h-6.5 rounded-md flex items-center justify-center transition-all duration-300 ease-in-out cursor-pointer flex-shrink-0"
+            class="h-6.5 rounded-md flex items-center justify-center transition-all duration-300 ease-in-out cursor-pointer flex-shrink-0"
             :class="[
-              isCollapsed ? 'w-0 opacity-0 pointer-events-none p-0 overflow-hidden ml-0' : 'w-6.5 opacity-100 ml-1',
+              isCollapsed ? 'w-0 max-w-0 opacity-0 pointer-events-none p-0 m-0 border-0 overflow-hidden' : 'w-6.5 opacity-100 ml-1',
               themeStore.isDark
                 ? 'hover:bg-[#18181b] text-zinc-400 hover:text-white border border-transparent hover:border-[#27272a] hover:scale-105 active:scale-95'
                 : 'hover:bg-zinc-200/70 text-zinc-500 hover:text-zinc-900 border border-transparent hover:border-zinc-300 hover:scale-105 active:scale-95'
