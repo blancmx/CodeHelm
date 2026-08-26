@@ -228,18 +228,19 @@
     <!-- Global Modals -->
     <teleport to="body">
       <ImportProjectModal />
+      <QuickSearchModal />
     </teleport>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue';
-import { useRouter, useRoute } from 'vue-router';
 import { useProjectStore } from '../stores/projectStore.js';
 import { useRunnerStore } from '../stores/runnerStore.js';
 import { useThemeStore } from '../stores/themeStore.js';
 import { useSidebarStore } from '../stores/sidebarStore.js';
 import ImportProjectModal from '../components/ImportProjectModal.vue';
+import QuickSearchModal from '../components/QuickSearchModal.vue';
 import {
   IconProjectGrid,
   IconRunnerZap,
@@ -248,8 +249,6 @@ import {
   IconSearch,
 } from '../components/icons/index.js';
 
-const router = useRouter();
-const route = useRoute();
 const projectStore = useProjectStore();
 const runnerStore = useRunnerStore();
 const themeStore = useThemeStore();
@@ -266,24 +265,13 @@ function handleSidebarBlankClick() {
 }
 
 function handleQuickSearch() {
-  if (route.name !== 'overview') {
-    router.push('/');
-  }
-  setTimeout(() => {
-    const searchInput =
-      document.querySelector<HTMLInputElement>('input[placeholder*="搜索项目"]') ||
-      document.querySelector<HTMLInputElement>('input[placeholder*="搜索"]');
-    if (searchInput) {
-      searchInput.focus();
-      searchInput.select();
-    }
-  }, 80);
+  projectStore.openSearchModal();
 }
 
 function handleGlobalKeydown(e: KeyboardEvent) {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
     e.preventDefault();
-    handleQuickSearch();
+    projectStore.searchModalVisible = !projectStore.searchModalVisible;
   }
 }
 

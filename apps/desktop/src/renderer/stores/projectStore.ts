@@ -12,6 +12,15 @@ export const useProjectStore = defineStore('project', () => {
   const currentProject = ref<ProjectDto | null>(null);
   const loading = ref(false);
   const importModalVisible = ref(false);
+  const searchModalVisible = ref(false);
+
+  function openSearchModal() {
+    searchModalVisible.value = true;
+  }
+
+  function closeSearchModal() {
+    searchModalVisible.value = false;
+  }
 
   async function fetchProjects() {
     loading.value = true;
@@ -106,6 +115,9 @@ export const useProjectStore = defineStore('project', () => {
     currentProject,
     loading,
     importModalVisible,
+    searchModalVisible,
+    openSearchModal,
+    closeSearchModal,
     fetchProjects,
     selectDirectory,
     scanWorkspace,

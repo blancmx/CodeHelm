@@ -22,25 +22,8 @@
         </p>
       </div>
 
-      <!-- Header Actions: Search & Import & View Toggle -->
+      <!-- Header Actions: Refresh & Import -->
       <div class="flex items-center gap-2.5 flex-shrink-0">
-        <!-- Global Search Input -->
-        <div class="relative flex items-center">
-          <n-input
-            v-model:value="searchQuery"
-            placeholder="搜索项目..."
-            clearable
-            size="small"
-            class="text-xs font-sans"
-            style="width: 280px;"
-            :input-props="{ style: { fontSize: '12px', lineHeight: '20px' } }"
-          >
-            <template #prefix>
-              <IconSearch :size="14" class="text-zinc-400 mr-1.5 flex-shrink-0" />
-            </template>
-          </n-input>
-        </div>
-
         <!-- Refresh Button (Only Spins on Click) -->
         <button
           type="button"
