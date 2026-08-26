@@ -28,6 +28,25 @@ app.setPath('sessionData', stableSessionDataPath);
 let mainWindow: BrowserWindow | null = null;
 let db: any = null;
 
+// Set Windows taskbar AppUserModelId for stable icon grouping
+if (process.platform === 'win32') {
+  app.setAppUserModelId('com.codehelm.desktop');
+}
+
+function getAppIconPath(): string {
+  const candidates = [
+    path.join(__dirname, '../../resources/icon.ico'),
+    path.join(__dirname, '../../resources/icon.png'),
+    path.join(process.resourcesPath, 'icon.ico'),
+    path.join(process.resourcesPath, 'icon.png'),
+    path.join(__dirname, '../../public/icon.png'),
+  ];
+  for (const p of candidates) {
+    if (fs.existsSync(p)) return p;
+  }
+  return '';
+}
+
 // Handle single instance lock
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
@@ -84,6 +103,11 @@ async function createWindow() {
   const preloadPath = path.join(__dirname, '../preload/index.js');
   console.log('[Main] Preload path:', preloadPath);
 
+  const iconPath = getAppIconPath();
+  if (iconPath) {
+    console.log('[Main] Using app icon:', iconPath);
+  }
+
   mainWindow = new BrowserWindow({
     title: 'CodeHelm',
     width: 1280,
@@ -94,6 +118,7 @@ async function createWindow() {
     titleBarStyle: 'hidden',
     show: true,
     backgroundColor: '#09090b',
+    ...(iconPath ? { icon: iconPath } : {}),
     webPreferences: {
       preload: preloadPath,
       nodeIntegration: false,
@@ -101,6 +126,10 @@ async function createWindow() {
       sandbox: false,
     },
   });
+
+  if (iconPath) {
+    mainWindow.setIcon(iconPath);
+  }
 
   mainWindow.removeMenu();
 

@@ -17,6 +17,7 @@ asarUnpack:
   - "**/*.node"
 
 win:
+  icon: resources/icon.ico
   target:
     - target: dir
       arch:
