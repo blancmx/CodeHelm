@@ -34,7 +34,7 @@ describe('persistent project port assignment', () => {
 
     expect(result.services[0].port).toBe(5176);
     expect(result.services[0].healthCheck?.port).toBe(5176);
-    expect(result.state.cursors['frontend:5173']).toBe(5177);
+    expect(result.state.cursors['frontend:5000']).toBe(5177);
   });
 
   it('keeps the previous assignment when the same project is analyzed again', async () => {
@@ -44,7 +44,7 @@ describe('persistent project port assignment', () => {
       services: [detected],
       existingServices: [existing],
       assignedPorts: [{ projectId: 'same', type: 'frontend', port: 5182 }],
-      state: { cursors: { 'frontend:5173': 5190 } },
+      state: { cursors: { 'frontend:5000': 5190 } },
       isAvailable: async () => true,
     });
 
@@ -66,10 +66,22 @@ describe('persistent project port assignment', () => {
     const result = await assignPersistentPorts({
       services: [service('web', 'frontend', 5173)],
       assignedPorts: [],
-      state: { cursors: { 'frontend:5173': 5200 } },
+      state: { cursors: { 'frontend:5000': 5200 } },
       isAvailable: async () => true,
     });
 
     expect(result.services[0].port).toBe(5200);
+  });
+
+  it('preserves a project-constrained fixed port instead of applying the high watermark', async () => {
+    const fixed = { ...service('web', 'frontend', 5173), portMode: 'fixed' as const };
+    const result = await assignPersistentPorts({
+      services: [fixed],
+      assignedPorts: [{ projectId: 'other', type: 'frontend', port: 5178 }],
+      isAvailable: async () => true,
+    });
+
+    expect(result.services[0].port).toBe(5173);
+    expect(result.services[0].portMode).toBe('fixed');
   });
 });

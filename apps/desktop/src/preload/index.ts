@@ -59,6 +59,19 @@ const api: CodeHelmApi = {
     get: () => ipcRenderer.invoke(IpcChannels.SETTINGS_GET),
     update: (patch) => ipcRenderer.invoke(IpcChannels.SETTINGS_UPDATE, toIpcPayload(patch)),
   },
+  window: {
+    minimize: () => ipcRenderer.invoke(IpcChannels.WINDOW_MINIMIZE),
+    toggleMaximize: () => ipcRenderer.invoke(IpcChannels.WINDOW_TOGGLE_MAXIMIZE),
+    close: () => ipcRenderer.invoke(IpcChannels.WINDOW_CLOSE),
+    isMaximized: () => ipcRenderer.invoke(IpcChannels.WINDOW_IS_MAXIMIZED),
+    onMaximizeChange: (listener) => {
+      const channel = IpcChannels.WINDOW_ON_MAXIMIZE_CHANGE;
+      const subscription = (_event: any, isMax: boolean) => listener(isMax);
+      ipcRenderer.on(channel, subscription);
+      return () => ipcRenderer.removeListener(channel, subscription);
+    },
+  },
 };
 
 contextBridge.exposeInMainWorld('codehelm', api);
+

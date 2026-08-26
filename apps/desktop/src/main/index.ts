@@ -1,12 +1,16 @@
-import { app, BrowserWindow, shell } from 'electron';
+import { app, BrowserWindow, shell, Menu, ipcMain } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
 import { createDatabase } from '@codehelm/database';
+import { IpcChannels } from '@codehelm/contracts';
 import { registerAllIpcHandlers } from './ipc/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Remove default application menu globally
+Menu.setApplicationMenu(null);
 
 // In development Electron derives userData from the scoped package name
 // "@codehelm/desktop". On Windows that becomes a nested path and Chromium can
@@ -46,6 +50,28 @@ process.on('unhandledRejection', (reason) => {
   console.error('[Main] Unhandled Rejection:', reason);
 });
 
+function registerWindowIpcHandlers() {
+  ipcMain.handle(IpcChannels.WINDOW_MINIMIZE, () => {
+    mainWindow?.minimize();
+  });
+  ipcMain.handle(IpcChannels.WINDOW_TOGGLE_MAXIMIZE, () => {
+    if (!mainWindow) return false;
+    if (mainWindow.isMaximized()) {
+      mainWindow.unmaximize();
+      return false;
+    } else {
+      mainWindow.maximize();
+      return true;
+    }
+  });
+  ipcMain.handle(IpcChannels.WINDOW_CLOSE, () => {
+    mainWindow?.close();
+  });
+  ipcMain.handle(IpcChannels.WINDOW_IS_MAXIMIZED, () => {
+    return mainWindow?.isMaximized() ?? false;
+  });
+}
+
 async function createWindow() {
   if (mainWindow && !mainWindow.isDestroyed()) {
     if (mainWindow.isMinimized()) mainWindow.restore();
@@ -59,20 +85,30 @@ async function createWindow() {
   console.log('[Main] Preload path:', preloadPath);
 
   mainWindow = new BrowserWindow({
-    title: 'CodeHelm - 本地项目控制台',
+    title: 'CodeHelm',
     width: 1280,
     height: 850,
     minWidth: 960,
     minHeight: 600,
-    frame: true,
+    frame: false,
+    titleBarStyle: 'hidden',
     show: true,
-    backgroundColor: '#0d0d11',
+    backgroundColor: '#09090b',
     webPreferences: {
       preload: preloadPath,
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: false,
     },
+  });
+
+  mainWindow.removeMenu();
+
+  mainWindow.on('maximize', () => {
+    mainWindow?.webContents.send(IpcChannels.WINDOW_ON_MAXIMIZE_CHANGE, true);
+  });
+  mainWindow.on('unmaximize', () => {
+    mainWindow?.webContents.send(IpcChannels.WINDOW_ON_MAXIMIZE_CHANGE, false);
   });
 
   mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
@@ -170,6 +206,7 @@ app.whenReady().then(() => {
     console.log('[Main] Initializing database at:', dbPath);
     db = createDatabase(dbPath);
     registerAllIpcHandlers(db);
+    registerWindowIpcHandlers();
     console.log('[Main] IPC handlers registered successfully.');
   } catch (dbErr) {
     console.error('[Main] Failed to initialize database or IPC handlers:', dbErr);

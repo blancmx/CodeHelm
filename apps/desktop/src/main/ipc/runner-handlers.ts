@@ -8,10 +8,23 @@ import {
 import { ProfileRepository, ProjectRepository } from '@codehelm/database';
 import { Orchestrator } from '@codehelm/runner';
 import { spawn } from 'node:child_process';
-import fs from 'node:fs';
-import path from 'node:path';
+import { createDependencyInstallPlans, type DependencyInstallPlan } from './dependency-installer.js';
+import { applyRuntimeProfileConstraints } from './runtime-profile-constraints.js';
 
 const orchestrator = new Orchestrator();
+
+function requireStartedSession(session: Awaited<ReturnType<Orchestrator['startSession']>>) {
+  if (session.status !== 'FAILED') return session;
+
+  const details = session.services
+    .filter((service) => service.status === 'FAILED')
+    .map((service) => `${service.serviceName}: ${service.errorMessage || '进程已退出'}`);
+  throw new Error(
+    details.length > 0
+      ? `服务方案启动失败：${details.join('；')}`
+      : '服务方案启动失败：没有服务成功运行，请检查端口占用与项目启动配置。'
+  );
+}
 
 export function registerRunnerHandlers(db: DatabaseInstance) {
   const profileRepo = new ProfileRepository(db);
@@ -69,18 +82,63 @@ export function registerRunnerHandlers(db: DatabaseInstance) {
     }
   }
 
+  async function runDependencyPlan(plan: DependencyInstallPlan): Promise<void> {
+    broadcastLog(
+      'CodeHelm Installer',
+      `[Dependency] 正在准备子模块 ${plan.label}: ${plan.executable} ${plan.args.join(' ')}\n`
+    );
+    await new Promise<void>((resolve, reject) => {
+      const child = spawn(plan.executable, plan.args, {
+        cwd: plan.cwd,
+        shell: true,
+        env: { ...process.env },
+      });
+      child.stdout?.on('data', (data: Buffer | string) => {
+        broadcastLog('CodeHelm Installer', data.toString().trimEnd());
+      });
+      child.stderr?.on('data', (data: Buffer | string) => {
+        broadcastLog('CodeHelm Installer', data.toString().trimEnd(), 'stderr');
+      });
+      child.once('error', reject);
+      child.once('close', (code: number | null) => {
+        if (code === 0) resolve();
+        else reject(new Error(`子模块 ${plan.label} 依赖安装失败（退出码 ${code ?? '未知'}）`));
+      });
+    });
+  }
+
+  function reconcileProfile(profileId: string) {
+    const storedProfile = profileRepo.findById(profileId);
+    if (!storedProfile) throw new Error(`Profile not found: ${profileId}`);
+    const project = projectRepo.findById(storedProfile.projectId);
+    if (!project) throw new Error(`Project not found: ${storedProfile.projectId}`);
+
+    const constrained = applyRuntimeProfileConstraints(project.rootPath, storedProfile);
+    let profile = constrained.profile;
+    if (constrained.messages.length > 0) {
+      profile = profileRepo.save({
+        id: profile.id,
+        projectId: profile.projectId,
+        name: profile.name,
+        description: profile.description,
+        isDefault: profile.isDefault,
+        failurePolicy: profile.failurePolicy,
+        services: profile.services,
+        userConfirmedAt: profile.userConfirmedAt,
+      });
+      for (const message of constrained.messages) {
+        broadcastLog('CodeHelm Runtime', `${message}\n`);
+      }
+    }
+    return { profile, project };
+  }
+
   ipcMain.handle(IpcChannels.RUNNER_START_SESSION, async (_event, profileId: string) => {
-    const profile = profileRepo.findById(profileId);
-    if (!profile) {
-      throw new Error(`Profile not found: ${profileId}`);
-    }
+    const { profile, project } = reconcileProfile(profileId);
 
-    const project = projectRepo.findById(profile.projectId);
-    if (!project) {
-      throw new Error(`Project not found: ${profile.projectId}`);
-    }
-
-    const session = await orchestrator.startSession(project.rootPath, profile);
+    const session = requireStartedSession(
+      await orchestrator.startSession(project.rootPath, profile)
+    );
 
     // Update project lastRunAt
     db.prepare('UPDATE projects SET last_run_at = ? WHERE id = ?').run(
@@ -96,82 +154,20 @@ export function registerRunnerHandlers(db: DatabaseInstance) {
 
   // Install dependencies and then start session
   ipcMain.handle(IpcChannels.RUNNER_INSTALL_AND_START, async (_event, profileId: string) => {
-    const profile = profileRepo.findById(profileId);
-    if (!profile) {
-      throw new Error(`Profile not found: ${profileId}`);
+    const { profile, project } = reconcileProfile(profileId);
+
+    const plans = createDependencyInstallPlans(project.rootPath, profile.services);
+    for (const plan of plans) {
+      await runDependencyPlan(plan);
     }
-
-    const project = projectRepo.findById(profile.projectId);
-    if (!project) {
-      throw new Error(`Project not found: ${profile.projectId}`);
-    }
-
-    const projectRoot = project.rootPath;
-
-    // Detect if Node.js project needs install
-    const hasPackageJson = fs.existsSync(path.join(projectRoot, 'package.json'));
-    const hasNodeModules = fs.existsSync(path.join(projectRoot, 'node_modules'));
-    const hasRequirementsTxt = fs.existsSync(path.join(projectRoot, 'requirements.txt'));
-
-    if (hasPackageJson && !hasNodeModules) {
-      let pm = 'npm';
-      if (fs.existsSync(path.join(projectRoot, 'pnpm-lock.yaml'))) pm = 'pnpm';
-      else if (fs.existsSync(path.join(projectRoot, 'yarn.lock'))) pm = 'yarn';
-      else if (fs.existsSync(path.join(projectRoot, 'bun.lockb')) || fs.existsSync(path.join(projectRoot, 'bun.lock'))) pm = 'bun';
-
-      broadcastLog('CodeHelm Installer', `[Vibe Auto-Fix] 正在为项目安装 Node.js 依赖: ${pm} install...`);
-
-      await new Promise<void>((resolve, reject) => {
-        const child = spawn(pm, ['install'], {
-          cwd: projectRoot,
-          shell: true,
-          env: { ...process.env },
-        });
-
-        child.stdout?.on('data', (data: Buffer | string) => {
-          broadcastLog('CodeHelm Installer', data.toString().trimEnd());
-        });
-
-        child.stderr?.on('data', (data: Buffer | string) => {
-          broadcastLog('CodeHelm Installer', data.toString().trimEnd(), 'stderr');
-        });
-
-        child.on('close', (code: number | null) => {
-          if (code === 0) {
-            broadcastLog('CodeHelm Installer', `[Vibe Auto-Fix] 依赖安装完成！准备拉起服务...`);
-            resolve();
-          } else {
-            reject(new Error(`依赖安装失败 (退出码: ${code})，请检查网络或配置`));
-          }
-        });
-
-        child.on('error', (err: Error) => reject(err));
-      });
-    } else if (hasRequirementsTxt) {
-      broadcastLog('CodeHelm Installer', `[Vibe Auto-Fix] 正在检查/安装 Python 依赖: pip install -r requirements.txt...`);
-      await new Promise<void>((resolve) => {
-        const child = spawn('pip', ['install', '-r', 'requirements.txt'], {
-          cwd: projectRoot,
-          shell: true,
-          env: { ...process.env },
-        });
-
-        child.stdout?.on('data', (data: Buffer | string) => {
-          broadcastLog('CodeHelm Installer', data.toString().trimEnd());
-        });
-
-        child.stderr?.on('data', (data: Buffer | string) => {
-          broadcastLog('CodeHelm Installer', data.toString().trimEnd(), 'stderr');
-        });
-
-        child.on('close', () => {
-          resolve();
-        });
-      });
+    if (plans.length > 0) {
+      broadcastLog('CodeHelm Installer', '[Dependency] 所有缺失依赖已安装，准备拉起服务。\n');
     }
 
     // Now start the session
-    const session = await orchestrator.startSession(project.rootPath, profile);
+    const session = requireStartedSession(
+      await orchestrator.startSession(project.rootPath, profile)
+    );
 
     db.prepare('UPDATE projects SET last_run_at = ? WHERE id = ?').run(
       new Date().toISOString(),

@@ -62,6 +62,13 @@ export interface CodeHelmApi {
     get(): Promise<AppSettingsDto>;
     update(patch: Partial<AppSettingsDto>): Promise<AppSettingsDto>;
   };
+  window: {
+    minimize(): Promise<void>;
+    toggleMaximize(): Promise<boolean>;
+    close(): Promise<void>;
+    isMaximized(): Promise<boolean>;
+    onMaximizeChange(listener: (isMaximized: boolean) => void): Unsubscribe;
+  };
 }
 
 declare global {

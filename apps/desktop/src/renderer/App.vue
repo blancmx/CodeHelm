@@ -5,10 +5,16 @@
     class="h-full w-full"
   >
     <div
-      class="h-full w-full font-sans antialiased overflow-hidden select-none transition-colors duration-200"
+      class="h-full w-full font-sans flex flex-col antialiased overflow-hidden select-none transition-colors duration-200"
       :class="themeStore.isDark ? 'bg-[#09090b] text-[#ffffff]' : 'bg-[#fafafa] text-[#09090b]'"
     >
-      <router-view />
+      <!-- Modern Frameless Window Header Bar with Drag Region & Windows 11 Controls -->
+      <WindowHeaderBar />
+
+      <!-- Main Application Router View -->
+      <div class="flex-1 min-h-0 w-full overflow-hidden">
+        <router-view />
+      </div>
     </div>
   </n-config-provider>
 </template>
@@ -18,6 +24,7 @@ import { computed } from 'vue';
 import { darkTheme } from 'naive-ui';
 import type { GlobalThemeOverrides } from 'naive-ui';
 import { useThemeStore } from './stores/themeStore.js';
+import WindowHeaderBar from './components/WindowHeaderBar.vue';
 
 const themeStore = useThemeStore();
 

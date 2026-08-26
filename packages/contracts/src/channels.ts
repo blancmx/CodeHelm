@@ -34,4 +34,11 @@ export const IpcChannels = {
   // Settings
   SETTINGS_GET: 'codehelm:settings:get',
   SETTINGS_UPDATE: 'codehelm:settings:update',
+
+  // Window Controls
+  WINDOW_MINIMIZE: 'codehelm:window:minimize',
+  WINDOW_TOGGLE_MAXIMIZE: 'codehelm:window:toggle-maximize',
+  WINDOW_CLOSE: 'codehelm:window:close',
+  WINDOW_IS_MAXIMIZED: 'codehelm:window:is-maximized',
+  WINDOW_ON_MAXIMIZE_CHANGE: 'codehelm:window:on-maximize-change',
 } as const;

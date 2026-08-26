@@ -1422,6 +1422,20 @@ export function setupBrowserMock() {
         return updated;
       },
     },
+
+    window: {
+      async minimize() {},
+      async toggleMaximize() {
+        return false;
+      },
+      async close() {},
+      async isMaximized() {
+        return false;
+      },
+      onMaximizeChange(_listener) {
+        return () => {};
+      },
+    },
   };
 
   (window as any).codehelm = mockApi;

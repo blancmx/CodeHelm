@@ -34,7 +34,8 @@ function serviceIdentity(service: ServiceConfig): string {
 }
 
 function familyKey(service: ServiceConfig, preferredPort: number): string {
-  return `${service.type}:${preferredPort}`;
+  const familyBase = Math.floor(preferredPort / 1000) * 1000;
+  return `${service.type}:${familyBase}`;
 }
 
 function cloneWithPort(service: ServiceConfig, port: number): ServiceConfig {
@@ -72,8 +73,16 @@ export async function assignPersistentPorts(
     }
 
     const existing = existingByIdentity.get(serviceIdentity(service));
+    if (service.portMode === 'fixed') {
+      services.push(cloneWithPort(service, service.port));
+      used.add(service.port);
+      continue;
+    }
     if (existing?.port) {
-      const preserved = cloneWithPort(service, existing.port);
+      const preserved = cloneWithPort(
+        { ...service, portMode: existing.portMode ?? service.portMode },
+        existing.port
+      );
       services.push(preserved);
       used.add(existing.port);
       const key = familyKey(service, service.port);
@@ -112,7 +121,39 @@ export async function assignPersistentPorts(
 export class PersistentPortAllocator {
   private queue: Promise<void> = Promise.resolve();
 
-  constructor(private readonly db: DatabaseInstance) {}
+  constructor(private readonly db: DatabaseInstance) {
+    this.bootstrapStateFromDatabase();
+  }
+
+  private bootstrapStateFromDatabase(): void {
+    const rows = this.db.prepare(`
+      SELECT rp.project_id AS projectId, sc.type, sc.port
+      FROM service_configs sc
+      JOIN run_profiles rp ON rp.id = sc.run_profile_id
+      WHERE sc.port IS NOT NULL
+    `).all() as AssignedPortRow[];
+    const settingRow = this.db.prepare(
+      'SELECT value FROM app_settings WHERE key = ?'
+    ).get(PORT_ALLOCATOR_SETTINGS_KEY) as { value: string } | undefined;
+    let state: PortAllocatorState = { cursors: {} };
+    if (settingRow) {
+      try {
+        const parsed = JSON.parse(settingRow.value) as PortAllocatorState;
+        if (parsed && typeof parsed.cursors === 'object') state = parsed;
+      } catch {
+        // Rebuild invalid state from persisted profiles.
+      }
+    }
+    for (const row of rows) {
+      const familyBase = Math.floor(row.port / 1000) * 1000;
+      const key = `${row.type}:${familyBase}`;
+      state.cursors[key] = Math.max(state.cursors[key] ?? row.port, row.port + 1);
+    }
+    this.db.prepare(`
+      INSERT INTO app_settings (key, value) VALUES (?, ?)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value
+    `).run(PORT_ALLOCATOR_SETTINGS_KEY, JSON.stringify(state));
+  }
 
   allocate(
     _projectId: string,
