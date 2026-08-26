@@ -38,12 +38,12 @@
           </h3>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-3.5 pt-1">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3.5 pt-1 relative z-20">
           <!-- Dark Option -->
           <div
-            class="border rounded-xl p-4 cursor-pointer flex items-center justify-between transition-all select-none group"
+            class="border rounded-xl p-4 cursor-pointer flex items-center justify-between transition-all duration-200 select-none group relative z-20 active:scale-[0.98]"
             :class="themeStore.mode === 'dark'
-              ? (themeStore.isDark ? 'bg-[#18181b] border-white shadow-sm' : 'bg-black border-black text-white')
+              ? (themeStore.isDark ? 'bg-[#18181b] border-white shadow-sm ring-1 ring-white/20' : 'bg-black border-black text-white shadow-sm')
               : (themeStore.isDark ? 'bg-[#18181b] border-[#27272a] hover:border-zinc-500' : 'bg-zinc-50 border-zinc-200 hover:border-zinc-300')"
             @click="(e) => themeStore.setMode('dark', e)"
           >
@@ -60,9 +60,9 @@
 
           <!-- Light Option -->
           <div
-            class="border rounded-xl p-4 cursor-pointer flex items-center justify-between transition-all select-none group"
+            class="border rounded-xl p-4 cursor-pointer flex items-center justify-between transition-all duration-200 select-none group relative z-20 active:scale-[0.98]"
             :class="themeStore.mode === 'light'
-              ? (themeStore.isDark ? 'bg-[#18181b] border-white shadow-sm' : 'bg-white border-black shadow-sm')
+              ? (themeStore.isDark ? 'bg-[#18181b] border-white shadow-sm ring-1 ring-white/20' : 'bg-white border-black shadow-sm ring-1 ring-black/10')
               : (themeStore.isDark ? 'bg-[#18181b] border-[#27272a] hover:border-zinc-500' : 'bg-zinc-50 border-zinc-200 hover:border-zinc-300')"
             @click="(e) => themeStore.setMode('light', e)"
           >
@@ -79,9 +79,9 @@
 
           <!-- Auto Option -->
           <div
-            class="border rounded-xl p-4 cursor-pointer flex items-center justify-between transition-all select-none group"
+            class="border rounded-xl p-4 cursor-pointer flex items-center justify-between transition-all duration-200 select-none group relative z-20 active:scale-[0.98]"
             :class="themeStore.mode === 'auto'
-              ? (themeStore.isDark ? 'bg-[#18181b] border-white shadow-sm' : 'bg-white border-black shadow-sm')
+              ? (themeStore.isDark ? 'bg-[#18181b] border-white shadow-sm ring-1 ring-white/20' : 'bg-white border-black shadow-sm ring-1 ring-black/10')
               : (themeStore.isDark ? 'bg-[#18181b] border-[#27272a] hover:border-zinc-500' : 'bg-zinc-50 border-zinc-200 hover:border-zinc-300')"
             @click="(e) => themeStore.setMode('auto', e)"
           >

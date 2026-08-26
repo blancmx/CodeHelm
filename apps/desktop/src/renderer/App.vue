@@ -5,14 +5,14 @@
     class="h-full w-full"
   >
     <div
-      class="h-full w-full font-sans flex flex-col antialiased overflow-hidden select-none transition-colors duration-200"
+      class="h-full w-full font-sans flex flex-col antialiased overflow-hidden select-none transition-colors duration-300 relative z-1"
       :class="themeStore.isDark ? 'bg-[#09090b] text-[#ffffff]' : 'bg-[#fafafa] text-[#09090b]'"
     >
       <!-- Modern Frameless Window Header Bar with Drag Region & Windows 11 Controls -->
-      <WindowHeaderBar />
+      <WindowHeaderBar class="relative z-30" />
 
       <!-- Main Application Router View -->
-      <div class="flex-1 min-h-0 w-full overflow-hidden">
+      <div class="flex-1 min-h-0 w-full overflow-hidden relative z-10">
         <router-view />
       </div>
     </div>
@@ -815,19 +815,5 @@ html.light .n-select-menu {
   color: inherit !important;
 }
 html.dark .n-button.n-button--error-type {
-  color: #fb7185 !important;
-}
-
-/* Circular radial theme radiation transition */
-::view-transition-old(root),
-::view-transition-new(root) {
-  animation: none;
-  mix-blend-mode: normal;
-}
-::view-transition-old(root) {
-  z-index: 1;
-}
-::view-transition-new(root) {
-  z-index: 9999;
 }
 </style>

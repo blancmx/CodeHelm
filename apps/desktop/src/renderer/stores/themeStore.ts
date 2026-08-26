@@ -22,52 +22,42 @@ export const useThemeStore = defineStore('theme', () => {
   });
 
   function triggerRadialWaveOverlay(x: number, y: number, radius: number, targetIsDark: boolean, callback: () => void) {
-    const overlay = document.createElement('div');
-    overlay.id = 'theme-radial-ripple-overlay';
-    overlay.style.position = 'fixed';
-    overlay.style.top = '0';
-    overlay.style.left = '0';
-    overlay.style.width = '100vw';
-    overlay.style.height = '100vh';
-    overlay.style.zIndex = '9999999';
-    overlay.style.pointerEvents = 'none';
-    overlay.style.backgroundColor = targetIsDark ? '#09090b' : '#fafafa';
-    overlay.style.willChange = 'clip-path, opacity';
-    document.documentElement.appendChild(overlay);
+    // 1. Immediately apply the theme changes so the clicked mode card and icons update without being blocked
+    callback();
 
-    const animation = overlay.animate(
+    // 2. Radiate the color wave purely in the background layer (z-index: 0, beneath content)
+    const existing = document.getElementById('theme-background-radial-ripple');
+    if (existing) existing.remove();
+
+    const ripple = document.createElement('div');
+    ripple.id = 'theme-background-radial-ripple';
+    ripple.style.position = 'fixed';
+    ripple.style.top = '0';
+    ripple.style.left = '0';
+    ripple.style.width = '100vw';
+    ripple.style.height = '100vh';
+    ripple.style.zIndex = '0'; // Behind cards and content
+    ripple.style.pointerEvents = 'none';
+    ripple.style.backgroundColor = targetIsDark ? '#09090b' : '#fafafa';
+    ripple.style.willChange = 'clip-path, opacity';
+
+    const appEl = document.getElementById('app') || document.body;
+    appEl.insertBefore(ripple, appEl.firstChild);
+
+    const animation = ripple.animate(
       [
         { clipPath: `circle(0px at ${x}px ${y}px)` },
         { clipPath: `circle(${radius}px at ${x}px ${y}px)` },
       ],
       {
-        duration: 460,
+        duration: 400,
         easing: 'cubic-bezier(0.16, 1, 0.3, 1)',
         fill: 'forwards',
       }
     );
 
-    // Midway through expansion or when finished, apply the theme underneath
-    let applied = false;
-    setTimeout(() => {
-      if (!applied) {
-        applied = true;
-        callback();
-      }
-    }, 280);
-
     animation.onfinish = () => {
-      if (!applied) {
-        applied = true;
-        callback();
-      }
-      const fadeAnim = overlay.animate(
-        [{ opacity: '1' }, { opacity: '0' }],
-        { duration: 160, easing: 'ease-out' }
-      );
-      fadeAnim.onfinish = () => {
-        overlay.remove();
-      };
+      ripple.remove();
     };
   }
 
