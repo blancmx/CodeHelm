@@ -9,43 +9,41 @@
     :stroke-width="strokeWidth"
     stroke-linecap="round"
     stroke-linejoin="round"
-    class="inline-block flex-shrink-0 align-middle pointer-events-none transition-transform duration-200"
+    class="inline-block flex-shrink-0 align-middle pointer-events-none"
     :class="$props.class"
   >
-    <!-- Outer Window Frame (Modern Rounded Rect with Corner Radius) -->
-    <rect x="3" y="3" width="18" height="18" rx="3.5" class="window-frame" />
-
-    <!-- Left Sidebar Area Subtle Fill (Lights up when expanded) -->
+    <!-- Outer Window Frame with Large Modern Rounded Corners -->
     <rect
-      x="3"
-      y="3"
-      width="6"
-      height="18"
-      rx="2"
-      class="sidebar-tint"
+      x="2.5"
+      y="2.5"
+      width="19"
+      height="19"
+      rx="5"
+      class="panel-outer-frame"
+    />
+
+    <!-- Left Sidebar Column: Solid Pill in Expanded, Slim Line in Collapsed -->
+    <rect
+      x="4.5"
+      y="4.5"
+      :width="collapsed ? 2 : 4.5"
+      height="15"
+      :rx="collapsed ? 1 : 2.2"
+      class="panel-sidebar-pill"
       :class="{ 'is-collapsed': collapsed }"
     />
 
-    <!-- Vertical Panel Divider Line -->
-    <line
-      x1="9"
-      y1="3"
-      x2="9"
-      y2="21"
-      class="sidebar-divider"
-      :class="{ 'is-collapsed': collapsed }"
-    />
-
-    <!-- Expanded State: Inner Panel Action Lines (Subtle Content Hint) -->
-    <g class="expanded-detail" :class="{ 'is-collapsed': collapsed }">
-      <line x1="12.5" y1="8" x2="17.5" y2="8" stroke-width="1.6" class="content-line" />
-      <line x1="12.5" y1="12" x2="16" y2="12" stroke-width="1.6" class="content-line" />
-    </g>
-
-    <!-- Collapsed State: Dynamic Expand Arrow (Smooth Slide-In) -->
+    <!-- Expanded State: Collapse-Left Arrow "<" -->
     <path
-      d="M13 9l3 3-3 3"
-      class="expand-arrow"
+      d="M15.5 9L12.5 12L15.5 15"
+      class="collapse-left-arrow"
+      :class="{ 'is-collapsed': collapsed }"
+    />
+
+    <!-- Collapsed State: Expand-Right Arrow ">" -->
+    <path
+      d="M11.5 9L14.5 12L11.5 15"
+      class="expand-right-arrow"
       :class="{ 'is-collapsed': collapsed }"
     />
   </svg>
@@ -57,76 +55,74 @@ withDefaults(
     size?: number | string;
     strokeWidth?: number | string;
     collapsed?: boolean;
-    hovered?: boolean;
     class?: string;
   }>(),
   {
-    size: 15,
+    size: 16,
     strokeWidth: 1.8,
     collapsed: false,
-    hovered: false,
     class: '',
   }
 );
 </script>
 
 <style scoped>
-.window-frame {
+.panel-outer-frame {
   transition: stroke 200ms ease;
 }
 
-/* Sidebar Tint: Filled in expanded mode, collapses to 0 in collapsed mode */
-.sidebar-tint {
+/* Sidebar Pill */
+.panel-sidebar-pill {
   fill: currentColor;
-  fill-opacity: 0.18;
   stroke: none;
-  transform-origin: 3px 12px;
-  transition: transform 260ms cubic-bezier(0.34, 1.56, 0.64, 1), fill-opacity 200ms ease;
+  transition:
+    all 280ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    fill-opacity 200ms ease;
 }
-.sidebar-tint.is-collapsed {
-  transform: scaleX(0);
-  fill-opacity: 0;
+.panel-sidebar-pill:not(.is-collapsed) {
+  fill-opacity: 0.95;
 }
-
-/* Sidebar Divider Line: Shifts left slightly when collapsed */
-.sidebar-divider {
-  transform-origin: 9px 12px;
-  transition: transform 260ms cubic-bezier(0.34, 1.56, 0.64, 1), opacity 200ms ease;
-}
-.sidebar-divider.is-collapsed {
-  transform: translateX(-3px);
-  opacity: 0.5;
+.panel-sidebar-pill.is-collapsed {
+  fill-opacity: 0.45;
 }
 
-/* Content Lines in Expanded Mode */
-.expanded-detail {
-  opacity: 0.85;
-  transition: opacity 200ms ease, transform 240ms ease;
+/* Collapse Left Arrow (Visible in Expanded Mode) */
+.collapse-left-arrow {
+  stroke-width: 2;
+  opacity: 1;
+  transform: translateX(0);
+  transition:
+    opacity 200ms ease,
+    transform 280ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
-.expanded-detail.is-collapsed {
+.collapse-left-arrow.is-collapsed {
   opacity: 0;
-  transform: translateX(2px);
+  transform: translateX(3px);
   pointer-events-none;
 }
 
-/* Expand Arrow in Collapsed Mode */
-.expand-arrow {
+/* Expand Right Arrow (Visible in Collapsed Mode) */
+.expand-right-arrow {
+  stroke-width: 2;
   opacity: 0;
-  transform-origin: 14.5px 12px;
   transform: translateX(-3px);
-  transition: opacity 220ms ease, transform 260ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition:
+    opacity 200ms ease,
+    transform 280ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  pointer-events-none;
 }
-.expand-arrow.is-collapsed {
+.expand-right-arrow.is-collapsed {
   opacity: 1;
   transform: translateX(0);
+  pointer-events-auto;
 }
 
-/* Hover micro-interaction on parent button hover */
-:global(.group\/toggle:hover) .expand-arrow.is-collapsed {
+/* Dynamic Directional Hover micro-animations */
+:global(.group\/toggle:hover) .collapse-left-arrow:not(.is-collapsed) {
+  transform: translateX(-1.5px);
+}
+
+:global(.group\/toggle:hover) .expand-right-arrow.is-collapsed {
   transform: translateX(1.5px);
-}
-
-:global(.group\/toggle:hover) .sidebar-divider:not(.is-collapsed) {
-  transform: translateX(-0.8px);
 }
 </style>

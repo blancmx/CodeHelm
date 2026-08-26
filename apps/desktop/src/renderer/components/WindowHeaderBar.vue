@@ -9,7 +9,7 @@
       <button
         type="button"
         :title="sidebarStore.isCollapsed ? '展开侧边栏' : '折叠侧边栏'"
-        class="h-6.5 w-6.5 rounded-lg border flex items-center justify-center transition-all duration-200 cursor-pointer select-none group/toggle active:scale-90"
+        class="w-7 h-7 rounded-lg border flex items-center justify-center transition-all duration-200 cursor-pointer select-none group/toggle active:scale-90"
         :class="[
           sidebarStore.isCollapsed
             ? (themeStore.isDark
@@ -21,7 +21,7 @@
         ]"
         @click.stop="sidebarStore.toggleCollapse"
       >
-        <IconSidebarAnimated :collapsed="sidebarStore.isCollapsed" :size="15" />
+        <IconSidebarAnimated :collapsed="sidebarStore.isCollapsed" :size="16" />
       </button>
     </div>
 
