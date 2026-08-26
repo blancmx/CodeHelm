@@ -84,34 +84,49 @@
         </n-button>
 
         <template v-if="isAnyServiceRunning">
-          <!-- Quick Web Browser Launch for Running Services (Frontend Web & Backend API Docs) -->
+          <!-- Compact Quick Access: Dropdown if multiple endpoints, single button if one -->
+          <n-dropdown
+            v-if="runningServicesWithPort.length > 1"
+            trigger="click"
+            :options="quickAccessDropdownOptions"
+            @select="handleQuickAccessSelect"
+          >
+            <n-button
+              type="primary"
+              size="small"
+              class="font-semibold shadow-xs"
+            >
+              <template #icon>
+                <IconExternalLink :size="14" />
+              </template>
+              <span>快捷访问 ({{ runningServicesWithPort.length }}) ▾</span>
+            </n-button>
+          </n-dropdown>
+
           <n-button
-            v-for="srv in runningServicesWithPort"
-            :key="srv.url"
-            :type="srv.type === 'frontend' ? 'primary' : 'default'"
-            :secondary="srv.type !== 'frontend'"
+            v-else-if="runningServicesWithPort.length === 1"
+            type="primary"
             size="small"
-            class="font-semibold shadow-sm cursor-pointer"
-            :class="srv.type === 'frontend' ? 'animate-pulse' : ''"
-            @click="openBrowser(srv.url)"
+            class="font-semibold shadow-xs"
+            @click="openBrowser(runningServicesWithPort[0].url)"
           >
             <template #icon>
               <IconExternalLink :size="14" />
             </template>
-            {{ srv.label }}
+            {{ runningServicesWithPort[0].label }}
           </n-button>
 
           <n-button
             type="error"
             secondary
             size="small"
-            class="font-semibold shadow-sm !text-rose-600 dark:!text-rose-400 !border-rose-500/40 hover:!bg-rose-500/10"
+            class="font-semibold shadow-xs !text-rose-600 dark:!text-rose-400 !border-rose-500/40 hover:!bg-rose-500/10"
             @click="handleStopSession"
           >
             <template #icon>
               <IconSquare :size="14" class="text-rose-600 dark:text-rose-400" />
             </template>
-            <span class="text-rose-600 dark:text-rose-400 font-semibold">停止全部服务</span>
+            <span class="text-rose-600 dark:text-rose-400 font-semibold">停止服务</span>
           </n-button>
         </template>
 
@@ -1306,6 +1321,17 @@ const runningServicesWithPort = computed(() => {
   }
   return res.sort((a, _b) => (a.type === 'frontend' ? -1 : 1));
 });
+
+const quickAccessDropdownOptions = computed(() => {
+  return runningServicesWithPort.value.map((s) => ({
+    label: s.label,
+    key: s.url,
+  }));
+});
+
+function handleQuickAccessSelect(key: string) {
+  openBrowser(key);
+}
 
 const activeEndpointsList = computed(() => {
   if (!activeProfile.value?.services) return [];

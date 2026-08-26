@@ -8,6 +8,8 @@ export interface RunnerServiceStatus {
   port?: number;
   sessionServiceId?: string;
   serviceName?: string;
+  projectId?: string;
+  runSessionId?: string;
 }
 
 export function mergeServiceStatus(
@@ -26,7 +28,28 @@ export function mergeServiceStatus(
     port: event.port,
     sessionServiceId: event.serviceSessionId,
     serviceName: event.serviceName,
+    projectId: event.projectId,
+    runSessionId: event.runSessionId,
   });
+  return next;
+}
+
+export function mergeRunSessionStatuses(
+  current: Map<string, RunnerServiceStatus>,
+  session: RunSessionDto
+): Map<string, RunnerServiceStatus> {
+  const next = new Map(current);
+  for (const service of session.services) {
+    next.set(service.serviceConfigId, {
+      status: service.status,
+      pid: service.pid,
+      port: service.port,
+      sessionServiceId: service.id,
+      serviceName: service.serviceName,
+      projectId: session.projectId,
+      runSessionId: session.id,
+    });
+  }
   return next;
 }
 
@@ -79,6 +102,7 @@ export const useRunnerStore = defineStore('runner', () => {
     setupListeners();
     const session = await window.codehelm.runner.start(profileId);
     currentSession.value = session;
+    serviceStatuses.value = mergeRunSessionStatuses(serviceStatuses.value, session);
     return session;
   }
 
@@ -87,6 +111,7 @@ export const useRunnerStore = defineStore('runner', () => {
     setupListeners();
     const session = await window.codehelm.runner.installAndStart(profileId);
     currentSession.value = session;
+    serviceStatuses.value = mergeRunSessionStatuses(serviceStatuses.value, session);
     return session;
   }
 
