@@ -17,7 +17,7 @@
       <div class="overflow-hidden">
         <!-- Brand Header (Left: Logo, Right: Quick Search) -->
         <div
-          class="h-14 px-2 flex items-center justify-between transition-colors duration-200 overflow-hidden flex-shrink-0"
+          class="h-14 px-2 flex items-center transition-colors duration-200 overflow-hidden flex-shrink-0"
         >
           <!-- Left: Brand Logo & Title Container -->
           <div
@@ -26,7 +26,7 @@
             :title="sidebarStore.isCollapsed ? '点击展开侧边栏' : ''"
             @click.stop="sidebarStore.isCollapsed ? sidebarStore.expandSidebar() : null"
           >
-            <!-- Logo Icon: Fixed 40px container, icon centered at exactly 28px -->
+            <!-- Logo Icon: Fixed 40px container, icon centered at exactly 28px in sidebar -->
             <div class="w-10 h-10 flex items-center justify-center flex-shrink-0">
               <div
                 class="w-8 h-8 rounded-lg border flex items-center justify-center shadow-xs flex-shrink-0 transition-colors"
@@ -39,28 +39,30 @@
               </div>
             </div>
 
-            <!-- Brand Text: Visible only when expanded -->
+            <!-- Brand Text: Smooth 300ms fade & slide sync with sidebar expansion -->
             <div
-              v-if="!sidebarStore.isCollapsed"
-              class="min-w-0 overflow-hidden whitespace-nowrap pl-1.5 flex-1 select-none"
+              class="min-w-0 overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out pl-1.5"
+              :class="sidebarStore.isCollapsed ? 'max-w-0 opacity-0 pointer-events-none p-0 m-0' : 'max-w-[110px] opacity-100 translate-x-0'"
             >
-              <h1 class="font-bold text-xs tracking-tight truncate" :class="themeStore.isDark ? 'text-white' : 'text-zinc-950'">
+              <h1 class="font-bold text-xs tracking-tight truncate select-none" :class="themeStore.isDark ? 'text-white' : 'text-zinc-950'">
                 CodeHelm
               </h1>
-              <p class="text-[9px] font-medium truncate" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
+              <p class="text-[9px] font-medium truncate select-none" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
                 本地多项目控制台
               </p>
             </div>
           </div>
 
-          <!-- Right: Quick Search Button (Ghost / Transparent with Interactive Micro-Animation) -->
+          <!-- Right: Quick Search Button (Smooth 300ms fade & width expansion sync) -->
           <button
-            v-if="!sidebarStore.isCollapsed"
             type="button"
-            class="w-7 h-7 flex items-center justify-center cursor-pointer flex-shrink-0 relative z-20 select-none ml-1.5 transition-transform duration-150 active:scale-90 group/search"
-            :class="themeStore.isDark
-              ? 'text-zinc-400 hover:text-white'
-              : 'text-zinc-500 hover:text-zinc-950'"
+            class="h-7 flex items-center justify-center cursor-pointer flex-shrink-0 relative z-20 select-none transition-all duration-300 ease-in-out active:scale-90 group/search"
+            :class="[
+              sidebarStore.isCollapsed
+                ? 'w-0 max-w-0 opacity-0 pointer-events-none p-0 m-0 border-0 overflow-hidden'
+                : 'w-7 max-w-[28px] opacity-100 ml-1',
+              themeStore.isDark ? 'text-zinc-400 hover:text-white' : 'text-zinc-500 hover:text-zinc-950'
+            ]"
             title="搜索项目"
             @mouseenter="isSearchHovered = true"
             @mouseleave="isSearchHovered = false"
