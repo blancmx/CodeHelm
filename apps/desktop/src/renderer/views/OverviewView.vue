@@ -168,16 +168,17 @@
           <button
             v-for="filter in filterOptions"
             :key="filter.value"
-            class="px-3 py-1 rounded-lg text-xs font-medium transition-all duration-150 cursor-pointer flex-shrink-0 select-none"
+            type="button"
+            class="h-7 px-3 rounded-lg text-xs font-medium transition-colors duration-150 cursor-pointer flex items-center justify-center flex-shrink-0 select-none border"
             :class="activeFilter === filter.value
-              ? (themeStore.isDark ? 'bg-white text-black font-bold shadow-sm' : 'bg-black text-white font-bold shadow-sm')
-              : (themeStore.isDark ? 'bg-[#18181b] text-zinc-400 hover:text-white border border-[#27272a]' : 'bg-white text-zinc-700 hover:bg-zinc-100 border border-zinc-200')"
+              ? (themeStore.isDark ? 'bg-white text-black border-white shadow-xs' : 'bg-black text-white border-black shadow-xs')
+              : (themeStore.isDark ? 'bg-[#18181b] text-zinc-400 hover:text-white border-[#27272a] hover:border-zinc-500' : 'bg-white text-zinc-700 hover:bg-zinc-100 border-zinc-200 hover:border-zinc-300')"
             @click="activeFilter = filter.value"
           >
-            {{ filter.label }}
+            <span>{{ filter.label }}</span>
             <span
               v-if="filter.count !== undefined"
-              class="ml-1 text-[10px] opacity-80 font-mono"
+              class="ml-1 text-[10px] font-mono opacity-80"
             >
               ({{ filter.count }})
             </span>
@@ -190,12 +191,12 @@
         <!-- Independent Running Status Filter Toggle Pill -->
         <button
           type="button"
-          class="h-6.5 px-2.5 rounded-lg text-xs font-medium transition-all duration-200 cursor-pointer flex items-center gap-1.5 flex-shrink-0 select-none border"
+          class="h-7 px-2.5 rounded-lg text-xs font-medium transition-colors duration-150 cursor-pointer flex items-center gap-1.5 flex-shrink-0 select-none border"
           :class="[
             onlyRunning
               ? (themeStore.isDark
-                  ? 'bg-emerald-950/60 text-emerald-300 border-emerald-600 shadow-sm ring-1 ring-emerald-500/30'
-                  : 'bg-emerald-50 text-emerald-700 border-emerald-400 shadow-xs ring-1 ring-emerald-400/30')
+                  ? 'bg-emerald-950/60 text-emerald-300 border-emerald-500/80 shadow-xs'
+                  : 'bg-emerald-50 text-emerald-800 border-emerald-400 shadow-xs')
               : (themeStore.isDark
                   ? 'bg-[#18181b] text-zinc-400 hover:text-zinc-200 border-[#27272a] hover:border-zinc-500'
                   : 'bg-white text-zinc-600 hover:text-zinc-900 border-zinc-200 hover:border-zinc-300 shadow-2xs')
@@ -204,7 +205,7 @@
           @click="onlyRunning = !onlyRunning"
         >
           <span
-            class="w-1.5 h-1.5 rounded-full"
+            class="w-1.5 h-1.5 rounded-full flex-shrink-0"
             :class="runningProjectsCount > 0 ? (onlyRunning ? 'bg-emerald-400 pulsing-dot-active' : 'bg-emerald-400') : 'bg-zinc-400'"
           />
           <span>仅看运行中</span>
@@ -299,7 +300,7 @@
     </div>
 
     <!-- Main Content Area with Smooth View Transition -->
-    <div class="flex-1 overflow-y-auto pt-2 flex flex-col">
+    <div class="flex-1 overflow-y-auto pt-2 flex flex-col [scrollbar-gutter:stable]">
       <transition name="view-fade-slide" mode="out-in">
         <!-- Empty State -->
         <div
