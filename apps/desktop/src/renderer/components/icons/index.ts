@@ -105,16 +105,17 @@ export const IconMonitor = createIcon('IconMonitor', () => [
 // 2. Project & Files
 export const IconFolder = createIcon('IconFolder', () => [
   h('path', {
-    d: 'M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z',
+    d: 'M4 4h4.5a2 2 0 0 1 1.4.6L11.5 6H20a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z',
   }),
+  h('line', { x1: 2, y1: 10, x2: 22, y2: 10 }),
 ]);
 
 export const IconFolderOpen = createIcon('IconFolderOpen', () => [
   h('path', {
-    d: 'M2 11V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2v3H2z',
+    d: 'M2 11V6a2 2 0 0 1 2-2h4.5a2 2 0 0 1 1.4.6L11.5 6H20a2 2 0 0 1 2 2v3',
   }),
   h('path', {
-    d: 'M2 11l2.5 9.5a2 2 0 0 0 1.9 1.5h15.2a2 2 0 0 0 1.9-1.5L22 11H2z',
+    d: 'M2 11l2.2 9.2A2 2 0 0 0 6.1 22h11.8a2 2 0 0 0 1.9-1.4L22 11H2z',
   }),
 ]);
 

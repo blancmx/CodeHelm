@@ -23,10 +23,11 @@
           @click="handleSelectSingleDir"
         >
           <div
-            class="w-14 h-14 rounded-2xl border mx-auto mb-3.5 flex items-center justify-center transition-all duration-300 group-hover:scale-108 group-hover:shadow-md"
+            class="w-14 h-14 rounded-2xl border mx-auto mb-3.5 flex items-center justify-center transition-all duration-300 group-hover:scale-108 group-hover:shadow-md relative select-none"
             :class="themeStore.isDark ? 'bg-[#27272a] border-[#3f3f46] text-white shadow-black/40' : 'bg-white border-zinc-200 text-zinc-950 shadow-zinc-200'"
           >
-            <IconFolderOpen :size="26" />
+            <IconFolder :size="26" class="transition-opacity duration-200 group-hover:opacity-0" />
+            <IconFolderOpen :size="26" class="absolute transition-opacity duration-200 opacity-0 group-hover:opacity-100" />
           </div>
           <div class="text-sm font-bold tracking-tight" :class="themeStore.isDark ? 'text-white' : 'text-zinc-950'">
             点击打开文件资源管理器选择项目根目录
@@ -148,6 +149,7 @@ import { useProjectStore } from '../stores/projectStore.js';
 import { useThemeStore } from '../stores/themeStore.js';
 import type { DiscoveredProjectDto } from '@codehelm/contracts';
 import {
+  IconFolder,
   IconFolderOpen,
   IconLock,
 } from '../components/icons/index.js';
