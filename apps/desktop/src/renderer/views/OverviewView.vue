@@ -171,8 +171,8 @@
             type="button"
             class="h-7 px-3 rounded-lg text-xs font-medium transition-colors duration-150 cursor-pointer flex items-center justify-center flex-shrink-0 select-none border"
             :class="activeFilter === filter.value
-              ? (themeStore.isDark ? 'bg-white text-black border-white shadow-xs' : 'bg-black text-white border-black shadow-xs')
-              : (themeStore.isDark ? 'bg-[#18181b] text-zinc-400 hover:text-white border-[#27272a] hover:border-zinc-500' : 'bg-white text-zinc-700 hover:bg-zinc-100 border-zinc-200 hover:border-zinc-300')"
+              ? (themeStore.isDark ? '!bg-white !text-black !border-white shadow-xs' : '!bg-black !text-white !border-black shadow-xs')
+              : (themeStore.isDark ? '!bg-[#18181b] !text-zinc-400 hover:!text-white border-[#27272a] hover:border-zinc-500' : '!bg-white !text-zinc-700 hover:!bg-zinc-100 border-zinc-200 hover:border-zinc-300')"
             @click="activeFilter = filter.value"
           >
             <span>{{ filter.label }}</span>

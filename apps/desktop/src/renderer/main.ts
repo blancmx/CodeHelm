@@ -10,9 +10,9 @@ if (!window.codehelm) {
   setupBrowserMock();
 }
 
-// UnoCSS
-import 'virtual:uno.css';
+// UnoCSS: Reset MUST be imported before virtual:uno.css
 import '@unocss/reset/tailwind.css';
+import 'virtual:uno.css';
 
 const app = createApp(App);
 app.config.errorHandler = (err, _instance, info) => {
