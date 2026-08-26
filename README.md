@@ -1,6 +1,8 @@
 <div align="center">
 
-# ⚓ CodeHelm
+<img src="./assets/logo.svg" width="96" height="96" alt="CodeHelm Logo" />
+
+# CodeHelm
 
 ### 本地项目控制台与多进程自动化运行中心
 **A Local Project Dashboard & Multi-Process Orchestrator for the AI & Vibe Coding Era**
