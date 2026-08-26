@@ -827,6 +827,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
+import { useRoute } from 'vue-router';
 import { message } from '../utils/discrete.js';
 import { setPageTitle } from '../utils/title.js';
 import { useProjectStore } from '../stores/projectStore.js';
@@ -863,6 +864,7 @@ const props = defineProps<{
   id: string;
 }>();
 
+const route = useRoute();
 const projectStore = useProjectStore();
 const runnerStore = useRunnerStore();
 const themeStore = useThemeStore();
@@ -877,7 +879,7 @@ watch(
   { immediate: true }
 );
 
-const activeMainTab = ref('services');
+const activeMainTab = ref(typeof route?.query?.tab === 'string' ? route.query.tab : 'overview');
 const latestSnapshot = ref<AnalysisSnapshotDto | null>(null);
 const profiles = ref<RunProfileDto[]>([]);
 const editingProfile = ref<RunProfileDto | null>(null);
@@ -923,6 +925,7 @@ onUnmounted(() => {
 watch(
   () => props.id,
   async () => {
+    activeMainTab.value = typeof route?.query?.tab === 'string' ? route.query.tab : 'overview';
     await loadData();
     await refreshLegacyAnalysis();
   }
@@ -1252,7 +1255,12 @@ function handleEditService(service: ServiceConfigDto) {
 }
 
 function handleServicePortOverride(service: ServiceConfigDto, value: number | null) {
-  service.port = value ?? undefined;
+  const nextPort = value ?? undefined;
+  // Naive UI may emit the initial value when the confirmation modal mounts.
+  // Only a real value change is a manual override; otherwise keep the
+  // allocator-owned `detected` source so future analysis can manage it.
+  if (service.port === nextPort) return;
+  service.port = nextPort;
   service.source = 'manual';
   if (service.healthCheck && service.healthCheck.type !== 'none') {
     service.healthCheck.port = service.port;
