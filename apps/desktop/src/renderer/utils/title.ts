@@ -2,12 +2,8 @@
  * Browser page title and favicon synchronization utility
  */
 
-export function setPageTitle(title?: string) {
-  if (title && title.trim()) {
-    document.title = `CodeHelm - ${title.trim()}`;
-  } else {
-    document.title = 'CodeHelm - 本地项目控制台';
-  }
+export function setPageTitle(_title?: string) {
+  document.title = 'CodeHelm';
 }
 
 export function setFavicon(url: string) {
