@@ -162,23 +162,38 @@
     <!-- Quick Filter Tabs, Sorting & View Mode Switcher -->
     <div class="flex items-center justify-between pt-3 pb-2 flex-shrink-0 gap-3">
       <!-- Left: Dynamic Ecosystem Tabs & Independent Running Toggle -->
-      <div class="flex items-center gap-2 overflow-x-auto py-0.5 min-w-0">
-        <!-- Dynamic Ecosystem Filter Tabs -->
-        <div class="flex items-center gap-1.5 flex-shrink-0">
+      <div class="flex items-center gap-2.5 overflow-x-auto py-0.5 min-w-0">
+        <!-- Dynamic Ecosystem Filter Tabs with Silky Magnetic Sliding Pill -->
+        <div
+          ref="tabContainerRef"
+          class="relative flex items-center p-0.5 rounded-xl border flex-shrink-0 select-none overflow-hidden"
+          :class="themeStore.isDark ? 'bg-[#121216] border-[#27272a]' : 'bg-zinc-100/90 border-zinc-200'"
+        >
+          <!-- Sliding Active Pill Indicator -->
+          <div
+            class="absolute rounded-[9px] transition-all duration-280 ease-[cubic-bezier(0.16,1,0.3,1)] shadow-xs pointer-events-none z-0"
+            :style="indicatorStyle"
+            :class="themeStore.isDark ? 'bg-white shadow-sm' : 'bg-black shadow-sm'"
+          />
+
           <button
             v-for="filter in filterOptions"
             :key="filter.value"
+            :ref="(el) => setTabRef(filter.value, el)"
             type="button"
-            class="h-7 px-3 rounded-lg text-xs font-medium transition-colors duration-150 cursor-pointer flex items-center justify-center flex-shrink-0 select-none border"
+            class="h-7 px-3 rounded-[9px] text-xs font-medium transition-colors duration-200 cursor-pointer flex items-center justify-center flex-shrink-0 select-none relative z-10 border border-transparent"
             :class="activeFilter === filter.value
-              ? (themeStore.isDark ? '!bg-white !text-black !border-white shadow-xs' : '!bg-black !text-white !border-black shadow-xs')
-              : (themeStore.isDark ? '!bg-[#18181b] !text-zinc-400 hover:!text-white border-[#27272a] hover:border-zinc-500' : '!bg-white !text-zinc-700 hover:!bg-zinc-100 border-zinc-200 hover:border-zinc-300')"
-            @click="activeFilter = filter.value"
+              ? (themeStore.isDark ? '!text-black font-bold' : '!text-white font-bold')
+              : (themeStore.isDark ? 'text-zinc-400 hover:text-zinc-100' : 'text-zinc-600 hover:text-zinc-950')"
+            @click="handleSelectFilter(filter.value)"
           >
             <span>{{ filter.label }}</span>
             <span
               v-if="filter.count !== undefined"
-              class="ml-1 text-[10px] font-mono opacity-80"
+              class="ml-1 text-[10px] font-mono transition-colors"
+              :class="activeFilter === filter.value
+                ? (themeStore.isDark ? 'text-black/80 font-bold' : 'text-white/80 font-bold')
+                : (themeStore.isDark ? 'text-zinc-500' : 'text-zinc-400')"
             >
               ({{ filter.count }})
             </span>
@@ -188,24 +203,24 @@
         <!-- Vertical Divider -->
         <div class="h-4 w-[1px] flex-shrink-0" :class="themeStore.isDark ? 'bg-[#27272a]' : 'bg-zinc-200'" />
 
-        <!-- Independent Running Status Filter Toggle Pill -->
+        <!-- Independent Running Status Filter Toggle Pill with smooth transition -->
         <button
           type="button"
-          class="h-7 px-2.5 rounded-lg text-xs font-medium transition-colors duration-150 cursor-pointer flex items-center gap-1.5 flex-shrink-0 select-none border"
+          class="h-8 px-3 rounded-xl text-xs font-medium transition-all duration-200 cursor-pointer flex items-center gap-1.5 flex-shrink-0 select-none border"
           :class="[
             onlyRunning
               ? (themeStore.isDark
-                  ? 'bg-emerald-950/60 text-emerald-300 border-emerald-500/80 shadow-xs'
-                  : 'bg-emerald-50 text-emerald-800 border-emerald-400 shadow-xs')
+                  ? 'bg-emerald-950/70 text-emerald-300 border-emerald-500/80 shadow-xs ring-1 ring-emerald-500/30'
+                  : 'bg-emerald-50 text-emerald-800 border-emerald-400 shadow-xs ring-1 ring-emerald-400/30')
               : (themeStore.isDark
-                  ? 'bg-[#18181b] text-zinc-400 hover:text-zinc-200 border-[#27272a] hover:border-zinc-500'
+                  ? 'bg-[#121216] text-zinc-400 hover:text-zinc-200 border-[#27272a] hover:border-zinc-500'
                   : 'bg-white text-zinc-600 hover:text-zinc-900 border-zinc-200 hover:border-zinc-300 shadow-2xs')
           ]"
           :title="onlyRunning ? '点击展示所有状态项目' : '点击仅筛选当前处于运行中的项目'"
           @click="onlyRunning = !onlyRunning"
         >
           <span
-            class="w-1.5 h-1.5 rounded-full flex-shrink-0"
+            class="w-1.5 h-1.5 rounded-full flex-shrink-0 transition-colors"
             :class="runningProjectsCount > 0 ? (onlyRunning ? 'bg-emerald-400 pulsing-dot-active' : 'bg-emerald-400') : 'bg-zinc-400'"
           />
           <span>仅看运行中</span>
@@ -636,7 +651,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, nextTick, watch, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { dialog, message } from '../utils/discrete.js';
 import { useProjectStore } from '../stores/projectStore.js';
@@ -687,6 +702,73 @@ const activeFilter = ref<string>('ALL');
 const onlyRunning = ref(false);
 const sortBy = ref<'recent' | 'name' | 'services' | 'status'>('recent');
 const isSortOpen = ref(false);
+
+// Smooth Sliding Magnetic Indicator for Ecosystem Filter Bar
+const tabContainerRef = ref<HTMLElement | null>(null);
+const tabRefs = new Map<string, HTMLElement>();
+
+function setTabRef(key: string, el: any) {
+  if (el) {
+    tabRefs.set(key, el.$el || el);
+  } else {
+    tabRefs.delete(key);
+  }
+}
+
+const indicatorStyle = ref<{ transform: string; width: string; height: string; opacity: number }>({
+  transform: 'translateX(0px)',
+  width: '0px',
+  height: '28px',
+  opacity: 0,
+});
+
+function updateIndicator() {
+  nextTick(() => {
+    const container = tabContainerRef.value;
+    const activeEl = tabRefs.get(activeFilter.value);
+    if (!container || !activeEl) {
+      indicatorStyle.value = {
+        transform: 'translateX(0px)',
+        width: '0px',
+        height: '28px',
+        opacity: 0,
+      };
+      return;
+    }
+
+    const containerRect = container.getBoundingClientRect();
+    const activeRect = activeEl.getBoundingClientRect();
+
+    const left = activeRect.left - containerRect.left;
+    const width = activeRect.width;
+    const height = activeRect.height;
+
+    indicatorStyle.value = {
+      transform: `translateX(${left}px)`,
+      width: `${width}px`,
+      height: `${height}px`,
+      opacity: 1,
+    };
+  });
+}
+
+function handleSelectFilter(val: string) {
+  activeFilter.value = val;
+  updateIndicator();
+}
+
+watch([() => activeFilter.value, () => filterOptions.value], () => {
+  updateIndicator();
+}, { deep: true });
+
+onMounted(() => {
+  updateIndicator();
+  window.addEventListener('resize', updateIndicator);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('resize', updateIndicator);
+});
 
 const sortOptions = [
   { label: '最近更新', value: 'recent' },
