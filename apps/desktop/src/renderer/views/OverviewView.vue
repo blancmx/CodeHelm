@@ -314,9 +314,9 @@
       </div>
     </div>
 
-    <!-- Main Content Area with Smooth View Transition -->
+    <!-- Main Content Area with Crisp Ghost-Free Transition -->
     <div class="flex-1 overflow-y-auto pt-2 flex flex-col [scrollbar-gutter:stable]">
-      <transition name="view-fade-slide" mode="out-in">
+      <transition name="tab-crossfade" mode="out-in">
         <!-- Empty State -->
         <div
           v-if="filteredProjects.length === 0 && !searchQuery.trim() && activeFilter === 'ALL' && !onlyRunning"
@@ -394,7 +394,7 @@
       <!-- No Filter/Search Results -->
       <div
         v-else-if="filteredProjects.length === 0"
-        key="no-results"
+        :key="'empty-' + activeFilter + '-' + (onlyRunning ? '1' : '0')"
         class="flex-1 flex flex-col items-center justify-center text-center py-16"
       >
         <div
@@ -407,18 +407,16 @@
         <p class="text-xs mt-1" :class="themeStore.isDark ? 'text-zinc-500' : 'text-zinc-400'">请尝试调整搜索关键词或分类标签</p>
       </div>
 
-      <!-- View Mode 1: Project Cards Grid (Monochrome with Silky FLIP Transition) -->
-      <TransitionGroup
+      <!-- View Mode 1: Project Cards Grid (Monochrome) -->
+      <div
         v-else-if="viewMode === 'grid'"
-        key="grid-view"
-        name="card-flip"
-        tag="div"
+        :key="'grid-' + activeFilter + '-' + (onlyRunning ? '1' : '0')"
         class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-6"
       >
         <div
           v-for="project in sortedProjects"
           :key="project.id"
-          class="border rounded-xl p-5 transition-colors duration-200 cursor-pointer flex flex-col justify-between group"
+          class="border rounded-xl p-5 transition-all duration-150 cursor-pointer flex flex-col justify-between group"
           :class="themeStore.isDark
             ? 'bg-[#121216] hover:bg-[#18181c] border-[#27272a] hover:border-zinc-500 shadow-sm'
             : 'bg-white hover:bg-zinc-50 border-zinc-200 hover:border-zinc-400 shadow-sm'"
@@ -526,12 +524,12 @@
             </div>
           </div>
         </div>
-      </TransitionGroup>
+      </div>
 
-      <!-- View Mode 2: Project Table / List View (Monochrome with Silky FLIP Transition) -->
+      <!-- View Mode 2: Project Table / List View (Monochrome) -->
       <div
         v-else-if="viewMode === 'list'"
-        key="list-view"
+        :key="'list-' + activeFilter + '-' + (onlyRunning ? '1' : '0')"
         class="border rounded-xl overflow-hidden pb-6 mb-4"
         :class="themeStore.isDark ? 'bg-[#121216] border-[#27272a]' : 'bg-white border-zinc-200 shadow-sm'"
       >
@@ -549,9 +547,7 @@
               <th class="py-3 px-4 text-right">操作</th>
             </tr>
           </thead>
-          <TransitionGroup
-            name="list-flip"
-            tag="tbody"
+          <tbody
             class="divide-y"
             :class="themeStore.isDark ? 'divide-[#1f1f23]' : 'divide-zinc-100'"
           >
@@ -649,7 +645,7 @@
                 </div>
               </td>
             </tr>
-          </TransitionGroup>
+          </tbody>
         </table>
       </div>
     </transition>
@@ -1022,70 +1018,24 @@ function statusBadgeClass(status?: string) {
 </script>
 
 <style scoped>
-/* Card FLIP Grid Transitions */
-.card-flip-move {
-  transition: transform 320ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.card-flip-enter-active {
-  transition: opacity 260ms cubic-bezier(0.16, 1, 0.3, 1), transform 260ms cubic-bezier(0.16, 1, 0.3, 1);
+/* Clean Ghost-Free Tab & View Crossfade Transition */
+.tab-crossfade-enter-active {
+  transition: opacity 160ms cubic-bezier(0.16, 1, 0.3, 1), transform 160ms cubic-bezier(0.16, 1, 0.3, 1);
   will-change: opacity, transform;
 }
 
-.card-flip-leave-active {
-  transition: opacity 180ms ease-out, transform 180ms ease-out;
-  position: absolute;
-  pointer-events: none;
+.tab-crossfade-leave-active {
+  transition: opacity 120ms ease-out;
+  will-change: opacity;
+}
+
+.tab-crossfade-enter-from {
   opacity: 0;
+  transform: translateY(6px);
 }
 
-.card-flip-enter-from {
+.tab-crossfade-leave-to {
   opacity: 0;
-  transform: translateY(12px) scale(0.97);
-}
-
-.card-flip-leave-to {
-  opacity: 0;
-  transform: scale(0.95);
-}
-
-/* List FLIP Table Transitions */
-.list-flip-move {
-  transition: transform 280ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.list-flip-enter-active {
-  transition: opacity 240ms cubic-bezier(0.16, 1, 0.3, 1), transform 240ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.list-flip-leave-active {
-  transition: opacity 160ms ease-out;
-}
-
-.list-flip-enter-from {
-  opacity: 0;
-  transform: translateY(8px);
-}
-
-.list-flip-leave-to {
-  opacity: 0;
-}
-
-/* View Mode Out-In Fade Slide */
-.view-fade-slide-enter-active,
-.view-fade-slide-leave-active {
-  transition: opacity 220ms cubic-bezier(0.16, 1, 0.3, 1), transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
-  will-change: opacity, transform;
-}
-
-.view-fade-slide-enter-from {
-  opacity: 0;
-  transform: translateY(8px);
-}
-
-.view-fade-slide-leave-to {
-  opacity: 0;
-  transform: translateY(-8px);
 }
 
 @keyframes refresh-spin {
