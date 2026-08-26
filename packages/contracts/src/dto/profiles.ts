@@ -30,6 +30,7 @@ export const ServiceConfigDtoSchema = z.object({
   cwdRelative: z.string(),
   env: z.array(ServiceEnvVarDtoSchema),
   port: z.number().optional(),
+  portMode: z.enum(['auto', 'fixed']).optional(),
   portExtractRegex: z.string().optional(),
   healthCheck: HealthCheckConfigDtoSchema.optional(),
   dependsOn: z.array(z.string()),

@@ -12,6 +12,7 @@ import type {
   ServiceStatusEventDto,
   LogBatchDto,
   FileTreeNodeDto,
+  ReadmeSummaryDto,
 } from '@codehelm/contracts';
 
 const STORAGE_KEY_PROJECTS = 'codehelm_browser_mock_projects_v5';
@@ -966,6 +967,53 @@ export function setupBrowserMock() {
         }
 
         return [];
+      },
+
+      async getReadmeSummary(rootPath: string): Promise<ReadmeSummaryDto> {
+        const list = getStoredMockData();
+        const found = list.find((item) => item.project.rootPath === rootPath);
+        const name = found?.project.name || 'Project';
+        const isCodeHelm = name.toLowerCase().includes('codehelm') || name.toLowerCase().includes('desk');
+        const isLangChain = name.toLowerCase().includes('langchain') || name.toLowerCase().includes('rag');
+
+        if (isCodeHelm) {
+          return {
+            hasReadme: true,
+            title: 'CodeHelm',
+            description: '本地项目控制台与多进程自动化运行中心，面向 AI & Vibe Coding 时代的现代化桌面工作台。',
+            features: [
+              '智能工程探测与静态画像生成，自动识别主导语言与框架拓扑',
+              '多服务一键协同编排拉起，进程树防孤儿安全清理机制',
+              '自研动态端口分配与防冲突，支持一键打开前端界面与 API 文档',
+              '纯本地优先与数据隔离，SQLite 嵌入式存储，零云端代码上传',
+            ],
+          };
+        }
+
+        if (isLangChain) {
+          return {
+            hasReadme: true,
+            title: 'LangChain RAG Knowledge Base',
+            description: '基于 FastAPI 与 Vue 3 的端到端企业级大模型检索增强生成 (RAG) 知识库系统。',
+            features: [
+              '混合向量检索与知识库切片重排 (Hybrid Rerank)',
+              'FastAPI 异步高性能流式对话接口 (SSE)',
+              'Vue 3 + Vite 现代化前端对话与文档管理界面',
+              '多数据源连接器支持 PDF, Markdown 与网页内容导入',
+            ],
+          };
+        }
+
+        return {
+          hasReadme: true,
+          title: name,
+          description: `基于 ${found?.summary.primaryLanguages?.join(' / ') || '多语言'} 构建的现代化代码工程。`,
+          features: [
+            `内置 ${found?.summary.primaryFrameworks?.join('、') || '核心'} 技术框架与自动化启动支持`,
+            '支持单进程/多服务编排拉起与实时终端日志分流监控',
+            '本地持久化环境配置与端口防冲突自动映射',
+          ],
+        };
       },
     },
 

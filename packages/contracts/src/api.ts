@@ -6,6 +6,7 @@ import type {
   ProjectSummaryDto,
   SelectedDirectoryDto,
   FileTreeNodeDto,
+  ReadmeSummaryDto,
 } from './dto/projects.js';
 import type {
   AnalysisProgressDto,
@@ -35,6 +36,7 @@ export interface CodeHelmApi {
     remove(id: string): Promise<void>;
     update(id: string, patch: Partial<ProjectDto>): Promise<ProjectDto | null>;
     getFileTree(rootPath: string, options?: { maxDepth?: number }): Promise<FileTreeNodeDto[]>;
+    getReadmeSummary(rootPath: string): Promise<ReadmeSummaryDto>;
   };
   analysis: {
     start(projectId: string): Promise<{ taskId: string }>;

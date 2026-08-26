@@ -82,3 +82,13 @@ export interface FileTreeNodeDto {
   children?: FileTreeNodeDto[];
 }
 
+export const ReadmeSummaryDtoSchema = z.object({
+  hasReadme: z.boolean(),
+  title: z.string(),
+  description: z.string(),
+  features: z.array(z.string()),
+  rawExcerpt: z.string().optional(),
+});
+export type ReadmeSummaryDto = z.infer<typeof ReadmeSummaryDtoSchema>;
+
+

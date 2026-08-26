@@ -244,4 +244,159 @@ export function registerProjectHandlers(db: DatabaseInstance) {
     const maxDepth = options?.maxDepth ?? 5;
     return buildFileTree(normRoot, normRoot, 1, maxDepth);
   });
+
+  ipcMain.handle(IpcChannels.PROJECTS_GET_README, async (_event, rootPath: string) => {
+    const normRoot = normalizePath(rootPath);
+    if (!fs.existsSync(normRoot)) {
+      return {
+        hasReadme: false,
+        title: '未检测到项目',
+        description: '指定目录不存在',
+        features: [],
+      };
+    }
+
+    const candidateNames = [
+      'README.md',
+      'readme.md',
+      'README.zh-CN.md',
+      'README.zh.md',
+      'README.MD',
+      'Readme.md',
+      'README.txt',
+      'README',
+    ];
+
+    let readmePath: string | null = null;
+    for (const name of candidateNames) {
+      const full = path.join(normRoot, name);
+      if (fs.existsSync(full) && fs.statSync(full).isFile()) {
+        readmePath = full;
+        break;
+      }
+    }
+
+    if (!readmePath) {
+      try {
+        const files = fs.readdirSync(normRoot);
+        const matched = files.find((f) => /^readme(\.[a-z0-9_-]+)?$/i.test(f));
+        if (matched) {
+          readmePath = path.join(normRoot, matched);
+        }
+      } catch {}
+    }
+
+    if (!readmePath) {
+      const dirName = path.basename(normRoot);
+      return {
+        hasReadme: false,
+        title: dirName,
+        description: '该工程根目录下未包含 README.md 文档，可通过服务控制面板配置并运行各项服务。',
+        features: [],
+      };
+    }
+
+    try {
+      const rawContent = fs.readFileSync(readmePath, 'utf-8');
+      const lines = rawContent.split(/\r?\n/);
+
+      let title = '';
+      let description = '';
+      const features: string[] = [];
+
+      let inFeatureSection = false;
+      const descLines: string[] = [];
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+
+        if (line.startsWith('[![') || line.startsWith('<p align') || line.startsWith('<div align') || line.includes('shields.io')) {
+          continue;
+        }
+
+        if (!title && (line.startsWith('# ') || /^<h1[^>]*>/.test(line))) {
+          title = line.replace(/^#\s*/, '').replace(/<[^>]*>/g, '').trim();
+          continue;
+        }
+
+        if (/^#{2,4}\s+/.test(line)) {
+          const headingText = line.replace(/^#{2,4}\s+/, '').toLowerCase();
+          if (
+            headingText.includes('功能') ||
+            headingText.includes('feature') ||
+            headingText.includes('亮点') ||
+            headingText.includes('特性') ||
+            headingText.includes('highlight') ||
+            headingText.includes('capabilities') ||
+            headingText.includes('core')
+          ) {
+            inFeatureSection = true;
+            continue;
+          } else {
+            if (inFeatureSection && features.length > 0) {
+              inFeatureSection = false;
+            }
+          }
+        }
+
+        if (inFeatureSection) {
+          if (/^[-*+]\s+/.test(line) || /^\d+\.\s+/.test(line)) {
+            const itemText = line
+              .replace(/^[-*+]\s+/, '')
+              .replace(/^\d+\.\s+/, '')
+              .replace(/\*\*(.*?)\*\*/g, '$1')
+              .replace(/`([^`]+)`/g, '$1')
+              .replace(/<[^>]*>/g, '')
+              .trim();
+            if (itemText && itemText.length > 2 && features.length < 8) {
+              features.push(itemText);
+            }
+          }
+        } else if (!description && descLines.length < 3 && !line.startsWith('#') && !line.startsWith('```')) {
+          const cleanLine = line.replace(/<[^>]*>/g, '').replace(/\*\*(.*?)\*\*/g, '$1').trim();
+          if (cleanLine && !cleanLine.startsWith('![')) {
+            descLines.push(cleanLine);
+          }
+        }
+      }
+
+      if (descLines.length > 0) {
+        description = descLines.join(' ');
+      }
+
+      if (features.length === 0) {
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if ((trimmed.startsWith('- ') || trimmed.startsWith('* ')) && !trimmed.includes('shields.io')) {
+            const item = trimmed
+              .replace(/^[-*]\s+/, '')
+              .replace(/\*\*(.*?)\*\*/g, '$1')
+              .replace(/`([^`]+)`/g, '$1')
+              .replace(/<[^>]*>/g, '')
+              .trim();
+            if (item.length > 4 && features.length < 6) {
+              features.push(item);
+            }
+          }
+        }
+      }
+
+      const fallbackTitle = path.basename(normRoot);
+
+      return {
+        hasReadme: true,
+        title: title || fallbackTitle,
+        description: description || '已自动解析本地工程 README 文档。',
+        features,
+      };
+    } catch (err: any) {
+      return {
+        hasReadme: false,
+        title: path.basename(normRoot),
+        description: `读取 README 失败: ${err.message}`,
+        features: [],
+      };
+    }
+  });
 }

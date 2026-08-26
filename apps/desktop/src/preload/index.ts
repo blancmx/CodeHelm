@@ -16,6 +16,8 @@ const api: CodeHelmApi = {
     update: (id, patch) => ipcRenderer.invoke(IpcChannels.PROJECTS_UPDATE, id, toIpcPayload(patch)),
     getFileTree: (rootPath, options) =>
       ipcRenderer.invoke(IpcChannels.PROJECTS_GET_FILE_TREE, rootPath, toIpcPayload(options)),
+    getReadmeSummary: (rootPath) =>
+      ipcRenderer.invoke(IpcChannels.PROJECTS_GET_README, rootPath),
   },
   analysis: {
     start: (projectId) => ipcRenderer.invoke(IpcChannels.ANALYSIS_START, projectId),

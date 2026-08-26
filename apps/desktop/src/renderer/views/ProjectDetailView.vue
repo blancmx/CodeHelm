@@ -179,6 +179,53 @@
         <!-- Tab 1: 概览 (Overview) -->
         <n-tab-pane name="overview" tab="项目概览" class="h-full overflow-y-auto">
           <div class="space-y-4 pt-2 pb-6">
+            <!-- Project Description & Key Highlights from README -->
+            <div
+              v-if="readmeSummary"
+              class="border rounded-xl p-5 transition-all"
+              :class="themeStore.isDark ? 'bg-[#121216] border-[#27272a]' : 'bg-white border-zinc-200 shadow-sm'"
+            >
+              <div class="flex items-start justify-between gap-4 pb-3 border-b transition-colors" :class="themeStore.isDark ? 'border-[#20202d]' : 'border-zinc-100'">
+                <div class="space-y-1">
+                  <div class="flex items-center gap-2">
+                    <IconFileText :size="16" :class="themeStore.isDark ? 'text-zinc-300' : 'text-zinc-700'" />
+                    <h3 class="text-sm font-bold tracking-tight" :class="themeStore.isDark ? 'text-white' : 'text-zinc-950'">
+                      {{ readmeSummary.title || projectStore.currentProject?.name || '项目介绍' }}
+                    </h3>
+                    <span
+                      v-if="readmeSummary.hasReadme"
+                      class="text-[10px] font-mono px-1.5 py-0.2 rounded border font-medium"
+                      :class="themeStore.isDark ? 'bg-[#18181b] text-zinc-400 border-[#27272a]' : 'bg-zinc-100 text-zinc-600 border-zinc-200'"
+                    >
+                      README.md
+                    </span>
+                  </div>
+                  <p class="text-xs leading-relaxed" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-600'">
+                    {{ readmeSummary.description }}
+                  </p>
+                </div>
+              </div>
+
+              <!-- Main Features List extracted from README -->
+              <div v-if="readmeSummary.features && readmeSummary.features.length > 0" class="mt-3.5">
+                <div class="text-[11px] font-medium mb-2.5 flex items-center gap-1.5" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
+                  <IconZap :size="12" />
+                  <span>主要功能与核心亮点</span>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  <div
+                    v-for="(feature, idx) in readmeSummary.features"
+                    :key="idx"
+                    class="border rounded-lg p-2.5 text-xs flex items-start gap-2.5 transition-colors"
+                    :class="themeStore.isDark ? 'bg-[#18181b] border-[#27272a] text-zinc-300' : 'bg-zinc-50 border-zinc-200 text-zinc-800'"
+                  >
+                    <span class="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0" :class="themeStore.isDark ? 'bg-white' : 'bg-black'" />
+                    <span class="leading-snug break-words flex-1 select-text">{{ feature }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <!-- 3 Stat Metrics -->
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div
@@ -855,6 +902,7 @@ import type {
   AnalysisSnapshotDto,
   DetectedTechnologyDto,
   ProcessStatus,
+  ReadmeSummaryDto,
   RunProfileDto,
   SaveRunProfileInput,
   ServiceConfigDto,
@@ -881,6 +929,7 @@ watch(
 
 const activeMainTab = ref(typeof route?.query?.tab === 'string' ? route.query.tab : 'overview');
 const latestSnapshot = ref<AnalysisSnapshotDto | null>(null);
+const readmeSummary = ref<ReadmeSummaryDto | null>(null);
 const profiles = ref<RunProfileDto[]>([]);
 const editingProfile = ref<RunProfileDto | null>(null);
 
@@ -933,6 +982,14 @@ watch(
 
 async function loadData() {
   await projectStore.loadProjectDetail(props.id);
+
+  if (projectStore.currentProject?.rootPath && window.codehelm?.projects?.getReadmeSummary) {
+    try {
+      readmeSummary.value = await window.codehelm.projects.getReadmeSummary(projectStore.currentProject.rootPath);
+    } catch {
+      readmeSummary.value = null;
+    }
+  }
 
   if (window.codehelm?.analysis) {
     latestSnapshot.value = await window.codehelm.analysis.getLatest(props.id);
@@ -1179,6 +1236,10 @@ async function handleInstallAndLaunch() {
     isLaunching.value = true;
     message.loading('正在检查/安装前置依赖并拉起服务方案...');
     await runnerStore.installAndStartProfile(activeProfile.value.id);
+    // Runtime reconciliation may persist a project-constrained port (for
+    // example a backend CORS origin). Reload so cards and launch links show
+    // the same port as the running process.
+    await loadData();
     message.success('依赖准备完毕，服务方案已成功启动！');
   } catch (err: any) {
     message.error(err.message || '安装依赖或启动失败');
@@ -1204,6 +1265,7 @@ async function handleConfirmLaunch() {
     launchStage = '启动服务';
     message.loading('正在按 DAG 拓扑并发拉起服务...');
     await runnerStore.startProfile(savedProfile.id);
+    await loadData();
     message.success('服务方案已启动');
   } catch (err: any) {
     message.error(`${launchStage}失败：${err?.message || '未知错误'}`);
