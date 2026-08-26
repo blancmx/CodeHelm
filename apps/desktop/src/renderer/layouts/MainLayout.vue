@@ -39,10 +39,10 @@
               </div>
             </div>
 
-            <!-- Brand Text: Smooth fade & slide without affecting logo -->
+            <!-- Brand Text: Visible only when expanded -->
             <div
-              class="min-w-0 overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out pl-1.5"
-              :class="sidebarStore.isCollapsed ? 'max-w-0 opacity-0 pointer-events-none p-0 m-0' : 'max-w-[100px] opacity-100 translate-x-0'"
+              v-if="!sidebarStore.isCollapsed"
+              class="min-w-0 overflow-hidden whitespace-nowrap pl-1.5 flex-1 select-none"
             >
               <h1 class="font-bold text-xs tracking-tight truncate" :class="themeStore.isDark ? 'text-white' : 'text-zinc-950'">
                 CodeHelm
@@ -53,18 +53,16 @@
             </div>
           </div>
 
-          <!-- Right: Quick Search Button -->
+          <!-- Right: Quick Search Button (Visible only when expanded, 0 interference with collapsed logo) -->
           <button
+            v-if="!sidebarStore.isCollapsed"
             type="button"
-            class="w-7 h-7 rounded-lg border flex items-center justify-center transition-all duration-150 cursor-pointer flex-shrink-0 relative z-20 select-none ml-1"
-            :class="[
-              sidebarStore.isCollapsed ? 'hidden' : 'flex',
-              themeStore.isDark
-                ? 'bg-[#18181b] hover:bg-[#27272a] text-zinc-400 hover:text-white border-[#27272a] hover:border-zinc-500 shadow-2xs active:scale-95'
-                : 'bg-white hover:bg-zinc-100 text-zinc-600 hover:text-zinc-950 border-zinc-200 hover:border-zinc-300 shadow-2xs active:scale-95'
-            ]"
+            class="w-7 h-7 rounded-lg border flex items-center justify-center transition-all duration-150 cursor-pointer flex-shrink-0 relative z-20 select-none ml-1.5"
+            :class="themeStore.isDark
+              ? 'bg-[#18181b] hover:bg-[#27272a] text-zinc-400 hover:text-white border-[#27272a] hover:border-zinc-500 shadow-2xs active:scale-95'
+              : 'bg-white hover:bg-zinc-100 text-zinc-600 hover:text-zinc-950 border-zinc-200 hover:border-zinc-300 shadow-2xs active:scale-95'"
             title="搜索项目 (Ctrl+K)"
-            @click.stop.prevent="handleQuickSearch"
+            @click.stop="handleQuickSearch"
           >
             <IconSearch :size="14" class="pointer-events-none" />
           </button>
