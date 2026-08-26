@@ -161,24 +161,54 @@
 
     <!-- Quick Filter Tabs, Sorting & View Mode Switcher -->
     <div class="flex items-center justify-between pt-3 pb-2 flex-shrink-0 gap-3">
-      <!-- Filter Tabs -->
-      <div class="flex items-center gap-1.5 overflow-x-auto py-0.5">
-        <button
-          v-for="filter in filterOptions"
-          :key="filter.value"
-          class="px-3 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer flex-shrink-0"
-          :class="activeFilter === filter.value
-            ? (themeStore.isDark ? 'bg-white text-black font-bold shadow-sm' : 'bg-black text-white font-bold shadow-sm')
-            : (themeStore.isDark ? 'bg-[#18181b] text-zinc-400 hover:text-white border border-[#27272a]' : 'bg-white text-zinc-700 hover:bg-zinc-100 border border-zinc-200')"
-          @click="activeFilter = filter.value"
-        >
-          {{ filter.label }}
-          <span
-            v-if="filter.count !== undefined"
-            class="ml-1 text-[10px] opacity-80"
+      <!-- Left: Dynamic Ecosystem Tabs & Independent Running Toggle -->
+      <div class="flex items-center gap-2 overflow-x-auto py-0.5 min-w-0">
+        <!-- Dynamic Ecosystem Filter Tabs -->
+        <div class="flex items-center gap-1.5 flex-shrink-0">
+          <button
+            v-for="filter in filterOptions"
+            :key="filter.value"
+            class="px-3 py-1 rounded-lg text-xs font-medium transition-all duration-150 cursor-pointer flex-shrink-0 select-none"
+            :class="activeFilter === filter.value
+              ? (themeStore.isDark ? 'bg-white text-black font-bold shadow-sm' : 'bg-black text-white font-bold shadow-sm')
+              : (themeStore.isDark ? 'bg-[#18181b] text-zinc-400 hover:text-white border border-[#27272a]' : 'bg-white text-zinc-700 hover:bg-zinc-100 border border-zinc-200')"
+            @click="activeFilter = filter.value"
           >
-            ({{ filter.count }})
-          </span>
+            {{ filter.label }}
+            <span
+              v-if="filter.count !== undefined"
+              class="ml-1 text-[10px] opacity-80 font-mono"
+            >
+              ({{ filter.count }})
+            </span>
+          </button>
+        </div>
+
+        <!-- Vertical Divider -->
+        <div class="h-4 w-[1px] flex-shrink-0" :class="themeStore.isDark ? 'bg-[#27272a]' : 'bg-zinc-200'" />
+
+        <!-- Independent Running Status Filter Toggle Pill -->
+        <button
+          type="button"
+          class="h-6.5 px-2.5 rounded-lg text-xs font-medium transition-all duration-200 cursor-pointer flex items-center gap-1.5 flex-shrink-0 select-none border"
+          :class="[
+            onlyRunning
+              ? (themeStore.isDark
+                  ? 'bg-emerald-950/60 text-emerald-300 border-emerald-600 shadow-sm ring-1 ring-emerald-500/30'
+                  : 'bg-emerald-50 text-emerald-700 border-emerald-400 shadow-xs ring-1 ring-emerald-400/30')
+              : (themeStore.isDark
+                  ? 'bg-[#18181b] text-zinc-400 hover:text-zinc-200 border-[#27272a] hover:border-zinc-500'
+                  : 'bg-white text-zinc-600 hover:text-zinc-900 border-zinc-200 hover:border-zinc-300 shadow-2xs')
+          ]"
+          :title="onlyRunning ? '点击展示所有状态项目' : '点击仅筛选当前处于运行中的项目'"
+          @click="onlyRunning = !onlyRunning"
+        >
+          <span
+            class="w-1.5 h-1.5 rounded-full"
+            :class="runningProjectsCount > 0 ? (onlyRunning ? 'bg-emerald-400 pulsing-dot-active' : 'bg-emerald-400') : 'bg-zinc-400'"
+          />
+          <span>仅看运行中</span>
+          <span class="text-[10px] opacity-80 font-mono">({{ runningProjectsCount }})</span>
         </button>
       </div>
 
@@ -273,7 +303,7 @@
       <transition name="view-fade-slide" mode="out-in">
         <!-- Empty State -->
         <div
-          v-if="filteredProjects.length === 0 && !searchQuery.trim() && activeFilter === 'ALL'"
+          v-if="filteredProjects.length === 0 && !searchQuery.trim() && activeFilter === 'ALL' && !onlyRunning"
           key="empty-state"
           class="flex-1 flex flex-col items-center justify-center text-center max-w-lg mx-auto py-8 my-auto"
         >
@@ -652,7 +682,8 @@ async function handleManualRefresh() {
 }
 
 const searchQuery = ref('');
-const activeFilter = ref<'ALL' | 'FRONTEND' | 'BACKEND' | 'RUNNING'>('ALL');
+const activeFilter = ref<string>('ALL');
+const onlyRunning = ref(false);
 const sortBy = ref<'recent' | 'name' | 'services' | 'status'>('recent');
 const isSortOpen = ref(false);
 
@@ -703,18 +734,104 @@ const topTechnologiesText = computed(() => {
   return uniqueTechnologies.value.slice(0, 4).join(' • ');
 });
 
+const runningProjectsCount = computed(() => {
+  return (projectStore.projects || []).filter(
+    (p: ProjectSummaryDto) => p.lastRunStatus === 'RUNNING' || p.lastRunStatus === 'STARTING'
+  ).length;
+});
+
+interface EcosystemCategory {
+  key: string;
+  label: string;
+  match: (p: ProjectSummaryDto) => boolean;
+}
+
+const standardEcosystems: EcosystemCategory[] = [
+  {
+    key: 'NODE_WEB',
+    label: 'Node / Web 前端',
+    match: (p) => {
+      const items = [
+        ...(Array.isArray(p.primaryLanguages) ? p.primaryLanguages : []),
+        ...(Array.isArray(p.primaryFrameworks) ? p.primaryFrameworks : []),
+      ].map((s) => (s || '').toLowerCase());
+      return items.some((i) =>
+        ['vue', 'react', 'typescript', 'javascript', 'html', 'next.js', 'vite', 'nuxt', 'node.js', 'express', 'nestjs', 'electron', 'angular', 'svelte'].includes(i)
+      );
+    },
+  },
+  {
+    key: 'PYTHON_AI',
+    label: 'Python / AI',
+    match: (p) => {
+      const items = [
+        ...(Array.isArray(p.primaryLanguages) ? p.primaryLanguages : []),
+        ...(Array.isArray(p.primaryFrameworks) ? p.primaryFrameworks : []),
+      ].map((s) => (s || '').toLowerCase());
+      return items.some((i) =>
+        ['python', 'fastapi', 'flask', 'django', 'pytorch', 'langchain', 'openai', 'transformers', 'pandas', 'numpy'].includes(i)
+      );
+    },
+  },
+  {
+    key: 'JAVA_SPRING',
+    label: 'Java / Spring',
+    match: (p) => {
+      const items = [
+        ...(Array.isArray(p.primaryLanguages) ? p.primaryLanguages : []),
+        ...(Array.isArray(p.primaryFrameworks) ? p.primaryFrameworks : []),
+      ].map((s) => (s || '').toLowerCase());
+      return items.some((i) =>
+        ['java', 'spring', 'spring boot', 'maven', 'gradle', 'kotlin'].includes(i)
+      );
+    },
+  },
+  {
+    key: 'GO',
+    label: 'Go',
+    match: (p) => {
+      const items = [
+        ...(Array.isArray(p.primaryLanguages) ? p.primaryLanguages : []),
+        ...(Array.isArray(p.primaryFrameworks) ? p.primaryFrameworks : []),
+      ].map((s) => (s || '').toLowerCase());
+      return items.some((i) =>
+        ['go', 'gin', 'echo', 'fiber', 'go modules', 'golang'].includes(i)
+      );
+    },
+  },
+  {
+    key: 'RUST',
+    label: 'Rust',
+    match: (p) => {
+      const items = [
+        ...(Array.isArray(p.primaryLanguages) ? p.primaryLanguages : []),
+        ...(Array.isArray(p.primaryFrameworks) ? p.primaryFrameworks : []),
+      ].map((s) => (s || '').toLowerCase());
+      return items.some((i) =>
+        ['rust', 'cargo', 'actix', 'axum', 'tauri', 'tokio'].includes(i)
+      );
+    },
+  },
+];
+
 const filterOptions = computed(() => {
   const list = projectStore.projects || [];
-  const runningCount = list.filter((p: ProjectSummaryDto) => p.lastRunStatus === 'RUNNING' || p.lastRunStatus === 'STARTING').length;
-  const frontendCount = list.filter((p: ProjectSummaryDto) => (p.primaryLanguages || []).some((l: string) => ['Vue', 'TypeScript', 'JavaScript', 'HTML', 'React'].includes(l))).length;
-  const backendCount = list.filter((p: ProjectSummaryDto) => (p.primaryLanguages || []).some((l: string) => ['Python', 'Java', 'Go', 'Rust', 'C#', 'Go Modules', 'Kotlin'].includes(l))).length;
-
-  return [
-    { label: '全部项目', value: 'ALL' as const, count: list.length },
-    { label: '前端工程', value: 'FRONTEND' as const, count: frontendCount },
-    { label: '后端 / 全栈', value: 'BACKEND' as const, count: backendCount },
-    { label: '运行中', value: 'RUNNING' as const, count: runningCount },
+  const res = [
+    { label: '全部项目', value: 'ALL', count: list.length },
   ];
+
+  for (const eco of standardEcosystems) {
+    const count = list.filter(eco.match).length;
+    if (count > 0) {
+      res.push({
+        label: eco.label,
+        value: eco.key,
+        count,
+      });
+    }
+  }
+
+  return res;
 });
 
 const filteredProjects = computed(() => {
@@ -722,26 +839,26 @@ const filteredProjects = computed(() => {
 
   return list.filter((p: ProjectSummaryDto) => {
     if (!p) return false;
-    const langs = Array.isArray(p.primaryLanguages) ? p.primaryLanguages : [];
-    const frameworks = Array.isArray(p.primaryFrameworks) ? p.primaryFrameworks : [];
-    const tags = Array.isArray(p.tags) ? p.tags : [];
-    const name = p.name || '';
-    const rootPath = p.rootPath || '';
 
-    // 1. Filter by category
-    if (activeFilter.value === 'RUNNING') {
+    // 1. Independent Running status toggle
+    if (onlyRunning.value) {
       if (p.lastRunStatus !== 'RUNNING' && p.lastRunStatus !== 'STARTING') return false;
-    } else if (activeFilter.value === 'FRONTEND') {
-      if (!langs.some((l: string) => ['Vue', 'TypeScript', 'JavaScript', 'HTML', 'React'].includes(l))) return false;
-    } else if (activeFilter.value === 'BACKEND') {
-      if (!langs.some((l: string) => ['Python', 'Java', 'Go', 'Rust', 'C#', 'Go Modules', 'Kotlin'].includes(l))) return false;
     }
 
-    // 2. Filter by search query
+    // 2. Dynamic Ecosystem category
+    if (activeFilter.value !== 'ALL') {
+      const eco = standardEcosystems.find((e) => e.key === activeFilter.value);
+      if (eco && !eco.match(p)) return false;
+    }
+
+    // 3. Search query
     if (searchQuery.value && searchQuery.value.trim()) {
       const q = searchQuery.value.toLowerCase().trim();
-      const matchName = name.toLowerCase().includes(q);
-      const matchPath = rootPath.toLowerCase().includes(q);
+      const matchName = (p.name || '').toLowerCase().includes(q);
+      const matchPath = (p.rootPath || '').toLowerCase().includes(q);
+      const langs = Array.isArray(p.primaryLanguages) ? p.primaryLanguages : [];
+      const frameworks = Array.isArray(p.primaryFrameworks) ? p.primaryFrameworks : [];
+      const tags = Array.isArray(p.tags) ? p.tags : [];
       const matchLang = langs.some((l: string) => (l || '').toLowerCase().includes(q));
       const matchFw = frameworks.some((f: string) => (f || '').toLowerCase().includes(q));
       const matchTag = tags.some((t: string) => (t || '').toLowerCase().includes(q));
