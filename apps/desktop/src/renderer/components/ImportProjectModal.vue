@@ -3,82 +3,97 @@
     v-model:show="store.importModalVisible"
     preset="card"
     title="导入代码工程"
-    class="w-720px border shadow-2xl transition-colors duration-200"
+    class="w-680px border shadow-2xl transition-colors duration-200"
     :class="themeStore.isDark ? 'bg-[#121216] border-[#27272a] shadow-black/80' : 'bg-white border-zinc-200 shadow-zinc-400/30'"
     :segmented="{ content: 'soft', footer: 'soft' }"
   >
     <div class="space-y-4 pt-1">
       <div>
-        <label class="block text-xs mb-1.5 font-medium" :class="themeStore.isDark ? 'text-zinc-300' : 'text-zinc-700'">
-          选择项目根目录路径 *
+        <label class="block text-xs mb-2 font-medium" :class="themeStore.isDark ? 'text-zinc-300' : 'text-zinc-700'">
+          选择项目根目录 *
         </label>
 
-        <!-- Clickable Direct Explorer Dropzone -->
+        <!-- 1. Expanded Clickable Explorer Dropzone (When unselected) -->
         <div
           v-if="!singleForm.rootPath"
-          class="border border-dashed rounded-xl p-6 text-center transition-all cursor-pointer group mb-3"
-          :class="themeStore.isDark ? 'bg-[#18181b]/60 border-zinc-700 hover:border-zinc-400 hover:bg-[#18181b]' : 'bg-zinc-50 border-zinc-300 hover:border-zinc-500 hover:bg-zinc-100'"
+          class="border-2 border-dashed rounded-2xl py-10 px-6 text-center transition-all duration-200 cursor-pointer group select-none"
+          :class="themeStore.isDark
+            ? 'bg-[#18181b]/70 border-zinc-700 hover:border-zinc-400 hover:bg-[#18181b] shadow-sm'
+            : 'bg-zinc-50/80 border-zinc-300 hover:border-zinc-500 hover:bg-zinc-100/90 shadow-xs'"
           @click="handleSelectSingleDir"
         >
           <div
-            class="w-11 h-11 rounded-xl border mx-auto mb-2.5 flex items-center justify-center transition-transform group-hover:scale-110"
-            :class="themeStore.isDark ? 'bg-[#27272a] border-[#3f3f46] text-white' : 'bg-white border-zinc-200 text-zinc-950'"
+            class="w-14 h-14 rounded-2xl border mx-auto mb-3.5 flex items-center justify-center transition-all duration-300 group-hover:scale-108 group-hover:shadow-md"
+            :class="themeStore.isDark ? 'bg-[#27272a] border-[#3f3f46] text-white shadow-black/40' : 'bg-white border-zinc-200 text-zinc-950 shadow-zinc-200'"
           >
-            <IconFolderOpen :size="20" />
+            <IconFolderOpen :size="26" />
           </div>
-          <div class="text-xs font-bold" :class="themeStore.isDark ? 'text-zinc-200' : 'text-zinc-800'">
+          <div class="text-sm font-bold tracking-tight" :class="themeStore.isDark ? 'text-white' : 'text-zinc-950'">
             点击打开文件资源管理器选择项目根目录
           </div>
-          <div class="text-[11px] mt-1" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
-            无论项目下包含多少子文件夹（如 frontend、backend、src、docs 等），均纳管为 1 个整体工程
+          <div class="text-xs mt-1.5 leading-relaxed max-w-md mx-auto" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
+            支持 Monorepo 及包含多个前后端/子模块的代码库，CodeHelm 将秒级自动探测技术栈与命令
           </div>
         </div>
 
-        <div class="flex gap-2">
-          <n-input
-            v-model:value="singleForm.rootPath"
-            placeholder="点击右侧按钮或在此输入项目绝对路径..."
-            class="flex-1 font-mono text-xs"
-            @update:value="handlePathChange"
-          />
-          <n-button type="default" secondary @click="handleSelectSingleDir">
-            <template #icon>
-              <IconFolderOpen :size="14" />
-            </template>
-            打开资源管理器...
-          </n-button>
-        </div>
-      </div>
+        <!-- 2. Selected Directory Info & Action Card (When selected) -->
+        <div
+          v-else
+          class="border rounded-2xl p-4.5 space-y-3 transition-colors"
+          :class="themeStore.isDark ? 'bg-[#18181b] border-[#27272a]' : 'bg-zinc-50 border-zinc-200 shadow-xs'"
+        >
+          <div class="flex items-start justify-between gap-3">
+            <div class="flex items-center gap-3 min-w-0">
+              <div
+                class="w-10 h-10 rounded-xl border flex items-center justify-center flex-shrink-0"
+                :class="themeStore.isDark ? 'bg-[#27272a] border-[#3f3f46] text-white' : 'bg-white border-zinc-200 text-zinc-950'"
+              >
+                <IconFolderOpen :size="18" />
+              </div>
+              <div class="min-w-0">
+                <div class="text-xs font-bold truncate" :class="themeStore.isDark ? 'text-white' : 'text-zinc-950'">
+                  {{ singleForm.name || '已选定工程目录' }}
+                </div>
+                <div
+                  class="text-[11px] font-mono truncate max-w-380px mt-0.5"
+                  :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'"
+                  :title="singleForm.rootPath"
+                >
+                  {{ singleForm.rootPath }}
+                </div>
+              </div>
+            </div>
 
-      <!-- Detected Project Preview Info Card -->
-      <div
-        v-if="singleForm.rootPath"
-        class="border rounded-xl p-3.5 space-y-2 transition-colors"
-        :class="themeStore.isDark ? 'bg-[#18181b] border-[#27272a]' : 'bg-zinc-50 border-zinc-200'"
-      >
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-2">
-            <span class="text-xs font-bold" :class="themeStore.isDark ? 'text-white' : 'text-zinc-950'">
-              {{ singleForm.name || '待导入工程' }}
-            </span>
-            <span
-              v-if="detectedPreview?.framework"
-              class="text-[10px] font-medium px-2 py-0.5 rounded border"
-              :class="themeStore.isDark ? 'bg-[#27272a] text-zinc-200 border-[#3f3f46]' : 'bg-zinc-200 text-zinc-900 border-zinc-300'"
-            >
-              {{ detectedPreview.framework }}
-            </span>
+            <n-button size="tiny" secondary @click="handleSelectSingleDir">
+              <template #icon>
+                <IconFolderOpen :size="12" />
+              </template>
+              更换目录...
+            </n-button>
           </div>
-          <span class="text-[11px] font-mono" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
-            将作为 1 个统一工程纳管
-          </span>
-        </div>
 
-        <div class="text-[11px] flex items-center gap-3" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
-          <span>推荐启动指令:</span>
-          <code class="font-mono text-xs px-1.5 py-0.5 rounded border" :class="themeStore.isDark ? 'bg-[#121216] border-[#27272a] text-zinc-200' : 'bg-white border-zinc-200 text-zinc-800'">
-            $ {{ detectedPreview?.recommendedRunCommand || 'npm run dev' }}
-          </code>
+          <!-- Detected Framework & Command Details -->
+          <div
+            class="pt-3 border-t flex items-center justify-between text-xs transition-colors"
+            :class="themeStore.isDark ? 'border-[#27272a]' : 'border-zinc-200'"
+          >
+            <div class="flex items-center gap-2">
+              <span class="text-[11px]" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">探测技术栈:</span>
+              <span
+                class="text-[10px] font-mono font-medium px-2 py-0.5 rounded border"
+                :class="themeStore.isDark ? 'bg-[#27272a] text-zinc-200 border-[#3f3f46]' : 'bg-zinc-200 text-zinc-900 border-zinc-300'"
+              >
+                {{ detectedPreview?.framework || '通用项目' }}
+              </span>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <span class="text-[11px]" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">推断启动:</span>
+              <code class="font-mono text-[11px] px-2 py-0.5 rounded border" :class="themeStore.isDark ? 'bg-[#121216] border-[#27272a] text-zinc-200' : 'bg-white border-zinc-200 text-zinc-800'">
+                $ {{ detectedPreview?.recommendedRunCommand || 'npm run dev' }}
+              </code>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -98,7 +113,7 @@
 
       <!-- Bottom Safety Guarantee -->
       <div
-        class="border rounded-lg p-3 text-xs flex items-start gap-2.5 transition-colors mt-2"
+        class="border rounded-xl p-3 text-xs flex items-start gap-2.5 transition-colors mt-2"
         :class="themeStore.isDark ? 'bg-[#18181b] border-[#27272a] text-zinc-400' : 'bg-zinc-50 border-zinc-200 text-zinc-600'"
       >
         <IconLock :size="14" class="text-zinc-400 flex-shrink-0 mt-0.5" />
@@ -118,7 +133,7 @@
           :disabled="!singleForm.rootPath.trim()"
           @click="handleSingleImportSubmit"
         >
-          确认导入为 1 个整体工程并进入
+          确认导入工程并进入
         </n-button>
       </div>
     </template>
@@ -153,18 +168,11 @@ async function handleSelectSingleDir() {
   const selected = await store.selectDirectory();
   if (selected) {
     singleForm.rootPath = selected.path;
-    singleForm.name = selected.name || singleForm.name || 'Project';
-    await runPreScan(selected.path);
-  }
-}
-
-async function handlePathChange(val: string) {
-  if (val.trim()) {
-    const defaultName = val.split(/[/\\]/).filter(Boolean).pop() || 'Project';
+    const defaultName = selected.name || selected.path.split(/[/\\]/).filter(Boolean).pop() || 'Project';
     if (!singleForm.name) {
       singleForm.name = defaultName;
     }
-    await runPreScan(val.trim());
+    await runPreScan(selected.path);
   }
 }
 
@@ -182,7 +190,7 @@ async function runPreScan(rootPath: string) {
 
 async function handleSingleImportSubmit() {
   if (!singleForm.rootPath.trim()) {
-    message.warning('请输入或选择项目根目录');
+    message.warning('请选择项目根目录');
     return;
   }
 
