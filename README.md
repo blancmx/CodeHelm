@@ -1,11 +1,9 @@
-<div align="center">
-
-# <img src="./assets/logo.svg" width="36" height="36" valign="middle" alt="CodeHelm Logo" /> CodeHelm
+# <img src="./assets/logo.svg" width="36" height="36" valign="middle" alt="CodeHelm" /> CodeHelm
 
 ### 本地项目控制台与多进程自动化运行中心
 **A Local Project Dashboard & Multi-Process Orchestrator for the AI & Vibe Coding Era**
 
-<p align="center">
+<p align="left">
   <img src="https://img.shields.io/badge/Electron-33.x-black?style=flat-square&logo=electron" alt="Electron" />
   <img src="https://img.shields.io/badge/Vue-3.5-black?style=flat-square&logo=vue.js" alt="Vue 3" />
   <img src="https://img.shields.io/badge/TypeScript-5.x-black?style=flat-square&logo=typescript" alt="TypeScript" />
@@ -13,8 +11,6 @@
   <img src="https://img.shields.io/badge/SQLite-Better--sqlite3-black?style=flat-square&logo=sqlite" alt="SQLite" />
   <img src="https://img.shields.io/badge/License-MIT-black?style=flat-square" alt="License" />
 </p>
-
-</div>
 
 ---
 
