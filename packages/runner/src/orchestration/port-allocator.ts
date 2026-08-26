@@ -26,7 +26,7 @@ async function canBindHost(port: number, host: string): Promise<boolean> {
   });
 }
 
-async function canBind(port: number): Promise<boolean> {
+export async function isPortAvailable(port: number): Promise<boolean> {
   // Vite and several other frameworks resolve localhost to IPv6 on Windows.
   // A port is safe only when both localhost loopback families are available.
   const [ipv4Available, ipv6Available] = await Promise.all([
@@ -39,7 +39,7 @@ async function canBind(port: number): Promise<boolean> {
 export async function prepareServicePort(
   service: ServiceConfig,
   reservedPorts: Set<number>,
-  isAvailable: (port: number) => Promise<boolean> = canBind
+  isAvailable: (port: number) => Promise<boolean> = isPortAvailable
 ): Promise<RuntimePortResolution> {
   if (!service.port) return { service: cloneService(service), changed: false };
 

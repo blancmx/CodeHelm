@@ -15,6 +15,7 @@ import { normalizePath } from '@codehelm/shared';
 import fs from 'node:fs';
 import path from 'node:path';
 import { upsertAutoDetectedProfile } from './auto-profile.js';
+import { getPersistentPortAllocator } from './persistent-port-allocator.js';
 
 export function registerProjectHandlers(db: DatabaseInstance) {
   const projectRepo = new ProjectRepository(db);
@@ -22,6 +23,7 @@ export function registerProjectHandlers(db: DatabaseInstance) {
   const profileRepo = new ProfileRepository(db);
   const workspaceScanner = new WorkspaceScanner();
   const analyzerEngine = new AnalyzerEngine();
+  const portAllocator = getPersistentPortAllocator(db);
 
   // Helper to run quick analysis and auto-generate default RunProfile
   async function autoAnalyzeAndProfile(projectId: string, rootPath: string) {
@@ -38,7 +40,7 @@ export function registerProjectHandlers(db: DatabaseInstance) {
         projectId
       );
 
-      upsertAutoDetectedProfile(profileRepo, projectId, snapshot);
+      await upsertAutoDetectedProfile(profileRepo, projectId, snapshot, portAllocator);
     } catch (err) {
       console.warn(`Auto analyze failed for project ${projectId}:`, err);
     }

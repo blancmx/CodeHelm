@@ -4,6 +4,14 @@ import { generateId } from '@codehelm/shared';
 
 export const AUTO_PROFILE_NAME = 'Default (Auto-Detected)';
 
+export interface DetectedServicePortAllocator {
+  allocate(
+    projectId: string,
+    services: ServiceConfig[],
+    existingServices?: ServiceConfig[]
+  ): Promise<ServiceConfig[]>;
+}
+
 function inferSimpleFrontendDependency(services: ServiceConfig[]): ServiceConfig[] {
   const enabledBackends = services.filter(
     (service) => service.enabled && service.type === 'backend'
@@ -103,19 +111,27 @@ export function mergeDetectedServices(
   return inferSimpleFrontendDependency(cleaned);
 }
 
-export function upsertAutoDetectedProfile(
+export async function upsertAutoDetectedProfile(
   profileRepo: ProfileRepository,
   projectId: string,
-  snapshot: AnalysisSnapshot
-): void {
+  snapshot: AnalysisSnapshot,
+  portAllocator?: DetectedServicePortAllocator
+): Promise<void> {
   const profiles = profileRepo.findByProjectId(projectId);
   const autoProfile = profiles.find((profile) => profile.name === AUTO_PROFILE_NAME);
 
   // Never create a second default beside user-created profiles.
   if (!autoProfile && profiles.length > 0) return;
 
-  const detectedServices = buildDetectedServices(snapshot);
+  let detectedServices = buildDetectedServices(snapshot);
   if (detectedServices.length === 0) return;
+  if (portAllocator) {
+    detectedServices = await portAllocator.allocate(
+      projectId,
+      detectedServices,
+      autoProfile?.services ?? []
+    );
+  }
   const services = autoProfile
     ? mergeDetectedServices(autoProfile.services, detectedServices)
     : detectedServices;

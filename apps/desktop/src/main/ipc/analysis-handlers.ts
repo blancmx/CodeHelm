@@ -5,6 +5,7 @@ import { AnalysisRepository, ProfileRepository, ProjectRepository } from '@codeh
 import { AnalyzerEngine } from '@codehelm/analyzer';
 import { generateId } from '@codehelm/shared';
 import { upsertAutoDetectedProfile } from './auto-profile.js';
+import { getPersistentPortAllocator } from './persistent-port-allocator.js';
 
 const activeAnalyzers = new Map<string, AnalyzerEngine>();
 
@@ -12,6 +13,7 @@ export function registerAnalysisHandlers(db: DatabaseInstance) {
   const analysisRepo = new AnalysisRepository(db);
   const projectRepo = new ProjectRepository(db);
   const profileRepo = new ProfileRepository(db);
+  const portAllocator = getPersistentPortAllocator(db);
 
   ipcMain.handle(IpcChannels.ANALYSIS_GET_LATEST, async (_event, projectId: string) => {
     return analysisRepo.findLatestByProjectId(projectId);
@@ -48,7 +50,7 @@ export function registerAnalysisHandlers(db: DatabaseInstance) {
       );
 
       // Refresh only the unconfirmed auto profile. Confirmed or manual profiles remain untouched.
-      upsertAutoDetectedProfile(profileRepo, projectId, snapshot);
+      await upsertAutoDetectedProfile(profileRepo, projectId, snapshot, portAllocator);
 
       return { taskId, snapshot: savedSnapshot };
     } finally {
