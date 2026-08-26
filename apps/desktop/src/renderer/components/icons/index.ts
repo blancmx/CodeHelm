@@ -259,6 +259,12 @@ export const IconX = createIcon('IconX', () => [
   h('line', { x1: 6, y1: 6, x2: 18, y2: 18 }),
 ]);
 
+export const IconDownload = createIcon('IconDownload', () => [
+  h('path', { d: 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4' }),
+  h('polyline', { points: '7 10 12 15 17 10' }),
+  h('line', { x1: 12, y1: 15, x2: 12, y2: 3 }),
+]);
+
 export const IconPalette = createIcon('IconPalette', () => [
   h('circle', { cx: 13.5, cy: 6.5, r: 0.5, fill: 'currentColor' }),
   h('circle', { cx: 17.5, cy: 10.5, r: 0.5, fill: 'currentColor' }),
