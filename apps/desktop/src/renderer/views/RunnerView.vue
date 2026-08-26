@@ -121,21 +121,9 @@
             <div class="flex items-center gap-2">
               <n-button
                 size="small"
-                secondary
-                class="font-medium text-xs"
-                @click="$router.push(`/projects/${proj.projectId}?tab=logs`)"
-              >
-                <template #icon>
-                  <IconTerminal :size="13" />
-                </template>
-                查看实时控制台
-              </n-button>
-
-              <n-button
-                size="small"
                 type="error"
                 secondary
-                class="font-medium text-xs !text-rose-600 dark:!text-rose-400 !border-rose-500/30 hover:!bg-rose-500/10"
+                class="font-medium text-xs !text-rose-600 dark:!text-rose-400 !border-rose-500/30 hover:!bg-rose-500/10 shadow-2xs"
                 @click="handleStopProject(proj)"
               >
                 <template #icon>
@@ -243,47 +231,6 @@
             </div>
           </div>
         </div>
-
-        <!-- Global Aggregated Log Stream -->
-        <div class="bg-[#09090b] border border-[#27272a] rounded-xl overflow-hidden shadow-2xl">
-          <div class="h-10 px-4 bg-[#121216] border-b border-[#27272a] flex items-center justify-between select-none">
-            <span class="text-xs font-sans font-semibold text-zinc-300 flex items-center gap-2">
-              <IconTerminal :size="14" class="text-zinc-400" />
-              <span>跨项目全局聚合控制台日志 (最近 200 条)</span>
-            </span>
-
-            <n-button size="tiny" quaternary type="error" @click="runnerStore.clearLogs">
-              <template #icon>
-                <IconTrash :size="12" />
-              </template>
-              清屏
-            </n-button>
-          </div>
-
-          <div class="h-64 overflow-y-auto p-3 font-mono text-xs space-y-1 select-text bg-[#09090b] [scrollbar-gutter:stable]">
-            <div v-if="runnerStore.logs.length === 0" class="text-zinc-600 text-center py-16 font-sans">
-              暂无运行日志输出...
-            </div>
-            <div
-              v-for="(entry, idx) in runnerStore.logs.slice(-200)"
-              :key="idx"
-              class="break-all flex items-start gap-2 hover:bg-[#18181b] px-1.5 py-0.5 rounded transition-colors"
-            >
-              <span class="text-zinc-500 text-[10px] select-none flex-shrink-0 font-mono">
-                {{ entry.timestamp ? new Date(entry.timestamp).toLocaleTimeString() : '' }}
-              </span>
-              <span class="text-zinc-200 font-medium text-[10px] bg-zinc-800 px-1.5 py-0.2 rounded flex-shrink-0 select-none border border-zinc-700 font-sans">
-                {{ entry.serviceName }}
-              </span>
-              <span
-                class="flex-1 text-xs"
-                :class="entry.stream === 'stderr' ? 'text-rose-400 font-medium' : 'text-zinc-300'"
-              >
-                {{ entry.message }}
-              </span>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   </div>
@@ -300,8 +247,6 @@ import {
   IconZap,
   IconSquare,
   IconExternalLink,
-  IconTerminal,
-  IconTrash,
   IconCopy,
   IconRefresh,
 } from '../components/icons/index.js';
@@ -361,19 +306,13 @@ const runningProjectGroups = computed<RunningProjectGroup[]>(() => {
         isBackend,
       };
 
-      // Determine the project for this service
-      let projId = val.projectId || runnerStore.currentSession?.projectId || projectStore.currentProject?.id || 'default-project';
-      let projObj = projectStore.projects.find((p) => p.id === projId);
+      // Determine the project for this service strictly by its own projectId
+      const projId = val.projectId || 'unassigned';
+      const projObj = projectStore.projects.find((p) => p.id === projId);
 
-      // If not found by ID, fallback to matching by project in store
-      if (!projObj && projectStore.projects.length > 0) {
-        projObj = projectStore.projects[0];
-        projId = projObj.id;
-      }
-
-      const projectName = projObj?.name || projectStore.currentProject?.name || '本地运行项目';
-      const projectPath = projObj?.rootPath || projectStore.currentProject?.rootPath || '';
-      const runSessionId = val.runSessionId || runnerStore.currentSession?.id;
+      const projectName = projObj?.name || (val.serviceName ? `${val.serviceName}` : '运行中项目');
+      const projectPath = projObj?.rootPath || '';
+      const runSessionId = val.runSessionId;
 
       if (!groupsMap.has(projId)) {
         groupsMap.set(projId, {

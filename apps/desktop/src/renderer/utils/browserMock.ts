@@ -1112,11 +1112,13 @@ export function setupBrowserMock() {
         const hasFrontendDir = fileTree.some((f) => f.type === 'directory' && ['frontend', 'web', 'client', 'ui'].includes(f.name.toLowerCase()));
         const hasBackendDir = fileTree.some((f) => f.type === 'directory' && ['backend', 'server', 'api'].includes(f.name.toLowerCase()));
 
+        const shortId = projectId.replace(/-/g, '').slice(0, 8);
+
         // Fullstack Project (e.g. LangChainRAG or any project with frontend + backend subdirs)
         if (isLangChainOrRag || (hasFrontendDir && hasBackendDir)) {
-          const profileId = generateUuid();
-          const srvBackendId = 'srv-backend';
-          const srvFrontendId = 'srv-frontend';
+          const profileId = `prof-${shortId}-fullstack`;
+          const srvBackendId = `srv-${shortId}-backend`;
+          const srvFrontendId = `srv-${shortId}-frontend`;
 
           return [
             {
@@ -1172,18 +1174,20 @@ export function setupBrowserMock() {
         const args = parts.slice(1);
         const isPython = found?.summary.primaryLanguages?.includes('Python');
         const port = isPython ? undefined : 5173;
+        const profileId = `prof-${shortId}-main`;
+        const srvDefaultId = `srv-${shortId}-default`;
 
         return [
           {
-            id: generateUuid(),
+            id: profileId,
             projectId,
             name: '默认受控启动配置',
             isDefault: true,
             failurePolicy: 'continue',
             services: [
               {
-                id: 'srv-default',
-                runProfileId: generateUuid(),
+                id: srvDefaultId,
+                runProfileId: profileId,
                 name: `${found?.summary.name || 'Main'} Process`,
                 type: isPython ? 'backend' : 'frontend',
                 moduleRelativePath: '.',
@@ -1221,19 +1225,27 @@ export function setupBrowserMock() {
         const sessionId = generateUuid();
         const list = getStoredMockData();
         let targetProfile: RunProfileDto | undefined;
+        let targetProjectId = '';
 
         for (const item of list) {
           const profs = await mockApi.profiles.list(item.project.id);
           const matched = profs.find((p) => p.id === profileId);
           if (matched) {
             targetProfile = matched;
+            targetProjectId = item.project.id;
             break;
           }
         }
 
+        if (!targetProjectId && list.length > 0) {
+          targetProjectId = list[0].project.id;
+        }
+
+        const shortId = targetProjectId ? targetProjectId.replace(/-/g, '').slice(0, 8) : 'default';
+
         const servicesToStart = targetProfile?.services || [
           {
-            id: 'srv-default',
+            id: `srv-${shortId}-default`,
             name: 'Main Process',
             type: 'backend' as const,
             executable: 'python',
@@ -1243,7 +1255,7 @@ export function setupBrowserMock() {
         ];
 
         const sessionServices = servicesToStart.map((srv, idx) => ({
-          id: `ss-${idx + 1}-${generateUuid().slice(0, 6)}`,
+          id: `ss-${shortId}-${idx + 1}`,
           runSessionId: sessionId,
           serviceConfigId: srv.id,
           serviceName: srv.name,
@@ -1252,6 +1264,7 @@ export function setupBrowserMock() {
           pid: 18490 + idx,
           port: srv.port,
           startedAt: new Date().toISOString(),
+          projectId: targetProjectId,
         }));
 
         for (const s of sessionServices) {
@@ -1261,7 +1274,7 @@ export function setupBrowserMock() {
 
         const session: RunSessionDto = {
           id: sessionId,
-          projectId: targetProfile?.projectId || generateUuid(),
+          projectId: targetProjectId || targetProfile?.projectId || generateUuid(),
           runProfileId: profileId,
           status: 'RUNNING',
           startedAt: new Date().toISOString(),
@@ -1329,42 +1342,36 @@ export function setupBrowserMock() {
       },
 
       async stopSession(sessionId: string) {
-        statusListeners.forEach((fn) => {
-          ['srv-backend', 'srv-frontend', 'srv-default', 'srv-1', 'srv-2'].forEach((cfgId) => {
-            fn({
-              projectId: generateUuid(),
-              runSessionId: sessionId,
-              serviceSessionId: `ss-${cfgId}`,
-              serviceConfigId: cfgId,
-              serviceName: 'Service',
-              status: 'STOPPED',
-            });
-          });
+        directoryHandleMap.forEach((val, key) => {
+          if (val && typeof val === 'object' && val.runSessionId === sessionId) {
+            statusListeners.forEach((fn) =>
+              fn({
+                projectId: val.projectId || '',
+                runSessionId: sessionId,
+                serviceSessionId: val.id || key,
+                serviceConfigId: val.serviceConfigId || key,
+                serviceName: val.serviceName || 'Service',
+                status: 'STOPPED',
+              })
+            );
+          }
         });
       },
 
       async stopService(serviceSessionId: string) {
-        statusListeners.forEach((fn) => {
-          fn({
-            projectId: generateUuid(),
-            runSessionId: '',
-            serviceSessionId,
-            serviceConfigId: serviceSessionId.startsWith('ss-') ? 'srv-default' : serviceSessionId,
-            serviceName: 'Service Process',
-            status: 'STOPPED',
-          });
-          // Also broadcast for srv-default, srv-backend, srv-frontend
-          ['srv-default', 'srv-backend', 'srv-frontend'].forEach((id) => {
+        const val = directoryHandleMap.get(serviceSessionId);
+        if (val) {
+          statusListeners.forEach((fn) =>
             fn({
-              projectId: generateUuid(),
-              runSessionId: '',
-              serviceSessionId,
-              serviceConfigId: id,
-              serviceName: 'Service Process',
+              projectId: val.projectId || '',
+              runSessionId: val.runSessionId || '',
+              serviceSessionId: val.id || serviceSessionId,
+              serviceConfigId: val.serviceConfigId || serviceSessionId,
+              serviceName: val.serviceName || 'Service Process',
               status: 'STOPPED',
-            });
-          });
-        });
+            })
+          );
+        }
       },
 
       async restartService(serviceSessionId: string) {
