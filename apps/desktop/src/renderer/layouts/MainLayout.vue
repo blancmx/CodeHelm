@@ -17,11 +17,11 @@
       <div class="overflow-hidden">
         <!-- Brand Header (Left: Logo, Right: Quick Search) -->
         <div
-          class="h-14 px-2 flex items-center transition-colors duration-200 overflow-hidden flex-shrink-0"
+          class="h-14 px-2 flex items-center justify-between transition-colors duration-200 overflow-hidden flex-shrink-0"
         >
           <!-- Left: Brand Logo & Title Container -->
           <div
-            class="flex items-center min-w-0 flex-1 overflow-hidden"
+            class="flex items-center min-w-0 overflow-hidden flex-1"
             :class="sidebarStore.isCollapsed ? 'cursor-pointer' : ''"
             :title="sidebarStore.isCollapsed ? '点击展开侧边栏' : ''"
             @click.stop="sidebarStore.isCollapsed ? sidebarStore.expandSidebar() : null"
@@ -41,8 +41,8 @@
 
             <!-- Brand Text: Smooth fade & slide without affecting logo -->
             <div
-              class="min-w-0 overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out"
-              :class="sidebarStore.isCollapsed ? 'max-w-0 opacity-0 pointer-events-none p-0 m-0' : 'max-w-[110px] opacity-100 pl-1.5 translate-x-0'"
+              class="min-w-0 overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out pl-1.5"
+              :class="sidebarStore.isCollapsed ? 'max-w-0 opacity-0 pointer-events-none p-0 m-0' : 'max-w-[100px] opacity-100 translate-x-0'"
             >
               <h1 class="font-bold text-xs tracking-tight truncate" :class="themeStore.isDark ? 'text-white' : 'text-zinc-950'">
                 CodeHelm
@@ -56,17 +56,17 @@
           <!-- Right: Quick Search Button -->
           <button
             type="button"
-            class="h-6.5 rounded-md flex items-center justify-center transition-all duration-300 ease-in-out cursor-pointer flex-shrink-0"
+            class="w-7 h-7 rounded-lg border flex items-center justify-center transition-all duration-150 cursor-pointer flex-shrink-0 relative z-20 select-none ml-1"
             :class="[
-              sidebarStore.isCollapsed ? 'w-0 max-w-0 opacity-0 pointer-events-none p-0 m-0 border-0 overflow-hidden' : 'w-6.5 opacity-100 ml-1',
+              sidebarStore.isCollapsed ? 'hidden' : 'flex',
               themeStore.isDark
-                ? 'hover:bg-[#18181b] text-zinc-400 hover:text-white border border-transparent hover:border-[#27272a] hover:scale-105 active:scale-95'
-                : 'hover:bg-zinc-200/70 text-zinc-500 hover:text-zinc-900 border border-transparent hover:border-zinc-300 hover:scale-105 active:scale-95'
+                ? 'bg-[#18181b] hover:bg-[#27272a] text-zinc-400 hover:text-white border-[#27272a] hover:border-zinc-500 shadow-2xs active:scale-95'
+                : 'bg-white hover:bg-zinc-100 text-zinc-600 hover:text-zinc-950 border-zinc-200 hover:border-zinc-300 shadow-2xs active:scale-95'
             ]"
             title="搜索项目 (Ctrl+K)"
-            @click.stop="handleQuickSearch"
+            @click.stop.prevent="handleQuickSearch"
           >
-            <IconSearch :size="15" />
+            <IconSearch :size="14" class="pointer-events-none" />
           </button>
         </div>
 
