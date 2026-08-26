@@ -184,7 +184,7 @@
         <div class="flex items-center justify-between">
           <span class="font-bold" :class="themeStore.isDark ? 'text-white' : 'text-zinc-950'">关于 CodeHelm</span>
           <span class="font-mono px-2 py-0.5 rounded text-[10px] border" :class="themeStore.isDark ? 'bg-[#18181b] text-zinc-300 border-[#27272a]' : 'bg-zinc-100 text-zinc-800 border-zinc-200'">
-            v1.0.0 (Windows x64)
+            v0.1 (Windows x64)
           </span>
         </div>
         <div
