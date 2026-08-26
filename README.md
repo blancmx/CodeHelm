@@ -86,23 +86,6 @@ pnpm install
 pnpm build
 ```
 
-### 3. 启动开发模式
-- **方式一：通过终端启动**
-```bash
-pnpm dev
-```
-- **方式二：Windows 桌面双击直接启动**
-双击运行根目录下的 `start-desktop.bat` 脚本。
-
-- **方式三：纯浏览器访问**
-启动后直接在浏览器中打开：[http://localhost:5173/](http://localhost:5173/)（内置完整浏览器模拟适配层）。
-
-### 4. 构建打包
-```bash
-# 构建全部包及桌面客户端应用
-pnpm -r run build
-```
-
 ---
 
 ## 🛠️ 技术栈 (Tech Stack)
