@@ -134,7 +134,7 @@
           :disabled="!singleForm.rootPath.trim()"
           @click="handleSingleImportSubmit"
         >
-          确认导入工程并进入
+          确认导入工程
         </n-button>
       </div>
     </template>
@@ -144,7 +144,6 @@
 <script setup lang="ts">
 import { ref, reactive } from 'vue';
 import { message } from '../utils/discrete.js';
-import { useRouter } from 'vue-router';
 import { useProjectStore } from '../stores/projectStore.js';
 import { useThemeStore } from '../stores/themeStore.js';
 import type { DiscoveredProjectDto } from '@codehelm/contracts';
@@ -156,7 +155,6 @@ import {
 
 const store = useProjectStore();
 const themeStore = useThemeStore();
-const router = useRouter();
 
 // Single project form state
 const singleForm = reactive({
@@ -212,7 +210,7 @@ async function handleSingleImportSubmit() {
       detectedPreview.value = null;
 
       message.success(`工程 "${project.name}" 纳管成功！已自动建立技术画像`);
-      router.push(`/projects/${project.id}`);
+      await store.fetchProjects();
     }
   } catch (err: any) {
     message.error(err.message || '导入工程失败');
