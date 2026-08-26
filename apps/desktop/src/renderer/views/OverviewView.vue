@@ -232,19 +232,19 @@
         >
           <button
             type="button"
-            class="h-7.5 w-[124px] px-2.5 rounded-lg border flex items-center justify-between text-xs font-medium transition-all cursor-pointer select-none"
+            class="h-7.5 w-[124px] px-2.5 rounded-lg border flex items-center justify-between font-sans antialiased text-xs font-medium transition-all cursor-pointer select-none"
             :class="[
               isSortOpen
-                ? (themeStore.isDark ? 'bg-[#18181b] border-white text-white shadow-xs' : 'bg-white border-black text-black shadow-xs')
-                : (themeStore.isDark ? 'bg-[#18181b] border-[#27272a] text-zinc-300 hover:border-zinc-500' : 'bg-white border-zinc-200 text-zinc-700 hover:border-zinc-400 shadow-2xs')
+                ? (themeStore.isDark ? 'bg-[#18181b] border-white text-white shadow-xs' : 'bg-white border-black text-zinc-950 shadow-xs')
+                : (themeStore.isDark ? 'bg-[#18181b] border-[#27272a] text-zinc-200 hover:border-zinc-500' : 'bg-white border-zinc-200 text-zinc-800 hover:border-zinc-400 shadow-2xs')
             ]"
             title="选择排序方式"
           >
-            <span class="truncate">{{ currentSortLabel }}</span>
+            <span class="truncate font-sans font-medium text-xs">{{ currentSortLabel }}</span>
             <IconChevronDown
               :size="12"
               class="transition-transform duration-300 ease-in-out flex-shrink-0 ml-1"
-              :class="isSortOpen ? 'rotate-180 text-white' : 'rotate-0 text-zinc-400'"
+              :class="isSortOpen ? (themeStore.isDark ? 'rotate-180 text-white' : 'rotate-180 text-zinc-950') : 'rotate-0 text-zinc-400'"
             />
           </button>
         </n-popselect>
