@@ -533,18 +533,18 @@
         class="border rounded-xl overflow-hidden pb-6 mb-4"
         :class="themeStore.isDark ? 'bg-[#121216] border-[#27272a]' : 'bg-white border-zinc-200 shadow-sm'"
       >
-        <table class="w-full text-left text-xs border-collapse">
+        <table class="w-full text-left text-xs border-collapse table-fixed">
           <thead>
             <tr
               class="border-b text-[11px] font-medium"
               :class="themeStore.isDark ? 'bg-[#18181b] border-[#27272a] text-zinc-400' : 'bg-zinc-50 border-zinc-200 text-zinc-600'"
             >
-              <th class="py-3 px-4">工程名称</th>
-              <th class="py-3 px-4">本地路径</th>
-              <th class="py-3 px-4">技术生态</th>
-              <th class="py-3 px-4">架构规模</th>
-              <th class="py-3 px-4">运行状态</th>
-              <th class="py-3 px-4 text-right">操作</th>
+              <th class="py-3 px-4 w-[24%]">工程名称</th>
+              <th class="py-3 px-4 w-[26%]">本地路径</th>
+              <th class="py-3 px-4 w-[18%]">技术生态</th>
+              <th class="py-3 px-4 w-[14%]">架构规模</th>
+              <th class="py-3 px-4 w-[10%]">运行状态</th>
+              <th class="py-3 px-4 w-[8%] text-right">操作</th>
             </tr>
           </thead>
           <tbody
@@ -559,7 +559,7 @@
               @click="navigateToProject(project.id)"
             >
               <!-- Project Name & Avatar -->
-              <td class="py-3.5 px-4">
+              <td class="py-3.5 px-4 truncate">
                 <div class="flex items-center gap-2.5 min-w-0">
                   <div
                     class="w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs flex-shrink-0 border font-mono"
@@ -567,20 +567,20 @@
                   >
                     {{ (project.name || 'P').slice(0, 2).toUpperCase() }}
                   </div>
-                  <span class="font-bold text-xs truncate max-w-160px" :class="themeStore.isDark ? 'text-white' : 'text-zinc-950'">
+                  <span class="font-bold text-xs truncate" :class="themeStore.isDark ? 'text-white' : 'text-zinc-950'">
                     {{ project.name }}
                   </span>
                 </div>
               </td>
 
               <!-- Path -->
-              <td class="py-3.5 px-4 font-mono text-[11px] truncate max-w-220px" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'" :title="project.rootPath">
+              <td class="py-3.5 px-4 font-mono text-[11px] truncate" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'" :title="project.rootPath">
                 {{ project.rootPath }}
               </td>
 
               <!-- Tech Stack -->
-              <td class="py-3.5 px-4">
-                <div class="flex flex-wrap gap-1 max-w-220px">
+              <td class="py-3.5 px-4 truncate">
+                <div class="flex flex-wrap gap-1 max-w-full">
                   <span
                     v-for="lang in (project.primaryLanguages || []).slice(0, 3)"
                     :key="lang"
@@ -601,7 +601,7 @@
               </td>
 
               <!-- Scale -->
-              <td class="py-3.5 px-4 text-[11px]" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
+              <td class="py-3.5 px-4 text-[11px] truncate" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
                 <span>{{ project.moduleCount || 0 }} 模块 / {{ project.serviceCount || 0 }} 服务</span>
               </td>
 
