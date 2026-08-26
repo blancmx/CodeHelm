@@ -341,7 +341,7 @@
           <template #icon>
             <IconFolderOpen :size="16" />
           </template>
-          扫描项目总文件夹 (批量导入)
+          导入本地代码工程
         </n-button>
       </div>
 
