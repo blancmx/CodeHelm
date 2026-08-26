@@ -17,31 +17,33 @@
       <div class="overflow-hidden">
         <!-- Brand Header (Compact & Clean) -->
         <div
-          class="h-14 px-3 flex items-center border-b transition-colors duration-200 overflow-hidden"
+          class="h-14 px-2 flex items-center border-b transition-colors duration-200 overflow-hidden flex-shrink-0"
           :class="themeStore.isDark ? 'border-[#27272a]' : 'border-[#e4e4e7]'"
         >
-          <!-- Left: Brand Logo & Title Container (Static, no hover animation) -->
+          <!-- Left: Brand Logo & Title Container -->
           <div
-            class="flex items-center min-w-0 flex-1 transition-all"
+            class="flex items-center min-w-0 flex-1 overflow-hidden"
             :class="isCollapsed ? 'cursor-pointer' : ''"
             :title="isCollapsed ? '点击展开侧边栏' : ''"
             @click.stop="isCollapsed ? expandSidebar() : null"
           >
-            <!-- Logo Icon: Fixed & Stable -->
-            <div
-              class="w-8 h-8 rounded-lg border flex items-center justify-center shadow-sm flex-shrink-0 transition-colors"
-              :class="[
-                themeStore.isDark ? 'bg-[#18181b] border-[#3f3f46] text-white' : 'bg-white border-zinc-300 text-zinc-950',
-                isCollapsed ? 'hover:border-zinc-400' : ''
-              ]"
-            >
-              <IconCodeHelmLogo :size="18" stroke-width="1.9" />
+            <!-- Logo Icon: Fixed 40px container, icon centered at exactly 28px -->
+            <div class="w-10 h-10 flex items-center justify-center flex-shrink-0">
+              <div
+                class="w-8 h-8 rounded-lg border flex items-center justify-center shadow-xs flex-shrink-0 transition-colors"
+                :class="[
+                  themeStore.isDark ? 'bg-[#18181b] border-[#3f3f46] text-white' : 'bg-white border-zinc-300 text-zinc-950',
+                  isCollapsed ? 'hover:border-zinc-400' : ''
+                ]"
+              >
+                <IconCodeHelmLogo :size="18" stroke-width="1.9" />
+              </div>
             </div>
 
-            <!-- Brand Text: Slides and Collapses from Right to Left -->
+            <!-- Brand Text: Smooth fade & slide without affecting logo -->
             <div
-              class="min-w-0 overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out"
-              :class="isCollapsed ? 'max-w-0 opacity-0 -translate-x-3 pointer-events-none ml-0' : 'max-w-[125px] opacity-100 translate-x-0 ml-2.5'"
+              class="min-w-0 overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out pl-1.5"
+              :class="isCollapsed ? 'max-w-0 opacity-0 -translate-x-2 pointer-events-none' : 'max-w-[115px] opacity-100 translate-x-0'"
             >
               <h1 class="font-bold text-xs tracking-tight truncate" :class="themeStore.isDark ? 'text-white' : 'text-zinc-950'">
                 CodeHelm
@@ -52,15 +54,15 @@
             </div>
           </div>
 
-          <!-- Right: Collapse Toggle Button (Smooth hover animation) -->
+          <!-- Right: Collapse Toggle Button -->
           <button
             type="button"
             class="w-6.5 h-6.5 rounded-md flex items-center justify-center transition-all duration-300 ease-in-out cursor-pointer flex-shrink-0"
             :class="[
-              isCollapsed ? 'w-0 opacity-0 scale-75 pointer-events-none p-0 overflow-hidden ml-0' : 'w-6.5 opacity-100 scale-100 ml-1',
+              isCollapsed ? 'w-0 opacity-0 pointer-events-none p-0 overflow-hidden ml-0' : 'w-6.5 opacity-100 ml-1',
               themeStore.isDark
-                ? 'hover:bg-[#18181b] text-zinc-400 hover:text-white border border-transparent hover:border-[#27272a] hover:scale-110 hover:-translate-x-0.5 active:scale-95'
-                : 'hover:bg-zinc-200/70 text-zinc-500 hover:text-zinc-900 border border-transparent hover:border-zinc-300 hover:scale-110 hover:-translate-x-0.5 active:scale-95'
+                ? 'hover:bg-[#18181b] text-zinc-400 hover:text-white border border-transparent hover:border-[#27272a] hover:scale-105 active:scale-95'
+                : 'hover:bg-zinc-200/70 text-zinc-500 hover:text-zinc-900 border border-transparent hover:border-zinc-300 hover:scale-105 active:scale-95'
             ]"
             title="折叠侧边栏"
             @click.stop="toggleCollapse"
@@ -71,136 +73,134 @@
 
         <!-- Navigation Menu with Outline Vector Icons -->
         <nav class="p-2 space-y-1 overflow-hidden" @click.stop>
-          <!-- Overview Tab with Magnetic Docking Block Animation -->
+          <!-- Overview Tab -->
           <router-link
             to="/"
-            class="flex items-center rounded-lg text-xs font-medium transition-all group relative"
+            class="h-9 w-full rounded-lg flex items-center overflow-hidden transition-all duration-150 group relative"
             :class="[
-              isCollapsed ? 'justify-center px-0 py-2 h-9 overflow-visible' : 'px-2 py-2 overflow-hidden',
               $route.name === 'overview'
-                ? (themeStore.isDark ? 'bg-white/10 text-white border border-white/20 shadow-sm' : 'bg-black text-white border border-black font-semibold shadow-sm')
+                ? (themeStore.isDark ? 'bg-white/10 text-white border border-white/20 shadow-xs font-semibold' : 'bg-black text-white border border-black font-semibold shadow-xs')
                 : (themeStore.isDark ? 'text-zinc-400 hover:bg-[#18181b] hover:text-zinc-100 border border-transparent' : 'text-zinc-600 hover:bg-zinc-200/70 hover:text-zinc-950 border border-transparent')
             ]"
             :title="isCollapsed ? `项目总览 (${projectStore.projects.length})` : ''"
             @mouseenter="isOverviewHovered = true"
             @mouseleave="isOverviewHovered = false"
           >
-            <!-- Icon Container with Magnetic Snapping Grid -->
-            <div class="w-5 h-5 flex items-center justify-center flex-shrink-0">
-              <IconProjectGrid :size="15" :hovered="isOverviewHovered" />
-            </div>
+            <!-- Fixed Icon Box (40px wide, centered at exactly 28px in sidebar) -->
+            <div class="w-10 h-9 flex items-center justify-center flex-shrink-0 relative">
+              <IconProjectGrid :size="16" :hovered="isOverviewHovered" />
 
-            <!-- Text & Right Badge: Gradually shrinks & fades from right to left -->
-            <div
-              class="flex items-center justify-between min-w-0 flex-1 overflow-hidden transition-all duration-300 ease-in-out whitespace-nowrap"
-              :class="isCollapsed ? 'max-w-0 opacity-0 -translate-x-3 pointer-events-none ml-0' : 'max-w-[140px] opacity-100 translate-x-0 ml-2'"
-            >
-              <span class="truncate transition-transform duration-200 group-hover:translate-x-0.5">项目总览</span>
+              <!-- Collapsed Mode Float Badge -->
               <span
                 v-if="projectStore.projects.length"
-                class="text-[9px] px-1.5 py-0.2 rounded font-mono flex-shrink-0 ml-1.5 transition-transform duration-200 group-hover:scale-105"
-                :class="themeStore.isDark ? 'bg-[#27272a] text-zinc-300' : ($route.name === 'overview' ? 'bg-zinc-800 text-zinc-200' : 'bg-zinc-200 text-zinc-700')"
+                class="absolute top-1 right-1 min-w-[14px] h-[14px] px-0.5 rounded-full text-[8px] font-mono font-bold flex items-center justify-center border shadow-2xs transition-all duration-200 z-10"
+                :class="[
+                  isCollapsed ? 'opacity-100 scale-100' : 'opacity-0 scale-50 pointer-events-none',
+                  themeStore.isDark ? 'bg-[#27272a] text-zinc-200 border-[#3f3f46]' : 'bg-zinc-200 text-zinc-800 border-zinc-300'
+                ]"
               >
                 {{ projectStore.projects.length }}
               </span>
             </div>
 
-            <!-- Collapsed Float Badge: Moved outward to top-right corner, 100% clear of icon -->
-            <span
-              v-if="projectStore.projects.length"
-              class="absolute -top-1 -right-1 min-w-[15px] h-[15px] px-1 rounded-full text-[8px] font-mono font-bold flex items-center justify-center border shadow-xs transition-all duration-300 ease-in-out z-10"
-              :class="[
-                isCollapsed ? 'opacity-100 scale-100' : 'opacity-0 scale-50 pointer-events-none',
-                themeStore.isDark ? 'bg-[#27272a] text-zinc-200 border-[#3f3f46]' : 'bg-zinc-200 text-zinc-800 border-zinc-300'
-              ]"
+            <!-- Expanded Mode Text & Badge (Smooth clipping to the right of fixed icon) -->
+            <div
+              class="flex items-center justify-between min-w-0 flex-1 overflow-hidden transition-all duration-300 ease-in-out whitespace-nowrap pr-2"
+              :class="isCollapsed ? 'max-w-0 opacity-0 -translate-x-2 pointer-events-none' : 'max-w-[145px] opacity-100 translate-x-0'"
             >
-              {{ projectStore.projects.length }}
-            </span>
+              <span class="truncate text-xs font-medium transition-transform duration-200 group-hover:translate-x-0.5">项目总览</span>
+              <span
+                v-if="projectStore.projects.length"
+                class="text-[9px] px-1.5 py-0.2 rounded font-mono font-medium flex-shrink-0 ml-1.5"
+                :class="themeStore.isDark ? 'bg-[#27272a] text-zinc-300' : ($route.name === 'overview' ? 'bg-zinc-800 text-zinc-200' : 'bg-zinc-200 text-zinc-700')"
+              >
+                {{ projectStore.projects.length }}
+              </span>
+            </div>
           </router-link>
 
-          <!-- Runner Center Tab with Electric Pulse Animation -->
+          <!-- Runner Center Tab -->
           <router-link
             to="/runner"
-            class="flex items-center rounded-lg text-xs font-medium transition-all group relative"
+            class="h-9 w-full rounded-lg flex items-center overflow-hidden transition-all duration-150 group relative"
             :class="[
-              isCollapsed ? 'justify-center px-0 py-2 h-9 overflow-visible' : 'px-2 py-2 overflow-hidden',
               $route.name === 'runner'
-                ? (themeStore.isDark ? 'bg-white/10 text-white border border-white/20 shadow-sm' : 'bg-black text-white border border-black font-semibold shadow-sm')
+                ? (themeStore.isDark ? 'bg-white/10 text-white border border-white/20 shadow-xs font-semibold' : 'bg-black text-white border border-black font-semibold shadow-xs')
                 : (themeStore.isDark ? 'text-zinc-400 hover:bg-[#18181b] hover:text-zinc-100 border border-transparent' : 'text-zinc-600 hover:bg-zinc-200/70 hover:text-zinc-950 border border-transparent')
             ]"
             :title="isCollapsed ? `运行中心 (${runnerStore.runningCount > 0 ? runnerStore.runningCount + ' 个活跃进程' : '空闲'})` : ''"
             @mouseenter="isRunnerHovered = true"
             @mouseleave="isRunnerHovered = false"
           >
-            <div class="w-5 h-5 flex items-center justify-center flex-shrink-0">
+            <!-- Fixed Icon Box -->
+            <div class="w-10 h-9 flex items-center justify-center flex-shrink-0 relative">
               <IconRunnerZap
-                :size="15"
+                :size="16"
                 :hovered="isRunnerHovered"
                 :is-running="runnerStore.runningCount > 0"
               />
+
+              <!-- Collapsed Mode Float Badge -->
+              <span
+                v-if="runnerStore.runningCount > 0"
+                class="absolute top-1 right-1 min-w-[14px] h-[14px] px-0.5 rounded-full text-[8px] font-mono font-bold flex items-center justify-center border shadow-2xs transition-all duration-200 z-10"
+                :class="[
+                  isCollapsed ? 'opacity-100 scale-100' : 'opacity-0 scale-50 pointer-events-none',
+                  themeStore.isDark ? 'bg-white text-black border-zinc-200' : 'bg-black text-white border-zinc-800'
+                ]"
+              >
+                {{ runnerStore.runningCount }}
+              </span>
             </div>
 
+            <!-- Expanded Mode Text & Active Badge -->
             <div
-              class="flex items-center justify-between min-w-0 flex-1 overflow-hidden transition-all duration-300 ease-in-out whitespace-nowrap"
-              :class="isCollapsed ? 'max-w-0 opacity-0 -translate-x-3 pointer-events-none ml-0' : 'max-w-[140px] opacity-100 translate-x-0 ml-2'"
+              class="flex items-center justify-between min-w-0 flex-1 overflow-hidden transition-all duration-300 ease-in-out whitespace-nowrap pr-2"
+              :class="isCollapsed ? 'max-w-0 opacity-0 -translate-x-2 pointer-events-none' : 'max-w-[145px] opacity-100 translate-x-0'"
             >
-              <span class="truncate transition-transform duration-200 group-hover:translate-x-0.5">运行中心</span>
+              <span class="truncate text-xs font-medium transition-transform duration-200 group-hover:translate-x-0.5">运行中心</span>
               <div
                 v-if="runnerStore.runningCount > 0"
-                class="flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[9px] font-mono font-medium flex-shrink-0 ml-1.5 transition-transform duration-200 group-hover:scale-105"
+                class="flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[9px] font-mono font-medium flex-shrink-0 ml-1.5"
                 :class="themeStore.isDark ? 'bg-white/15 text-white border border-white/30' : ($route.name === 'runner' ? 'bg-zinc-800 text-white border border-zinc-700' : 'bg-black text-white border border-black')"
               >
                 <span class="w-1.5 h-1.5 rounded-full bg-white pulsing-dot-active" />
                 <span>{{ runnerStore.runningCount }}</span>
               </div>
             </div>
-
-            <!-- Collapsed Float Badge for Runner Center -->
-            <span
-              v-if="runnerStore.runningCount > 0"
-              class="absolute -top-1 -right-1 min-w-[15px] h-[15px] px-1 rounded-full text-[8px] font-mono font-bold flex items-center justify-center border shadow-xs transition-all duration-300 ease-in-out z-10"
-              :class="[
-                isCollapsed ? 'opacity-100 scale-100' : 'opacity-0 scale-50 pointer-events-none',
-                themeStore.isDark ? 'bg-white text-black border-zinc-200' : 'bg-black text-white border-zinc-800'
-              ]"
-            >
-              {{ runnerStore.runningCount }}
-            </span>
           </router-link>
         </nav>
       </div>
 
-      <!-- Bottom Settings with Rotating Gear Animation -->
+      <!-- Bottom Settings -->
       <div
-        class="border-t p-2 transition-all duration-300 ease-in-out overflow-hidden"
+        class="border-t p-2 transition-all duration-300 ease-in-out overflow-hidden flex-shrink-0"
         :class="themeStore.isDark ? 'border-[#27272a]' : 'border-[#e4e4e7]'"
         @click.stop
       >
-        <!-- Settings Tab with 180-Degree Gear Spin on Hover -->
         <router-link
           to="/settings"
-          class="flex items-center rounded-lg text-xs font-medium transition-all group relative overflow-hidden"
+          class="h-9 w-full rounded-lg flex items-center overflow-hidden transition-all duration-150 group relative"
           :class="[
-            isCollapsed ? 'justify-center px-0 py-2 h-9' : 'px-2 py-2',
             $route.name === 'settings'
-              ? (themeStore.isDark ? 'bg-white/10 text-white border border-white/20 shadow-sm' : 'bg-black text-white border border-black font-semibold shadow-sm')
+              ? (themeStore.isDark ? 'bg-white/10 text-white border border-white/20 shadow-xs font-semibold' : 'bg-black text-white border border-black font-semibold shadow-xs')
               : (themeStore.isDark ? 'text-zinc-400 hover:bg-[#18181b] hover:text-zinc-100 border border-transparent' : 'text-zinc-600 hover:bg-zinc-200/70 hover:text-zinc-950 border border-transparent')
           ]"
           :title="isCollapsed ? '系统设置' : ''"
         >
-          <!-- Gear Icon: Spins 180 Degrees Smoothly on Hover -->
-          <div class="w-5 h-5 flex items-center justify-center flex-shrink-0">
+          <!-- Fixed Icon Box -->
+          <div class="w-10 h-9 flex items-center justify-center flex-shrink-0 relative">
             <IconSettings
-              :size="15"
-              class="transition-transform duration-500 ease-in-out group-hover:rotate-180 group-hover:scale-115"
+              :size="16"
+              class="transition-transform duration-500 ease-in-out group-hover:rotate-180 group-hover:scale-110"
             />
           </div>
 
           <div
-            class="flex items-center justify-between min-w-0 flex-1 overflow-hidden transition-all duration-300 ease-in-out whitespace-nowrap"
-            :class="isCollapsed ? 'max-w-0 opacity-0 -translate-x-3 pointer-events-none ml-0' : 'max-w-[140px] opacity-100 translate-x-0 ml-2'"
+            class="flex items-center justify-between min-w-0 flex-1 overflow-hidden transition-all duration-300 ease-in-out whitespace-nowrap pr-2"
+            :class="isCollapsed ? 'max-w-0 opacity-0 -translate-x-2 pointer-events-none' : 'max-w-[145px] opacity-100 translate-x-0'"
           >
-            <span class="truncate transition-transform duration-200 group-hover:translate-x-0.5">系统设置</span>
+            <span class="truncate text-xs font-medium transition-transform duration-200 group-hover:translate-x-0.5">系统设置</span>
           </div>
         </router-link>
       </div>
