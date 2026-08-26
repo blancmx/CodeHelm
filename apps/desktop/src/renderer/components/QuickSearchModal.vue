@@ -31,13 +31,14 @@
               />
               <button
                 type="button"
-                class="text-[10px] font-mono font-semibold px-2 py-0.5 rounded border flex-shrink-0 cursor-pointer transition-colors"
+                class="w-6 h-6 rounded-md flex items-center justify-center cursor-pointer transition-colors"
                 :class="themeStore.isDark
-                  ? 'bg-[#1e1e24] text-zinc-400 border-[#2f2f38] hover:text-white hover:border-zinc-500'
-                  : 'bg-white text-zinc-500 border-zinc-300 shadow-2xs hover:text-zinc-950'"
+                  ? 'text-zinc-400 hover:text-white hover:bg-white/10'
+                  : 'text-zinc-400 hover:text-zinc-950 hover:bg-zinc-200'"
+                title="关闭"
                 @click="handleClose"
               >
-                ESC
+                <IconX :size="15" />
               </button>
             </div>
 
@@ -91,7 +92,7 @@
                   </div>
                 </div>
 
-                <!-- Right: Tags & Quick Enter Hint -->
+                <!-- Right: Tags -->
                 <div class="flex items-center gap-2 flex-shrink-0">
                   <!-- Primary Stack Tags -->
                   <div class="hidden sm:flex items-center gap-1">
@@ -103,16 +104,6 @@
                     >
                       {{ lang }}
                     </span>
-                  </div>
-
-                  <!-- Enter Icon on Selected -->
-                  <div
-                    v-if="selectedIndex === index"
-                    class="flex items-center gap-1 text-[10px] font-medium font-sans px-2 py-0.5 rounded-md"
-                    :class="themeStore.isDark ? 'text-white bg-white/10' : 'text-zinc-900 bg-zinc-200/80'"
-                  >
-                    <span>进入</span>
-                    <span class="font-mono text-xs">⏎</span>
                   </div>
                 </div>
               </div>
@@ -132,18 +123,13 @@
               </div>
             </div>
 
-            <!-- Bottom Status & Quick Shortcuts Footer -->
+            <!-- Bottom Status Footer (Clean, No Shortcut Displays) -->
             <div
-              class="h-9 px-4 flex items-center justify-between border-t text-[11px] transition-colors"
+              class="h-8 px-4 flex items-center justify-between border-t text-[11px] transition-colors"
               :class="themeStore.isDark ? 'border-[#1f1f24] bg-[#0e0e11] text-zinc-400' : 'border-zinc-100 bg-zinc-50 text-zinc-500'"
             >
-              <div class="flex items-center gap-3">
+              <div class="flex items-center gap-2">
                 <span>共找到 <strong :class="themeStore.isDark ? 'text-white' : 'text-zinc-950'">{{ filteredProjects.length }}</strong> 个匹配项目</span>
-              </div>
-              <div class="flex items-center gap-3 text-[10px] font-mono">
-                <span><kbd>↑</kbd> <kbd>↓</kbd> 切换</span>
-                <span><kbd>Enter</kbd> 打开</span>
-                <span><kbd>Esc</kbd> 退出</span>
               </div>
             </div>
           </div>
@@ -158,7 +144,7 @@ import { ref, computed, watch, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { useProjectStore } from '../stores/projectStore.js';
 import { useThemeStore } from '../stores/themeStore.js';
-import { IconSearch } from './icons/index.js';
+import { IconSearch, IconX } from './icons/index.js';
 
 const router = useRouter();
 const projectStore = useProjectStore();

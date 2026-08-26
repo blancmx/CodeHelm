@@ -61,7 +61,7 @@
             :class="themeStore.isDark
               ? 'text-zinc-400 hover:text-white'
               : 'text-zinc-500 hover:text-zinc-950'"
-            title="搜索项目 (Ctrl+K)"
+            title="搜索项目"
             @mouseenter="isSearchHovered = true"
             @mouseleave="isSearchHovered = false"
             @click.stop="handleQuickSearch"
@@ -69,7 +69,7 @@
             <IconSearchAnimated
               :size="16"
               :hovered="isSearchHovered"
-              :active="searchModalVisible"
+              :active="projectStore.searchModalVisible"
             />
           </button>
         </div>
