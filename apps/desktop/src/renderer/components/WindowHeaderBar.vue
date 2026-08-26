@@ -28,26 +28,26 @@
     <!-- Full Draggable Titlebar Spacer -->
     <div class="flex-1 h-full min-w-0" />
 
-    <!-- Right: Windows 11 Native Style Window Controls -->
-    <div class="flex items-center h-full no-drag">
+    <!-- Right: Modern Rounded Window Controls -->
+    <div class="flex items-center h-full no-drag pr-1.5 gap-0.5">
       <!-- Minimize Button -->
       <button
         type="button"
         title="最小化"
-        class="h-8 w-11 flex items-center justify-center transition-colors focus:outline-none cursor-pointer"
+        class="h-6.5 w-8 rounded-md flex items-center justify-center transition-all duration-150 focus:outline-none cursor-pointer active:scale-95"
         :class="themeStore.isDark ? 'hover:bg-white/10 text-zinc-400 hover:text-white' : 'hover:bg-zinc-200 text-zinc-600 hover:text-zinc-950'"
         @click="handleMinimize"
       >
-        <svg width="10" height="1" viewBox="0 0 10 1">
-          <rect width="10" height="1" fill="currentColor" />
+        <svg width="10" height="2" viewBox="0 0 10 2">
+          <rect width="10" height="1.5" rx="0.75" fill="currentColor" />
         </svg>
       </button>
 
-      <!-- Maximize / Restore Button -->
+      <!-- Maximize / Restore Button with Rounded Radius -->
       <button
         type="button"
         :title="isMaximized ? '还原' : '最大化'"
-        class="h-8 w-11 flex items-center justify-center transition-colors focus:outline-none cursor-pointer"
+        class="h-6.5 w-8 rounded-md flex items-center justify-center transition-all duration-150 focus:outline-none cursor-pointer active:scale-95"
         :class="themeStore.isDark ? 'hover:bg-white/10 text-zinc-400 hover:text-white' : 'hover:bg-zinc-200 text-zinc-600 hover:text-zinc-950'"
         @click="handleToggleMaximize"
       >
@@ -59,12 +59,12 @@
           viewBox="0 0 10 10"
           fill="none"
           stroke="currentColor"
-          stroke-width="1"
+          stroke-width="1.1"
         >
-          <path d="M2.5 1.5h6v6h-6z" />
-          <path d="M1.5 3.5h-1v6h6v-1" />
+          <rect x="2.5" y="0.75" width="6.75" height="6.75" rx="1.5" />
+          <path d="M0.75 3.25v4.5a1.5 1.5 0 0 0 1.5 1.5h4.5" stroke-linecap="round" />
         </svg>
-        <!-- Maximize Icon (when normal window) -->
+        <!-- Maximize Icon (with distinct rounded corners) -->
         <svg
           v-else
           width="10"
@@ -72,9 +72,9 @@
           viewBox="0 0 10 10"
           fill="none"
           stroke="currentColor"
-          stroke-width="1"
+          stroke-width="1.1"
         >
-          <rect x="0.5" y="0.5" width="9" height="9" rx="0.5" />
+          <rect x="0.75" y="0.75" width="8.5" height="8.5" rx="2" />
         </svg>
       </button>
 
@@ -82,7 +82,7 @@
       <button
         type="button"
         title="关闭"
-        class="h-8 w-11 flex items-center justify-center transition-colors focus:outline-none cursor-pointer hover:bg-[#e81123] hover:text-white active:bg-[#c4101f]"
+        class="h-6.5 w-8 rounded-md flex items-center justify-center transition-all duration-150 focus:outline-none cursor-pointer hover:bg-[#e81123] hover:text-white active:bg-[#c4101f] active:scale-95"
         :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-600'"
         @click="handleClose"
       >
@@ -92,10 +92,10 @@
           viewBox="0 0 10 10"
           fill="none"
           stroke="currentColor"
-          stroke-width="1.1"
+          stroke-width="1.2"
           stroke-linecap="round"
         >
-          <path d="M1 1l8 8M9 1L1 9" />
+          <path d="M1.5 1.5l7 7M8.5 1.5l-7 7" />
         </svg>
       </button>
     </div>
