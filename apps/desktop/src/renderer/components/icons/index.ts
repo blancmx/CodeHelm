@@ -299,5 +299,9 @@ export const IconSidebar = createIcon('IconSidebar', () => [
 export { default as IconCodeHelmLogo } from './IconCodeHelmLogo.vue';
 export { default as IconProjectGrid } from './IconProjectGrid.vue';
 export { default as IconRunnerZap } from './IconRunnerZap.vue';
+export { default as IconMoonAnimated } from './IconMoonAnimated.vue';
+export { default as IconSunAnimated } from './IconSunAnimated.vue';
+export { default as IconMonitorAnimated } from './IconMonitorAnimated.vue';
+
 
 

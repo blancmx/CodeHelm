@@ -41,14 +41,18 @@
         <div class="grid grid-cols-1 md:grid-cols-3 gap-3.5 pt-1">
           <!-- Dark Option -->
           <div
-            class="border rounded-xl p-4 cursor-pointer flex items-center justify-between transition-all select-none"
+            class="border rounded-xl p-4 cursor-pointer flex items-center justify-between transition-all select-none group"
             :class="themeStore.mode === 'dark'
               ? (themeStore.isDark ? 'bg-[#18181b] border-white shadow-sm' : 'bg-black border-black text-white')
               : (themeStore.isDark ? 'bg-[#18181b] border-[#27272a] hover:border-zinc-500' : 'bg-zinc-50 border-zinc-200 hover:border-zinc-300')"
             @click="(e) => themeStore.setMode('dark', e)"
           >
             <div class="flex items-center gap-3">
-              <IconMoon :size="20" :class="themeStore.mode === 'dark' ? 'text-white' : 'text-zinc-400'" />
+              <IconMoonAnimated
+                :size="20"
+                :active="themeStore.mode === 'dark'"
+                :class="themeStore.mode === 'dark' ? 'text-white' : 'text-zinc-400 group-hover:text-zinc-200'"
+              />
               <div class="text-xs font-bold" :class="themeStore.isDark ? 'text-white' : 'text-zinc-950'">暗黑模式</div>
             </div>
             <IconCheck v-if="themeStore.mode === 'dark'" :size="16" :class="themeStore.isDark ? 'text-white' : 'text-black'" />
@@ -56,14 +60,18 @@
 
           <!-- Light Option -->
           <div
-            class="border rounded-xl p-4 cursor-pointer flex items-center justify-between transition-all select-none"
+            class="border rounded-xl p-4 cursor-pointer flex items-center justify-between transition-all select-none group"
             :class="themeStore.mode === 'light'
               ? (themeStore.isDark ? 'bg-[#18181b] border-white shadow-sm' : 'bg-white border-black shadow-sm')
               : (themeStore.isDark ? 'bg-[#18181b] border-[#27272a] hover:border-zinc-500' : 'bg-zinc-50 border-zinc-200 hover:border-zinc-300')"
             @click="(e) => themeStore.setMode('light', e)"
           >
             <div class="flex items-center gap-3">
-              <IconSun :size="20" :class="themeStore.mode === 'light' ? (themeStore.isDark ? 'text-white' : 'text-black') : 'text-zinc-400'" />
+              <IconSunAnimated
+                :size="20"
+                :active="themeStore.mode === 'light'"
+                :class="themeStore.mode === 'light' ? (themeStore.isDark ? 'text-white' : 'text-black') : 'text-zinc-400 group-hover:text-zinc-600 dark:group-hover:text-zinc-200'"
+              />
               <div class="text-xs font-bold" :class="themeStore.isDark ? 'text-white' : 'text-zinc-950'">明亮模式</div>
             </div>
             <IconCheck v-if="themeStore.mode === 'light'" :size="16" :class="themeStore.isDark ? 'text-white' : 'text-black'" />
@@ -71,14 +79,18 @@
 
           <!-- Auto Option -->
           <div
-            class="border rounded-xl p-4 cursor-pointer flex items-center justify-between transition-all select-none"
+            class="border rounded-xl p-4 cursor-pointer flex items-center justify-between transition-all select-none group"
             :class="themeStore.mode === 'auto'
               ? (themeStore.isDark ? 'bg-[#18181b] border-white shadow-sm' : 'bg-white border-black shadow-sm')
               : (themeStore.isDark ? 'bg-[#18181b] border-[#27272a] hover:border-zinc-500' : 'bg-zinc-50 border-zinc-200 hover:border-zinc-300')"
             @click="(e) => themeStore.setMode('auto', e)"
           >
             <div class="flex items-center gap-3">
-              <IconMonitor :size="20" :class="themeStore.mode === 'auto' ? (themeStore.isDark ? 'text-white' : 'text-black') : 'text-zinc-400'" />
+              <IconMonitorAnimated
+                :size="20"
+                :active="themeStore.mode === 'auto'"
+                :class="themeStore.mode === 'auto' ? (themeStore.isDark ? 'text-white' : 'text-black') : 'text-zinc-400 group-hover:text-zinc-600 dark:group-hover:text-zinc-200'"
+              />
               <div class="text-xs font-bold" :class="themeStore.isDark ? 'text-white' : 'text-zinc-950'">跟随系统</div>
             </div>
             <IconCheck v-if="themeStore.mode === 'auto'" :size="16" :class="themeStore.isDark ? 'text-white' : 'text-black'" />
@@ -210,9 +222,9 @@ import { message, dialog } from '../utils/discrete.js';
 import { useThemeStore } from '../stores/themeStore.js';
 import {
   IconPalette,
-  IconMoon,
-  IconSun,
-  IconMonitor,
+  IconMoonAnimated,
+  IconSunAnimated,
+  IconMonitorAnimated,
   IconCheck,
   IconSearch,
   IconFileText,
