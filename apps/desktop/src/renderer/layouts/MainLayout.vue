@@ -53,18 +53,24 @@
             </div>
           </div>
 
-          <!-- Right: Quick Search Button (Visible only when expanded, 0 interference with collapsed logo) -->
+          <!-- Right: Quick Search Button (Ghost / Transparent with Interactive Micro-Animation) -->
           <button
             v-if="!sidebarStore.isCollapsed"
             type="button"
-            class="w-7 h-7 rounded-lg border flex items-center justify-center transition-all duration-150 cursor-pointer flex-shrink-0 relative z-20 select-none ml-1.5"
+            class="w-7 h-7 flex items-center justify-center cursor-pointer flex-shrink-0 relative z-20 select-none ml-1.5 transition-transform duration-150 active:scale-90 group/search"
             :class="themeStore.isDark
-              ? 'bg-[#18181b] hover:bg-[#27272a] text-zinc-400 hover:text-white border-[#27272a] hover:border-zinc-500 shadow-2xs active:scale-95'
-              : 'bg-white hover:bg-zinc-100 text-zinc-600 hover:text-zinc-950 border-zinc-200 hover:border-zinc-300 shadow-2xs active:scale-95'"
+              ? 'text-zinc-400 hover:text-white'
+              : 'text-zinc-500 hover:text-zinc-950'"
             title="搜索项目 (Ctrl+K)"
+            @mouseenter="isSearchHovered = true"
+            @mouseleave="isSearchHovered = false"
             @click.stop="handleQuickSearch"
           >
-            <IconSearch :size="14" class="pointer-events-none" />
+            <IconSearchAnimated
+              :size="16"
+              :hovered="isSearchHovered"
+              :active="searchModalVisible"
+            />
           </button>
         </div>
 
@@ -225,7 +231,7 @@
 
     <!-- Global Modals -->
     <ImportProjectModal />
-    <QuickSearchModal />
+    <QuickSearchModal v-model:show="searchModalVisible" />
   </div>
 </template>
 
@@ -242,7 +248,7 @@ import {
   IconRunnerZap,
   IconSettings,
   IconCodeHelmLogo,
-  IconSearch,
+  IconSearchAnimated,
 } from '../components/icons/index.js';
 
 const projectStore = useProjectStore();
@@ -253,6 +259,8 @@ const sidebarStore = useSidebarStore();
 // Hover states for icon animations
 const isOverviewHovered = ref(false);
 const isRunnerHovered = ref(false);
+const isSearchHovered = ref(false);
+const searchModalVisible = ref(false);
 
 function handleSidebarBlankClick() {
   if (sidebarStore.isCollapsed) {
@@ -261,13 +269,13 @@ function handleSidebarBlankClick() {
 }
 
 function handleQuickSearch() {
-  projectStore.openSearchModal();
+  searchModalVisible.value = true;
 }
 
 function handleGlobalKeydown(e: KeyboardEvent) {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
     e.preventDefault();
-    projectStore.searchModalVisible = !projectStore.searchModalVisible;
+    searchModalVisible.value = !searchModalVisible.value;
   }
 }
 

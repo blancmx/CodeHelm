@@ -1,8 +1,8 @@
-﻿<template>
+<template>
   <teleport to="body">
     <transition name="search-modal-overlay">
       <div
-        v-if="projectStore.searchModalVisible"
+        v-if="isVisible"
         class="fixed inset-0 z-[9999] flex items-start justify-center pt-[12vh] bg-black/60 backdrop-blur-xs select-none"
         @mousedown.self="handleClose"
       >
@@ -164,6 +164,26 @@ const router = useRouter();
 const projectStore = useProjectStore();
 const themeStore = useThemeStore();
 
+const props = withDefaults(
+  defineProps<{
+    show?: boolean;
+  }>(),
+  {
+    show: undefined,
+  }
+);
+
+const emit = defineEmits<{
+  'update:show': [value: boolean];
+}>();
+
+const isVisible = computed(() => {
+  if (props.show !== undefined) {
+    return props.show;
+  }
+  return projectStore.searchModalVisible;
+});
+
 const query = ref('');
 const selectedIndex = ref(0);
 const inputRef = ref<HTMLInputElement | null>(null);
@@ -184,7 +204,7 @@ const filteredProjects = computed(() => {
 });
 
 watch(
-  () => projectStore.searchModalVisible,
+  isVisible,
   (visible) => {
     if (visible) {
       query.value = '';
@@ -198,10 +218,11 @@ watch(
 
 function handleClose() {
   projectStore.closeSearchModal();
+  emit('update:show', false);
 }
 
 function selectProject(id: string) {
-  projectStore.closeSearchModal();
+  handleClose();
   router.push(`/projects/${id}`);
 }
 

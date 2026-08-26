@@ -302,6 +302,7 @@ export { default as IconRunnerZap } from './IconRunnerZap.vue';
 export { default as IconMoonAnimated } from './IconMoonAnimated.vue';
 export { default as IconSunAnimated } from './IconSunAnimated.vue';
 export { default as IconMonitorAnimated } from './IconMonitorAnimated.vue';
+export { default as IconSearchAnimated } from './IconSearchAnimated.vue';
 
 
 
