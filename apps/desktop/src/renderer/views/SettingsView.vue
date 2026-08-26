@@ -1,8 +1,8 @@
 <template>
-  <div class="flex-1 flex flex-col h-full overflow-hidden p-6">
+  <div class="flex-1 flex flex-col h-full overflow-hidden p-6 relative z-10">
     <!-- Top Header -->
     <header
-      class="flex items-center justify-between pb-5 border-b flex-shrink-0 transition-colors duration-200"
+      class="flex items-center justify-between pb-5 border-b flex-shrink-0 transition-colors duration-200 relative z-20"
       :class="themeStore.isDark ? 'border-[#27272a]' : 'border-zinc-200'"
     >
       <div>
@@ -25,10 +25,10 @@
     </header>
 
     <!-- Settings Content with Balanced Full-Width Grid -->
-    <div class="flex-1 overflow-y-auto pt-5 space-y-5 pb-8">
+    <div class="flex-1 overflow-y-auto pt-5 space-y-5 pb-8 relative z-10">
       <!-- Section 0: 外观与主题切换 (Theme & Appearance) with Vector Icons -->
       <div
-        class="border rounded-xl p-5 space-y-3.5 transition-all duration-200"
+        class="border rounded-xl p-5 space-y-3.5 transition-all duration-200 relative z-20"
         :class="themeStore.isDark ? 'bg-[#121216] border-[#27272a]' : 'bg-white border-zinc-200 shadow-sm'"
       >
         <div class="flex items-center gap-2">
@@ -99,10 +99,10 @@
       </div>
 
       <!-- 2-Column Grid: Scanner Budget & Log Lifecycle -->
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-5 relative z-20">
         <!-- Section 1: 扫描与分析预算 with Vector Icons -->
         <div
-          class="border rounded-xl p-5 space-y-4 flex flex-col justify-between transition-all duration-200"
+          class="border rounded-xl p-5 space-y-4 flex flex-col justify-between transition-all duration-200 relative z-20"
           :class="themeStore.isDark ? 'bg-[#121216] border-[#27272a]' : 'bg-white border-zinc-200 shadow-sm'"
         >
           <div>
@@ -127,7 +127,7 @@
 
         <!-- Section 2: 日志存储与生命周期 with Vector Icons -->
         <div
-          class="border rounded-xl p-5 space-y-4 transition-all duration-200"
+          class="border rounded-xl p-5 space-y-4 transition-all duration-200 relative z-20"
           :class="themeStore.isDark ? 'bg-[#121216] border-[#27272a]' : 'bg-white border-zinc-200 shadow-sm'"
         >
           <div class="flex items-center justify-between">
@@ -168,7 +168,7 @@
 
       <!-- Section 3: 安全与沙箱设计 with Vector Icons -->
       <div
-        class="border rounded-xl p-5 space-y-3 transition-all duration-200"
+        class="border rounded-xl p-5 space-y-3 transition-all duration-200 relative z-20"
         :class="themeStore.isDark ? 'bg-[#121216] border-[#27272a]' : 'bg-white border-zinc-200 shadow-sm'"
       >
         <div class="flex items-center gap-2">
@@ -190,7 +190,7 @@
 
       <!-- Section 4: 关于与快捷键 -->
       <div
-        class="border rounded-xl p-5 space-y-3 text-xs transition-all duration-200"
+        class="border rounded-xl p-5 space-y-3 text-xs transition-all duration-200 relative z-20"
         :class="themeStore.isDark ? 'bg-[#121216] border-[#27272a] text-zinc-400' : 'bg-white border-zinc-200 text-zinc-500 shadow-sm'"
       >
         <div class="flex items-center justify-between">

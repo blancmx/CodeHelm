@@ -5,7 +5,7 @@
   >
     <!-- Sidebar with Smooth Right-to-Left Collapse Animation -->
     <aside
-      class="h-full border-r flex flex-col justify-between select-none flex-shrink-0 z-10 overflow-hidden sidebar-transition"
+      class="h-full border-r flex flex-col justify-between select-none flex-shrink-0 z-20 relative overflow-hidden sidebar-transition"
       :class="[
         sidebarStore.isCollapsed ? 'w-[56px]' : 'w-[208px]',
         themeStore.isDark ? 'bg-[#0f0f12] border-[#27272a]' : 'bg-[#f4f4f5] border-[#e4e4e7]',
