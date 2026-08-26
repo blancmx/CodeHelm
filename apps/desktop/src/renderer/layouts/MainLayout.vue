@@ -1,0 +1,299 @@
+<template>
+  <div
+    class="flex h-full w-full overflow-hidden transition-colors duration-200"
+    :class="themeStore.isDark ? 'bg-[#09090b]' : 'bg-[#fafafa]'"
+  >
+    <!-- Sidebar with Smooth Right-to-Left Collapse Animation -->
+    <aside
+      class="h-full border-r flex flex-col justify-between select-none flex-shrink-0 z-10 overflow-hidden sidebar-transition"
+      :class="[
+        isCollapsed ? 'w-[56px]' : 'w-[208px]',
+        themeStore.isDark ? 'bg-[#0f0f12] border-[#27272a]' : 'bg-[#f4f4f5] border-[#e4e4e7]',
+        isCollapsed ? 'cursor-pointer' : ''
+      ]"
+      @click="handleSidebarBlankClick"
+    >
+      <!-- Top Brand & Navigation -->
+      <div class="overflow-hidden">
+        <!-- Brand Header (Compact & Clean) -->
+        <div
+          class="h-14 px-3 flex items-center border-b transition-colors duration-200 overflow-hidden"
+          :class="themeStore.isDark ? 'border-[#27272a]' : 'border-[#e4e4e7]'"
+        >
+          <!-- Left: Brand Logo & Title Container (Static, no hover animation) -->
+          <div
+            class="flex items-center min-w-0 flex-1 transition-all"
+            :class="isCollapsed ? 'cursor-pointer' : ''"
+            :title="isCollapsed ? '点击展开侧边栏' : ''"
+            @click.stop="isCollapsed ? expandSidebar() : null"
+          >
+            <!-- Logo Icon: Fixed & Stable -->
+            <div
+              class="w-8 h-8 rounded-lg border flex items-center justify-center shadow-sm flex-shrink-0 transition-colors"
+              :class="[
+                themeStore.isDark ? 'bg-[#18181b] border-[#3f3f46] text-white' : 'bg-white border-zinc-300 text-zinc-950',
+                isCollapsed ? 'hover:border-zinc-400' : ''
+              ]"
+            >
+              <IconCodeHelmLogo :size="18" stroke-width="1.9" />
+            </div>
+
+            <!-- Brand Text: Slides and Collapses from Right to Left -->
+            <div
+              class="min-w-0 overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out"
+              :class="isCollapsed ? 'max-w-0 opacity-0 -translate-x-3 pointer-events-none ml-0' : 'max-w-[125px] opacity-100 translate-x-0 ml-2.5'"
+            >
+              <h1 class="font-bold text-xs tracking-tight truncate" :class="themeStore.isDark ? 'text-white' : 'text-zinc-950'">
+                CodeHelm
+              </h1>
+              <p class="text-[9px] font-medium truncate" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
+                本地多项目控制台
+              </p>
+            </div>
+          </div>
+
+          <!-- Right: Collapse Toggle Button (Smooth hover animation) -->
+          <button
+            type="button"
+            class="w-6.5 h-6.5 rounded-md flex items-center justify-center transition-all duration-300 ease-in-out cursor-pointer flex-shrink-0"
+            :class="[
+              isCollapsed ? 'w-0 opacity-0 scale-75 pointer-events-none p-0 overflow-hidden ml-0' : 'w-6.5 opacity-100 scale-100 ml-1',
+              themeStore.isDark
+                ? 'hover:bg-[#18181b] text-zinc-400 hover:text-white border border-transparent hover:border-[#27272a] hover:scale-110 hover:-translate-x-0.5 active:scale-95'
+                : 'hover:bg-zinc-200/70 text-zinc-500 hover:text-zinc-900 border border-transparent hover:border-zinc-300 hover:scale-110 hover:-translate-x-0.5 active:scale-95'
+            ]"
+            title="折叠侧边栏"
+            @click.stop="toggleCollapse"
+          >
+            <IconPanelLeftClose :size="15" />
+          </button>
+        </div>
+
+        <!-- Navigation Menu with Outline Vector Icons -->
+        <nav class="p-2 space-y-1 overflow-hidden" @click.stop>
+          <!-- Overview Tab with Magnetic Docking Block Animation -->
+          <router-link
+            to="/"
+            class="flex items-center rounded-lg text-xs font-medium transition-all group relative"
+            :class="[
+              isCollapsed ? 'justify-center px-0 py-2 h-9 overflow-visible' : 'px-2 py-2 overflow-hidden',
+              $route.name === 'overview'
+                ? (themeStore.isDark ? 'bg-white/10 text-white border border-white/20 shadow-sm' : 'bg-black text-white border border-black font-semibold shadow-sm')
+                : (themeStore.isDark ? 'text-zinc-400 hover:bg-[#18181b] hover:text-zinc-100 border border-transparent' : 'text-zinc-600 hover:bg-zinc-200/70 hover:text-zinc-950 border border-transparent')
+            ]"
+            :title="isCollapsed ? `项目总览 (${projectStore.projects.length})` : ''"
+            @mouseenter="isOverviewHovered = true"
+            @mouseleave="isOverviewHovered = false"
+          >
+            <!-- Icon Container with Magnetic Snapping Grid -->
+            <div class="w-5 h-5 flex items-center justify-center flex-shrink-0">
+              <IconProjectGrid :size="15" :hovered="isOverviewHovered" />
+            </div>
+
+            <!-- Text & Right Badge: Gradually shrinks & fades from right to left -->
+            <div
+              class="flex items-center justify-between min-w-0 flex-1 overflow-hidden transition-all duration-300 ease-in-out whitespace-nowrap"
+              :class="isCollapsed ? 'max-w-0 opacity-0 -translate-x-3 pointer-events-none ml-0' : 'max-w-[140px] opacity-100 translate-x-0 ml-2'"
+            >
+              <span class="truncate transition-transform duration-200 group-hover:translate-x-0.5">项目总览</span>
+              <span
+                v-if="projectStore.projects.length"
+                class="text-[9px] px-1.5 py-0.2 rounded font-mono flex-shrink-0 ml-1.5 transition-transform duration-200 group-hover:scale-105"
+                :class="themeStore.isDark ? 'bg-[#27272a] text-zinc-300' : ($route.name === 'overview' ? 'bg-zinc-800 text-zinc-200' : 'bg-zinc-200 text-zinc-700')"
+              >
+                {{ projectStore.projects.length }}
+              </span>
+            </div>
+
+            <!-- Collapsed Float Badge: Moved outward to top-right corner, 100% clear of icon -->
+            <span
+              v-if="projectStore.projects.length"
+              class="absolute -top-1 -right-1 min-w-[15px] h-[15px] px-1 rounded-full text-[8px] font-mono font-bold flex items-center justify-center border shadow-xs transition-all duration-300 ease-in-out z-10"
+              :class="[
+                isCollapsed ? 'opacity-100 scale-100' : 'opacity-0 scale-50 pointer-events-none',
+                themeStore.isDark ? 'bg-[#27272a] text-zinc-200 border-[#3f3f46]' : 'bg-zinc-200 text-zinc-800 border-zinc-300'
+              ]"
+            >
+              {{ projectStore.projects.length }}
+            </span>
+          </router-link>
+
+          <!-- Runner Center Tab with Electric Pulse Animation -->
+          <router-link
+            to="/runner"
+            class="flex items-center rounded-lg text-xs font-medium transition-all group relative"
+            :class="[
+              isCollapsed ? 'justify-center px-0 py-2 h-9 overflow-visible' : 'px-2 py-2 overflow-hidden',
+              $route.name === 'runner'
+                ? (themeStore.isDark ? 'bg-white/10 text-white border border-white/20 shadow-sm' : 'bg-black text-white border border-black font-semibold shadow-sm')
+                : (themeStore.isDark ? 'text-zinc-400 hover:bg-[#18181b] hover:text-zinc-100 border border-transparent' : 'text-zinc-600 hover:bg-zinc-200/70 hover:text-zinc-950 border border-transparent')
+            ]"
+            :title="isCollapsed ? `运行中心 (${runnerStore.runningCount > 0 ? runnerStore.runningCount + ' 个活跃进程' : '空闲'})` : ''"
+            @mouseenter="isRunnerHovered = true"
+            @mouseleave="isRunnerHovered = false"
+          >
+            <div class="w-5 h-5 flex items-center justify-center flex-shrink-0">
+              <IconRunnerZap
+                :size="15"
+                :hovered="isRunnerHovered"
+                :is-running="runnerStore.runningCount > 0"
+              />
+            </div>
+
+            <div
+              class="flex items-center justify-between min-w-0 flex-1 overflow-hidden transition-all duration-300 ease-in-out whitespace-nowrap"
+              :class="isCollapsed ? 'max-w-0 opacity-0 -translate-x-3 pointer-events-none ml-0' : 'max-w-[140px] opacity-100 translate-x-0 ml-2'"
+            >
+              <span class="truncate transition-transform duration-200 group-hover:translate-x-0.5">运行中心</span>
+              <div
+                v-if="runnerStore.runningCount > 0"
+                class="flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[9px] font-mono font-medium flex-shrink-0 ml-1.5 transition-transform duration-200 group-hover:scale-105"
+                :class="themeStore.isDark ? 'bg-white/15 text-white border border-white/30' : ($route.name === 'runner' ? 'bg-zinc-800 text-white border border-zinc-700' : 'bg-black text-white border border-black')"
+              >
+                <span class="w-1.5 h-1.5 rounded-full bg-white pulsing-dot-active" />
+                <span>{{ runnerStore.runningCount }}</span>
+              </div>
+            </div>
+
+            <!-- Collapsed Float Badge for Runner Center -->
+            <span
+              v-if="runnerStore.runningCount > 0"
+              class="absolute -top-1 -right-1 min-w-[15px] h-[15px] px-1 rounded-full text-[8px] font-mono font-bold flex items-center justify-center border shadow-xs transition-all duration-300 ease-in-out z-10"
+              :class="[
+                isCollapsed ? 'opacity-100 scale-100' : 'opacity-0 scale-50 pointer-events-none',
+                themeStore.isDark ? 'bg-white text-black border-zinc-200' : 'bg-black text-white border-zinc-800'
+              ]"
+            >
+              {{ runnerStore.runningCount }}
+            </span>
+          </router-link>
+        </nav>
+      </div>
+
+      <!-- Bottom Settings with Rotating Gear Animation -->
+      <div
+        class="border-t p-2 transition-all duration-300 ease-in-out overflow-hidden"
+        :class="themeStore.isDark ? 'border-[#27272a]' : 'border-[#e4e4e7]'"
+        @click.stop
+      >
+        <!-- Settings Tab with 180-Degree Gear Spin on Hover -->
+        <router-link
+          to="/settings"
+          class="flex items-center rounded-lg text-xs font-medium transition-all group relative overflow-hidden"
+          :class="[
+            isCollapsed ? 'justify-center px-0 py-2 h-9' : 'px-2 py-2',
+            $route.name === 'settings'
+              ? (themeStore.isDark ? 'bg-white/10 text-white border border-white/20 shadow-sm' : 'bg-black text-white border border-black font-semibold shadow-sm')
+              : (themeStore.isDark ? 'text-zinc-400 hover:bg-[#18181b] hover:text-zinc-100 border border-transparent' : 'text-zinc-600 hover:bg-zinc-200/70 hover:text-zinc-950 border border-transparent')
+          ]"
+          :title="isCollapsed ? '系统设置' : ''"
+        >
+          <!-- Gear Icon: Spins 180 Degrees Smoothly on Hover -->
+          <div class="w-5 h-5 flex items-center justify-center flex-shrink-0">
+            <IconSettings
+              :size="15"
+              class="transition-transform duration-500 ease-in-out group-hover:rotate-180 group-hover:scale-115"
+            />
+          </div>
+
+          <div
+            class="flex items-center justify-between min-w-0 flex-1 overflow-hidden transition-all duration-300 ease-in-out whitespace-nowrap"
+            :class="isCollapsed ? 'max-w-0 opacity-0 -translate-x-3 pointer-events-none ml-0' : 'max-w-[140px] opacity-100 translate-x-0 ml-2'"
+          >
+            <span class="truncate transition-transform duration-200 group-hover:translate-x-0.5">系统设置</span>
+          </div>
+        </router-link>
+      </div>
+    </aside>
+
+    <!-- Main Content Area with Smooth Page Transitions -->
+    <main
+      class="flex-1 h-full min-w-0 flex flex-col overflow-hidden transition-colors duration-200"
+      :class="themeStore.isDark ? 'bg-[#09090b]' : 'bg-[#fafafa]'"
+    >
+      <router-view v-slot="{ Component, route }">
+        <transition name="page-fade-slide" mode="out-in">
+          <component :is="Component" :key="route.fullPath" />
+        </transition>
+      </router-view>
+    </main>
+
+    <!-- Global Modals -->
+    <teleport to="body">
+      <ImportProjectModal />
+    </teleport>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, onMounted } from 'vue';
+import { useProjectStore } from '../stores/projectStore.js';
+import { useRunnerStore } from '../stores/runnerStore.js';
+import { useThemeStore } from '../stores/themeStore.js';
+import ImportProjectModal from '../components/ImportProjectModal.vue';
+import {
+  IconProjectGrid,
+  IconRunnerZap,
+  IconSettings,
+  IconCodeHelmLogo,
+  IconPanelLeftClose,
+} from '../components/icons/index.js';
+
+const projectStore = useProjectStore();
+const runnerStore = useRunnerStore();
+const themeStore = useThemeStore();
+
+// Hover states for icon animations
+const isOverviewHovered = ref(false);
+const isRunnerHovered = ref(false);
+
+// Sidebar collapse state with localStorage persistence
+const isCollapsed = ref(localStorage.getItem('codehelm_sidebar_collapsed') === 'true');
+
+function toggleCollapse() {
+  isCollapsed.value = !isCollapsed.value;
+  localStorage.setItem('codehelm_sidebar_collapsed', String(isCollapsed.value));
+}
+
+function expandSidebar() {
+  if (isCollapsed.value) {
+    isCollapsed.value = false;
+    localStorage.setItem('codehelm_sidebar_collapsed', 'false');
+  }
+}
+
+function handleSidebarBlankClick() {
+  // If sidebar is collapsed, clicking any blank area will expand it
+  if (isCollapsed.value) {
+    expandSidebar();
+  }
+}
+
+onMounted(() => {
+  projectStore.fetchProjects();
+  runnerStore.setupListeners();
+});
+</script>
+
+<style scoped>
+.sidebar-transition {
+  transition: width 300ms cubic-bezier(0.4, 0, 0.2, 1), background-color 200ms ease, border-color 200ms ease;
+  will-change: width;
+}
+
+.page-fade-slide-enter-active,
+.page-fade-slide-leave-active {
+  transition: opacity 200ms cubic-bezier(0.4, 0, 0.2, 1), transform 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: opacity, transform;
+}
+
+.page-fade-slide-enter-from {
+  opacity: 0;
+  transform: translateY(6px);
+}
+
+.page-fade-slide-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+</style>

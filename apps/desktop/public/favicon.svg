@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <!-- White Background Container -->
+  <rect width="32" height="32" rx="7" fill="#ffffff" stroke="#e2e8f0" stroke-width="1" />
+  <!-- Black Line Helm Icon -->
+  <g transform="translate(4, 4) scale(1)" stroke="#09090b" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <circle cx="12" cy="12" r="6.8" />
+    <line x1="12" y1="1.8" x2="12" y2="5.2" />
+    <line x1="12" y1="18.8" x2="12" y2="22.2" />
+    <line x1="1.8" y1="12" x2="5.2" y2="12" />
+    <line x1="18.8" y1="12" x2="22.2" y2="12" />
+    <line x1="4.79" y1="4.79" x2="7.19" y2="7.19" />
+    <line x1="19.21" y1="4.79" x2="16.81" y2="7.19" />
+    <line x1="4.79" y1="19.21" x2="7.19" y2="16.81" />
+    <line x1="19.21" y1="19.21" x2="16.81" y2="16.81" />
+    <polyline points="10 9.8 7.8 12 10 14.2" stroke-width="1.85" />
+    <polyline points="14 9.8 16.2 12 14 14.2" stroke-width="1.85" />
+    <circle cx="12" cy="12" r="0.9" fill="#09090b" stroke="none" />
+  </g>
+</svg>

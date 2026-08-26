@@ -1,0 +1,22 @@
+{
+  "name": "codehelm-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CodeHelm - Local-first personal project management & orchestration desktop application",
+  "scripts": {
+    "dev": "pnpm --filter @codehelm/desktop dev",
+    "build": "pnpm -r --filter \"./packages/*\" run build && pnpm --filter @codehelm/desktop exec vite build",
+    "package": "pnpm build && pnpm --filter @codehelm/desktop exec electron-builder",
+    "package:dir": "pnpm build && pnpm --filter @codehelm/desktop exec electron-builder --dir",
+    "typecheck": "pnpm -r run typecheck",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "clean": "pnpm -r run clean"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.7",
+    "rimraf": "^6.0.1",
+    "@types/node": "^22.13.9"
+  }
+}

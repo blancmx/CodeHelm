@@ -1,0 +1,58 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Diagnostic and coverage
+coverage
+*.lcov
+.nyc_output
+
+# Dependency directories
+node_modules
+.pnpm-store
+
+# Build outputs
+dist
+dist-electron
+out
+build
+*.tsbuildinfo
+
+# OS metadata
+.DS_Store
+Thumbs.db
+
+# IDE and editors
+.idea
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Environment and sensitive data
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# Local database and test data
+*.sqlite
+*.sqlite3
+*.db
+local_data/
+test-results/
+
+# Internal requirements and development documents
+docs/
+*PRD*.md
+*prd*.md
