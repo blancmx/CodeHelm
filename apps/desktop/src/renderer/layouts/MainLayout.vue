@@ -89,7 +89,11 @@
           >
             <!-- Fixed Icon Box (40px wide, centered at exactly 28px in sidebar) -->
             <div class="w-10 h-9 flex items-center justify-center flex-shrink-0 relative">
-              <IconProjectGrid :size="16" :hovered="isOverviewHovered" />
+              <IconProjectGrid
+                :size="16"
+                :hovered="isOverviewHovered"
+                :active="$route.name === 'overview'"
+              />
             </div>
 
             <!-- Expanded Mode Text & Badge (Smooth clipping to the right of fixed icon) -->
@@ -139,6 +143,7 @@
               <IconRunnerZap
                 :size="16"
                 :hovered="isRunnerHovered"
+                :active="$route.name === 'runner'"
                 :is-running="runnerStore.runningCount > 0"
               />
             </div>
@@ -194,7 +199,8 @@
           <div class="w-10 h-9 flex items-center justify-center flex-shrink-0 relative">
             <IconSettings
               :size="16"
-              class="transition-transform duration-500 ease-in-out group-hover:rotate-180 group-hover:scale-110"
+              class="transition-transform duration-500 ease-in-out"
+              :class="$route.name === 'settings' ? 'rotate-90 scale-105' : 'group-hover:rotate-180 group-hover:scale-110'"
             />
           </div>
 

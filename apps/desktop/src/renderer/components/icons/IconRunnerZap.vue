@@ -12,11 +12,11 @@
     class="inline-block flex-shrink-0 align-middle pointer-events-none"
     :class="$props.class"
   >
-    <!-- Lightning Bolt Body: Outline initially, charges with Solid Fill + Energy Tilt on Hover -->
+    <!-- Lightning Bolt Body: Outline initially, solid fill + energy tilt when hovered or active -->
     <polygon
       points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"
       class="zap-body"
-      :class="{ 'is-active': hovered }"
+      :class="{ 'is-active': active || hovered }"
     />
 
     <!-- Top Right Spark Particle -->
@@ -26,7 +26,7 @@
       x2="21"
       y2="1"
       class="spark-line"
-      :class="{ 'is-active': hovered }"
+      :class="{ 'is-active': active || hovered }"
     />
 
     <!-- Bottom Left Spark Particle -->
@@ -36,7 +36,7 @@
       x2="2"
       y2="23"
       class="spark-line"
-      :class="{ 'is-active': hovered }"
+      :class="{ 'is-active': active || hovered }"
     />
   </svg>
 </template>
@@ -47,6 +47,7 @@ withDefaults(
     size?: number | string;
     strokeWidth?: number | string;
     hovered?: boolean;
+    active?: boolean;
     isRunning?: boolean;
     class?: string;
   }>(),
@@ -54,6 +55,7 @@ withDefaults(
     size: 16,
     strokeWidth: 1.8,
     hovered: false,
+    active: false,
     isRunning: false,
     class: '',
   }

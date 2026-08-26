@@ -21,7 +21,7 @@
     <!-- Bottom-Left Fixed Block -->
     <rect x="3" y="14" width="7" height="7" rx="1.5" />
 
-    <!-- Bottom-Right Block: Detached in initial state, smoothly docks to (0,0) when hovered -->
+    <!-- Bottom-Right Block: Detached in initial state, smoothly docks to (0,0) when hovered or active -->
     <rect
       x="14"
       y="14"
@@ -29,9 +29,7 @@
       height="7"
       rx="1.5"
       class="dock-piece"
-      :style="{
-        transform: hovered ? 'translate(0px, 0px)' : undefined,
-      }"
+      :class="{ 'is-active': active || hovered }"
     />
   </svg>
 </template>
@@ -42,12 +40,14 @@ withDefaults(
     size?: number | string;
     strokeWidth?: number | string;
     hovered?: boolean;
+    active?: boolean;
     class?: string;
   }>(),
   {
     size: 16,
     strokeWidth: 1.8,
     hovered: false,
+    active: false,
     class: '',
   }
 );
@@ -61,7 +61,8 @@ withDefaults(
   will-change: transform;
 }
 
-/* Snaps together when the parent link is hovered via CSS */
+/* Snaps together when hovered or when active/selected */
+.dock-piece.is-active,
 :global(.group:hover) .dock-piece {
   transform: translate(0px, 0px) !important;
 }
