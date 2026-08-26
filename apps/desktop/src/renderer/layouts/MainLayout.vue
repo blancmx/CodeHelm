@@ -76,8 +76,9 @@
           <!-- Overview Tab -->
           <router-link
             to="/"
-            class="h-9 w-full rounded-lg flex items-center overflow-hidden transition-all duration-150 group relative"
+            class="h-9 w-full rounded-lg flex items-center transition-all duration-150 group relative"
             :class="[
+              isCollapsed ? 'overflow-visible' : 'overflow-hidden',
               $route.name === 'overview'
                 ? (themeStore.isDark ? 'bg-white/10 text-white border border-white/20 shadow-xs font-semibold' : 'bg-black text-white border border-black font-semibold shadow-xs')
                 : (themeStore.isDark ? 'text-zinc-400 hover:bg-[#18181b] hover:text-zinc-100 border border-transparent' : 'text-zinc-600 hover:bg-zinc-200/70 hover:text-zinc-950 border border-transparent')
@@ -89,18 +90,6 @@
             <!-- Fixed Icon Box (40px wide, centered at exactly 28px in sidebar) -->
             <div class="w-10 h-9 flex items-center justify-center flex-shrink-0 relative">
               <IconProjectGrid :size="16" :hovered="isOverviewHovered" />
-
-              <!-- Collapsed Mode Float Badge (Intact complete circle, covers top-right neatly without clipping) -->
-              <span
-                v-if="projectStore.projects.length"
-                class="absolute top-1 right-1 min-w-[15px] h-[15px] px-1 rounded-full text-[9px] font-mono font-bold flex items-center justify-center border shadow-xs transition-all duration-200 z-10 select-none leading-none"
-                :class="[
-                  isCollapsed ? 'opacity-100 scale-100' : 'opacity-0 scale-50 pointer-events-none',
-                  themeStore.isDark ? 'bg-[#27272a] text-white border-[#3f3f46]' : 'bg-zinc-200 text-zinc-900 border-zinc-300'
-                ]"
-              >
-                {{ projectStore.projects.length }}
-              </span>
             </div>
 
             <!-- Expanded Mode Text & Badge (Smooth clipping to the right of fixed icon) -->
@@ -117,13 +106,26 @@
                 {{ projectStore.projects.length }}
               </span>
             </div>
+
+            <!-- Collapsed Float Badge: Positioned at outside square top-right corner, 100% round and unclipped -->
+            <span
+              v-if="projectStore.projects.length"
+              class="absolute -top-1 -right-1 min-w-[16px] h-[16px] px-1 rounded-full text-[9px] font-mono font-bold flex items-center justify-center border shadow-xs transition-all duration-200 z-20 select-none leading-none"
+              :class="[
+                isCollapsed ? 'opacity-100 scale-100' : 'opacity-0 scale-50 pointer-events-none',
+                themeStore.isDark ? 'bg-[#27272a] text-white border-[#3f3f46]' : 'bg-zinc-200 text-zinc-900 border-zinc-300'
+              ]"
+            >
+              {{ projectStore.projects.length }}
+            </span>
           </router-link>
 
           <!-- Runner Center Tab -->
           <router-link
             to="/runner"
-            class="h-9 w-full rounded-lg flex items-center overflow-hidden transition-all duration-150 group relative"
+            class="h-9 w-full rounded-lg flex items-center transition-all duration-150 group relative"
             :class="[
+              isCollapsed ? 'overflow-visible' : 'overflow-hidden',
               $route.name === 'runner'
                 ? (themeStore.isDark ? 'bg-white/10 text-white border border-white/20 shadow-xs font-semibold' : 'bg-black text-white border border-black font-semibold shadow-xs')
                 : (themeStore.isDark ? 'text-zinc-400 hover:bg-[#18181b] hover:text-zinc-100 border border-transparent' : 'text-zinc-600 hover:bg-zinc-200/70 hover:text-zinc-950 border border-transparent')
@@ -139,18 +141,6 @@
                 :hovered="isRunnerHovered"
                 :is-running="runnerStore.runningCount > 0"
               />
-
-              <!-- Collapsed Mode Float Badge (Intact complete circle, covers top-right neatly without clipping) -->
-              <span
-                v-if="runnerStore.runningCount > 0"
-                class="absolute top-1 right-1 min-w-[15px] h-[15px] px-1 rounded-full text-[9px] font-mono font-bold flex items-center justify-center border shadow-xs transition-all duration-200 z-10 select-none leading-none"
-                :class="[
-                  isCollapsed ? 'opacity-100 scale-100' : 'opacity-0 scale-50 pointer-events-none',
-                  themeStore.isDark ? 'bg-white text-black border-zinc-200' : 'bg-black text-white border-zinc-800'
-                ]"
-              >
-                {{ runnerStore.runningCount }}
-              </span>
             </div>
 
             <!-- Expanded Mode Text & Active Badge -->
@@ -168,6 +158,18 @@
                 <span>{{ runnerStore.runningCount }}</span>
               </div>
             </div>
+
+            <!-- Collapsed Float Badge: Positioned at outside square top-right corner, 100% round and unclipped -->
+            <span
+              v-if="runnerStore.runningCount > 0"
+              class="absolute -top-1 -right-1 min-w-[16px] h-[16px] px-1 rounded-full text-[9px] font-mono font-bold flex items-center justify-center border shadow-xs transition-all duration-200 z-20 select-none leading-none"
+              :class="[
+                isCollapsed ? 'opacity-100 scale-100' : 'opacity-0 scale-50 pointer-events-none',
+                themeStore.isDark ? 'bg-white text-black border-zinc-200' : 'bg-black text-white border-zinc-800'
+              ]"
+            >
+              {{ runnerStore.runningCount }}
+            </span>
           </router-link>
         </nav>
       </div>
