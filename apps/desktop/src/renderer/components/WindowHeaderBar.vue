@@ -9,14 +9,19 @@
       <button
         type="button"
         :title="sidebarStore.isCollapsed ? '展开侧边栏' : '折叠侧边栏'"
-        class="h-6.5 w-6.5 rounded-md flex items-center justify-center transition-all duration-150 cursor-pointer"
-        :class="themeStore.isDark
-          ? 'text-zinc-400 hover:text-white hover:bg-white/10'
-          : 'text-zinc-600 hover:text-zinc-950 hover:bg-zinc-200'"
+        class="h-6.5 w-6.5 rounded-lg border flex items-center justify-center transition-all duration-200 cursor-pointer select-none group/toggle active:scale-90"
+        :class="[
+          sidebarStore.isCollapsed
+            ? (themeStore.isDark
+                ? 'bg-[#18181b] border-[#3f3f46] text-white shadow-2xs hover:bg-[#27272a] hover:border-zinc-400'
+                : 'bg-white border-zinc-300 text-zinc-950 shadow-2xs hover:bg-zinc-50 hover:border-zinc-400')
+            : (themeStore.isDark
+                ? 'border-transparent text-zinc-400 hover:text-white hover:bg-white/10 hover:border-[#27272a]'
+                : 'border-transparent text-zinc-600 hover:text-zinc-950 hover:bg-zinc-200/80 hover:border-zinc-300')
+        ]"
         @click.stop="sidebarStore.toggleCollapse"
       >
-        <IconPanelLeftOpen v-if="sidebarStore.isCollapsed" :size="15" />
-        <IconPanelLeftClose v-else :size="15" />
+        <IconSidebarAnimated :collapsed="sidebarStore.isCollapsed" :size="15" />
       </button>
     </div>
 
@@ -101,7 +106,7 @@
 import { ref, onMounted, onUnmounted } from 'vue';
 import { useThemeStore } from '../stores/themeStore.js';
 import { useSidebarStore } from '../stores/sidebarStore.js';
-import { IconPanelLeftOpen, IconPanelLeftClose } from './icons/index.js';
+import { IconSidebarAnimated } from './icons/index.js';
 
 const themeStore = useThemeStore();
 const sidebarStore = useSidebarStore();

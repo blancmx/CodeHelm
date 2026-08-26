@@ -303,6 +303,7 @@ export { default as IconMoonAnimated } from './IconMoonAnimated.vue';
 export { default as IconSunAnimated } from './IconSunAnimated.vue';
 export { default as IconMonitorAnimated } from './IconMonitorAnimated.vue';
 export { default as IconSearchAnimated } from './IconSearchAnimated.vue';
+export { default as IconSidebarAnimated } from './IconSidebarAnimated.vue';
 
 
 
