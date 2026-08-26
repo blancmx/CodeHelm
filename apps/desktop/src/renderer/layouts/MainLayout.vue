@@ -226,10 +226,8 @@
     </main>
 
     <!-- Global Modals -->
-    <teleport to="body">
-      <ImportProjectModal />
-      <QuickSearchModal />
-    </teleport>
+    <ImportProjectModal />
+    <QuickSearchModal />
   </div>
 </template>
 
