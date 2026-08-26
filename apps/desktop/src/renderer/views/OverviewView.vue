@@ -701,9 +701,25 @@ async function handleManualRefresh() {
 }
 
 const searchQuery = ref('');
-const activeFilter = ref<string>('ALL');
-const onlyRunning = ref(false);
-const sortBy = ref<'recent' | 'name' | 'services' | 'status'>('recent');
+
+// Persist overview filters across route navigation
+const savedFilter = sessionStorage.getItem('codehelm_overview_filter') || 'ALL';
+const activeFilter = ref<string>(savedFilter);
+
+const savedOnlyRunning = sessionStorage.getItem('codehelm_overview_only_running') === 'true';
+const onlyRunning = ref(savedOnlyRunning);
+
+watch(onlyRunning, (val) => {
+  sessionStorage.setItem('codehelm_overview_only_running', String(val));
+});
+
+const savedSortBy = (sessionStorage.getItem('codehelm_overview_sort_by') as 'recent' | 'name' | 'services' | 'status') || 'recent';
+const sortBy = ref<'recent' | 'name' | 'services' | 'status'>(savedSortBy);
+
+watch(sortBy, (val) => {
+  sessionStorage.setItem('codehelm_overview_sort_by', val);
+});
+
 const isSortOpen = ref(false);
 
 // Smooth Sliding Magnetic Indicator for Ecosystem Filter Bar
@@ -757,15 +773,25 @@ function updateIndicator() {
 
 function handleSelectFilter(val: string) {
   activeFilter.value = val;
+  sessionStorage.setItem('codehelm_overview_filter', val);
   updateIndicator();
 }
 
 watch([() => activeFilter.value, () => filterOptions.value], () => {
+  if (activeFilter.value !== 'ALL' && filterOptions.value.length > 0) {
+    if (!filterOptions.value.some((o) => o.value === activeFilter.value)) {
+      activeFilter.value = 'ALL';
+      sessionStorage.setItem('codehelm_overview_filter', 'ALL');
+    }
+  }
   updateIndicator();
 }, { deep: true });
 
 onMounted(() => {
   updateIndicator();
+  // Ensure indicator updates once child refs are mounted
+  setTimeout(updateIndicator, 40);
+  setTimeout(updateIndicator, 150);
   window.addEventListener('resize', updateIndicator);
 });
 
