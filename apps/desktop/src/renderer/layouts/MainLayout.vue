@@ -17,8 +17,7 @@
       <div class="overflow-hidden">
         <!-- Brand Header (Left: Logo, Right: Quick Search) -->
         <div
-          class="h-14 px-2 flex items-center border-b transition-colors duration-200 overflow-hidden flex-shrink-0"
-          :class="themeStore.isDark ? 'border-[#27272a]' : 'border-[#e4e4e7]'"
+          class="h-14 px-2 flex items-center transition-colors duration-200 overflow-hidden flex-shrink-0"
         >
           <!-- Left: Brand Logo & Title Container -->
           <div

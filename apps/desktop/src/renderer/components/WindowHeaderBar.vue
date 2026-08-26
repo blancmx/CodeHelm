@@ -1,7 +1,7 @@
 <template>
   <div
     class="h-8 w-full select-none flex items-center justify-between flex-shrink-0 z-50 transition-colors duration-200 drag-header"
-    :class="themeStore.isDark ? 'bg-[#0f0f12] border-b border-[#27272a] text-zinc-400' : 'bg-[#f4f4f5] border-b border-[#e4e4e7] text-zinc-600'"
+    :class="themeStore.isDark ? 'bg-[#0f0f12] text-zinc-400' : 'bg-[#f4f4f5] text-zinc-600'"
     @dblclick="handleToggleMaximize"
   >
     <!-- Left: Sidebar Collapse/Expand Toggle Button on Top-Left -->
