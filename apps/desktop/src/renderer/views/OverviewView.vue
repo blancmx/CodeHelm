@@ -407,16 +407,18 @@
         <p class="text-xs mt-1" :class="themeStore.isDark ? 'text-zinc-500' : 'text-zinc-400'">请尝试调整搜索关键词或分类标签</p>
       </div>
 
-      <!-- View Mode 1: Project Cards Grid (Monochrome) -->
-      <div
+      <!-- View Mode 1: Project Cards Grid (Monochrome with Silky FLIP Transition) -->
+      <TransitionGroup
         v-else-if="viewMode === 'grid'"
         key="grid-view"
+        name="card-flip"
+        tag="div"
         class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-6"
       >
         <div
           v-for="project in sortedProjects"
           :key="project.id"
-          class="border rounded-xl p-5 transition-all duration-200 cursor-pointer flex flex-col justify-between group"
+          class="border rounded-xl p-5 transition-colors duration-200 cursor-pointer flex flex-col justify-between group"
           :class="themeStore.isDark
             ? 'bg-[#121216] hover:bg-[#18181c] border-[#27272a] hover:border-zinc-500 shadow-sm'
             : 'bg-white hover:bg-zinc-50 border-zinc-200 hover:border-zinc-400 shadow-sm'"
@@ -524,9 +526,9 @@
             </div>
           </div>
         </div>
-      </div>
+      </TransitionGroup>
 
-      <!-- View Mode 2: Project Table / List View (Monochrome) -->
+      <!-- View Mode 2: Project Table / List View (Monochrome with Silky FLIP Transition) -->
       <div
         v-else-if="viewMode === 'list'"
         key="list-view"
@@ -547,7 +549,12 @@
               <th class="py-3 px-4 text-right">操作</th>
             </tr>
           </thead>
-          <tbody class="divide-y" :class="themeStore.isDark ? 'divide-[#1f1f23]' : 'divide-zinc-100'">
+          <TransitionGroup
+            name="list-flip"
+            tag="tbody"
+            class="divide-y"
+            :class="themeStore.isDark ? 'divide-[#1f1f23]' : 'divide-zinc-100'"
+          >
             <tr
               v-for="project in sortedProjects"
               :key="project.id"
@@ -642,7 +649,7 @@
                 </div>
               </td>
             </tr>
-          </tbody>
+          </TransitionGroup>
         </table>
       </div>
     </transition>
@@ -1015,20 +1022,70 @@ function statusBadgeClass(status?: string) {
 </script>
 
 <style scoped>
+/* Card FLIP Grid Transitions */
+.card-flip-move {
+  transition: transform 320ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.card-flip-enter-active {
+  transition: opacity 260ms cubic-bezier(0.16, 1, 0.3, 1), transform 260ms cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
+}
+
+.card-flip-leave-active {
+  transition: opacity 180ms ease-out, transform 180ms ease-out;
+  position: absolute;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.card-flip-enter-from {
+  opacity: 0;
+  transform: translateY(12px) scale(0.97);
+}
+
+.card-flip-leave-to {
+  opacity: 0;
+  transform: scale(0.95);
+}
+
+/* List FLIP Table Transitions */
+.list-flip-move {
+  transition: transform 280ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.list-flip-enter-active {
+  transition: opacity 240ms cubic-bezier(0.16, 1, 0.3, 1), transform 240ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.list-flip-leave-active {
+  transition: opacity 160ms ease-out;
+}
+
+.list-flip-enter-from {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+.list-flip-leave-to {
+  opacity: 0;
+}
+
+/* View Mode Out-In Fade Slide */
 .view-fade-slide-enter-active,
 .view-fade-slide-leave-active {
-  transition: opacity 220ms cubic-bezier(0.4, 0, 0.2, 1), transform 220ms cubic-bezier(0.4, 0, 0.2, 1);
+  transition: opacity 220ms cubic-bezier(0.16, 1, 0.3, 1), transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
   will-change: opacity, transform;
 }
 
 .view-fade-slide-enter-from {
   opacity: 0;
-  transform: translateY(6px);
+  transform: translateY(8px);
 }
 
 .view-fade-slide-leave-to {
   opacity: 0;
-  transform: translateY(-6px);
+  transform: translateY(-8px);
 }
 
 @keyframes refresh-spin {
