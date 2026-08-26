@@ -4,6 +4,22 @@
     :class="themeStore.isDark ? 'bg-[#0f0f12] border-b border-[#27272a] text-zinc-400' : 'bg-[#f4f4f5] border-b border-[#e4e4e7] text-zinc-600'"
     @dblclick="handleToggleMaximize"
   >
+    <!-- Left: Sidebar Collapse/Expand Toggle Button on Top-Left -->
+    <div class="flex items-center h-full no-drag pl-2">
+      <button
+        type="button"
+        :title="sidebarStore.isCollapsed ? '展开侧边栏' : '折叠侧边栏'"
+        class="h-6.5 w-6.5 rounded-md flex items-center justify-center transition-all duration-150 cursor-pointer"
+        :class="themeStore.isDark
+          ? 'text-zinc-400 hover:text-white hover:bg-white/10'
+          : 'text-zinc-600 hover:text-zinc-950 hover:bg-zinc-200'"
+        @click.stop="sidebarStore.toggleCollapse"
+      >
+        <IconPanelLeftOpen v-if="sidebarStore.isCollapsed" :size="15" />
+        <IconPanelLeftClose v-else :size="15" />
+      </button>
+    </div>
+
     <!-- Full Draggable Titlebar Spacer -->
     <div class="flex-1 h-full min-w-0" />
 
@@ -84,8 +100,11 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue';
 import { useThemeStore } from '../stores/themeStore.js';
+import { useSidebarStore } from '../stores/sidebarStore.js';
+import { IconPanelLeftOpen, IconPanelLeftClose } from './icons/index.js';
 
 const themeStore = useThemeStore();
+const sidebarStore = useSidebarStore();
 const isMaximized = ref(false);
 let unsubscribeMaximize: (() => void) | null = null;
 

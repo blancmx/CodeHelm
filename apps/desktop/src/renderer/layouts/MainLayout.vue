@@ -7,49 +7,51 @@
     <aside
       class="h-full border-r flex flex-col justify-between select-none flex-shrink-0 z-10 overflow-hidden sidebar-transition"
       :class="[
-        isCollapsed ? 'w-[56px]' : 'w-[208px]',
+        sidebarStore.isCollapsed ? 'w-[56px]' : 'w-[208px]',
         themeStore.isDark ? 'bg-[#0f0f12] border-[#27272a]' : 'bg-[#f4f4f5] border-[#e4e4e7]',
-        isCollapsed ? 'cursor-pointer' : ''
+        sidebarStore.isCollapsed ? 'cursor-pointer' : ''
       ]"
       @click="handleSidebarBlankClick"
     >
       <!-- Top Brand & Navigation -->
       <div class="overflow-hidden">
-        <!-- Brand Header (Left: Collapse Toggle, Right: Quick Search) -->
+        <!-- Brand Header (Left: Logo, Right: Quick Search) -->
         <div
           class="h-14 px-2 flex items-center border-b transition-colors duration-200 overflow-hidden flex-shrink-0"
           :class="themeStore.isDark ? 'border-[#27272a]' : 'border-[#e4e4e7]'"
         >
-          <!-- Left: Collapse / Expand Toggle Button -->
-          <div class="w-10 h-10 flex items-center justify-center flex-shrink-0">
-            <button
-              type="button"
-              class="w-8 h-8 rounded-lg border flex items-center justify-center shadow-xs flex-shrink-0 transition-all duration-200 cursor-pointer"
-              :class="[
-                themeStore.isDark
-                  ? 'bg-[#18181b] border-[#3f3f46] text-zinc-400 hover:text-white hover:border-zinc-400 hover:bg-[#27272a]'
-                  : 'bg-white border-zinc-300 text-zinc-600 hover:text-zinc-950 hover:border-zinc-400 hover:bg-zinc-100'
-              ]"
-              :title="isCollapsed ? '展开侧边栏' : '折叠侧边栏'"
-              @click.stop="toggleCollapse"
-            >
-              <IconPanelLeftOpen v-if="isCollapsed" :size="16" />
-              <IconPanelLeftClose v-else :size="16" />
-            </button>
-          </div>
-
-          <!-- Brand Text: Smooth fade & slide without affecting toggle -->
+          <!-- Left: Brand Logo & Title Container -->
           <div
-            class="min-w-0 overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out flex-1 pl-1 cursor-pointer"
-            :class="isCollapsed ? 'max-w-0 opacity-0 pointer-events-none p-0 m-0' : 'max-w-[110px] opacity-100 translate-x-0'"
-            @click.stop="toggleCollapse"
+            class="flex items-center min-w-0 flex-1 overflow-hidden"
+            :class="sidebarStore.isCollapsed ? 'cursor-pointer' : ''"
+            :title="sidebarStore.isCollapsed ? '点击展开侧边栏' : ''"
+            @click.stop="sidebarStore.isCollapsed ? sidebarStore.expandSidebar() : null"
           >
-            <h1 class="font-bold text-xs tracking-tight truncate" :class="themeStore.isDark ? 'text-white' : 'text-zinc-950'">
-              CodeHelm
-            </h1>
-            <p class="text-[9px] font-medium truncate" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
-              本地多项目控制台
-            </p>
+            <!-- Logo Icon: Fixed 40px container, icon centered at exactly 28px -->
+            <div class="w-10 h-10 flex items-center justify-center flex-shrink-0">
+              <div
+                class="w-8 h-8 rounded-lg border flex items-center justify-center shadow-xs flex-shrink-0 transition-colors"
+                :class="[
+                  themeStore.isDark ? 'bg-[#18181b] border-[#3f3f46] text-white' : 'bg-white border-zinc-300 text-zinc-950',
+                  sidebarStore.isCollapsed ? 'hover:border-zinc-400' : ''
+                ]"
+              >
+                <IconCodeHelmLogo :size="18" stroke-width="1.9" />
+              </div>
+            </div>
+
+            <!-- Brand Text: Smooth fade & slide without affecting logo -->
+            <div
+              class="min-w-0 overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out"
+              :class="sidebarStore.isCollapsed ? 'max-w-0 opacity-0 pointer-events-none p-0 m-0' : 'max-w-[110px] opacity-100 pl-1.5 translate-x-0'"
+            >
+              <h1 class="font-bold text-xs tracking-tight truncate" :class="themeStore.isDark ? 'text-white' : 'text-zinc-950'">
+                CodeHelm
+              </h1>
+              <p class="text-[9px] font-medium truncate" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
+                本地多项目控制台
+              </p>
+            </div>
           </div>
 
           <!-- Right: Quick Search Button -->
@@ -57,7 +59,7 @@
             type="button"
             class="h-6.5 rounded-md flex items-center justify-center transition-all duration-300 ease-in-out cursor-pointer flex-shrink-0"
             :class="[
-              isCollapsed ? 'w-0 max-w-0 opacity-0 pointer-events-none p-0 m-0 border-0 overflow-hidden' : 'w-6.5 opacity-100 ml-1',
+              sidebarStore.isCollapsed ? 'w-0 max-w-0 opacity-0 pointer-events-none p-0 m-0 border-0 overflow-hidden' : 'w-6.5 opacity-100 ml-1',
               themeStore.isDark
                 ? 'hover:bg-[#18181b] text-zinc-400 hover:text-white border border-transparent hover:border-[#27272a] hover:scale-105 active:scale-95'
                 : 'hover:bg-zinc-200/70 text-zinc-500 hover:text-zinc-900 border border-transparent hover:border-zinc-300 hover:scale-105 active:scale-95'
@@ -76,12 +78,12 @@
             to="/"
             class="h-9 w-full rounded-lg flex items-center transition-all duration-150 group relative"
             :class="[
-              isCollapsed ? 'overflow-visible' : 'overflow-hidden',
+              sidebarStore.isCollapsed ? 'overflow-visible' : 'overflow-hidden',
               $route.name === 'overview'
                 ? (themeStore.isDark ? 'bg-white/10 text-white border border-white/20 shadow-xs font-semibold' : 'bg-black text-white border border-black font-semibold shadow-xs')
                 : (themeStore.isDark ? 'text-zinc-400 hover:bg-[#18181b] hover:text-zinc-100 border border-transparent' : 'text-zinc-600 hover:bg-zinc-200/70 hover:text-zinc-950 border border-transparent')
             ]"
-            :title="isCollapsed ? `项目总览 (${projectStore.projects.length})` : ''"
+            :title="sidebarStore.isCollapsed ? `项目总览 (${projectStore.projects.length})` : ''"
             @mouseenter="isOverviewHovered = true"
             @mouseleave="isOverviewHovered = false"
           >
@@ -97,7 +99,7 @@
             <!-- Expanded Mode Text & Badge (Smooth clipping to the right of fixed icon) -->
             <div
               class="flex items-center justify-between min-w-0 flex-1 overflow-hidden transition-all duration-300 ease-in-out whitespace-nowrap pr-2"
-              :class="isCollapsed ? 'max-w-0 opacity-0 -translate-x-2 pointer-events-none' : 'max-w-[145px] opacity-100 translate-x-0'"
+              :class="sidebarStore.isCollapsed ? 'max-w-0 opacity-0 -translate-x-2 pointer-events-none' : 'max-w-[145px] opacity-100 translate-x-0'"
             >
               <span class="truncate text-xs font-medium transition-transform duration-200 group-hover:translate-x-0.5">项目总览</span>
               <span
@@ -114,7 +116,7 @@
               v-if="projectStore.projects.length"
               class="absolute -top-1 -right-1 min-w-[16px] h-[16px] px-1 rounded-full text-[9px] font-mono font-bold flex items-center justify-center border shadow-xs transition-all duration-200 z-20 select-none leading-none"
               :class="[
-                isCollapsed ? 'opacity-100 scale-100' : 'opacity-0 scale-50 pointer-events-none',
+                sidebarStore.isCollapsed ? 'opacity-100 scale-100' : 'opacity-0 scale-50 pointer-events-none',
                 themeStore.isDark ? 'bg-[#27272a] text-white border-[#3f3f46]' : 'bg-zinc-200 text-zinc-900 border-zinc-300'
               ]"
             >
@@ -127,12 +129,12 @@
             to="/runner"
             class="h-9 w-full rounded-lg flex items-center transition-all duration-150 group relative"
             :class="[
-              isCollapsed ? 'overflow-visible' : 'overflow-hidden',
+              sidebarStore.isCollapsed ? 'overflow-visible' : 'overflow-hidden',
               $route.name === 'runner'
                 ? (themeStore.isDark ? 'bg-white/10 text-white border border-white/20 shadow-xs font-semibold' : 'bg-black text-white border border-black font-semibold shadow-xs')
                 : (themeStore.isDark ? 'text-zinc-400 hover:bg-[#18181b] hover:text-zinc-100 border border-transparent' : 'text-zinc-600 hover:bg-zinc-200/70 hover:text-zinc-950 border border-transparent')
             ]"
-            :title="isCollapsed ? `运行中心 (${runnerStore.runningCount > 0 ? runnerStore.runningCount + ' 个活跃进程' : '空闲'})` : ''"
+            :title="sidebarStore.isCollapsed ? `运行中心 (${runnerStore.runningCount > 0 ? runnerStore.runningCount + ' 个活跃进程' : '空闲'})` : ''"
             @mouseenter="isRunnerHovered = true"
             @mouseleave="isRunnerHovered = false"
           >
@@ -149,7 +151,7 @@
             <!-- Expanded Mode Text & Active Badge -->
             <div
               class="flex items-center justify-between min-w-0 flex-1 overflow-hidden transition-all duration-300 ease-in-out whitespace-nowrap pr-2"
-              :class="isCollapsed ? 'max-w-0 opacity-0 -translate-x-2 pointer-events-none' : 'max-w-[145px] opacity-100 translate-x-0'"
+              :class="sidebarStore.isCollapsed ? 'max-w-0 opacity-0 -translate-x-2 pointer-events-none' : 'max-w-[145px] opacity-100 translate-x-0'"
             >
               <span class="truncate text-xs font-medium transition-transform duration-200 group-hover:translate-x-0.5">运行中心</span>
               <div
@@ -167,7 +169,7 @@
               v-if="runnerStore.runningCount > 0"
               class="absolute -top-1 -right-1 min-w-[16px] h-[16px] px-1 rounded-full text-[9px] font-mono font-bold flex items-center justify-center border shadow-xs transition-all duration-200 z-20 select-none leading-none"
               :class="[
-                isCollapsed ? 'opacity-100 scale-100' : 'opacity-0 scale-50 pointer-events-none',
+                sidebarStore.isCollapsed ? 'opacity-100 scale-100' : 'opacity-0 scale-50 pointer-events-none',
                 themeStore.isDark ? 'bg-white text-black border-zinc-200' : 'bg-black text-white border-zinc-800'
               ]"
             >
@@ -191,7 +193,7 @@
               ? (themeStore.isDark ? 'bg-white/10 text-white border border-white/20 shadow-xs font-semibold' : 'bg-black text-white border border-black font-semibold shadow-xs')
               : (themeStore.isDark ? 'text-zinc-400 hover:bg-[#18181b] hover:text-zinc-100 border border-transparent' : 'text-zinc-600 hover:bg-zinc-200/70 hover:text-zinc-950 border border-transparent')
           ]"
-          :title="isCollapsed ? '系统设置' : ''"
+          :title="sidebarStore.isCollapsed ? '系统设置' : ''"
         >
           <!-- Fixed Icon Box -->
           <div class="w-10 h-9 flex items-center justify-center flex-shrink-0 relative">
@@ -204,7 +206,7 @@
 
           <div
             class="flex items-center justify-between min-w-0 flex-1 overflow-hidden transition-all duration-300 ease-in-out whitespace-nowrap pr-2"
-            :class="isCollapsed ? 'max-w-0 opacity-0 -translate-x-2 pointer-events-none' : 'max-w-[145px] opacity-100 translate-x-0'"
+            :class="sidebarStore.isCollapsed ? 'max-w-0 opacity-0 -translate-x-2 pointer-events-none' : 'max-w-[145px] opacity-100 translate-x-0'"
           >
             <span class="truncate text-xs font-medium transition-transform duration-200 group-hover:translate-x-0.5">系统设置</span>
           </div>
@@ -237,13 +239,13 @@ import { useRouter, useRoute } from 'vue-router';
 import { useProjectStore } from '../stores/projectStore.js';
 import { useRunnerStore } from '../stores/runnerStore.js';
 import { useThemeStore } from '../stores/themeStore.js';
+import { useSidebarStore } from '../stores/sidebarStore.js';
 import ImportProjectModal from '../components/ImportProjectModal.vue';
 import {
   IconProjectGrid,
   IconRunnerZap,
   IconSettings,
-  IconPanelLeftClose,
-  IconPanelLeftOpen,
+  IconCodeHelmLogo,
   IconSearch,
 } from '../components/icons/index.js';
 
@@ -252,30 +254,15 @@ const route = useRoute();
 const projectStore = useProjectStore();
 const runnerStore = useRunnerStore();
 const themeStore = useThemeStore();
+const sidebarStore = useSidebarStore();
 
 // Hover states for icon animations
 const isOverviewHovered = ref(false);
 const isRunnerHovered = ref(false);
 
-// Sidebar collapse state with localStorage persistence
-const isCollapsed = ref(localStorage.getItem('codehelm_sidebar_collapsed') === 'true');
-
-function toggleCollapse() {
-  isCollapsed.value = !isCollapsed.value;
-  localStorage.setItem('codehelm_sidebar_collapsed', String(isCollapsed.value));
-}
-
-function expandSidebar() {
-  if (isCollapsed.value) {
-    isCollapsed.value = false;
-    localStorage.setItem('codehelm_sidebar_collapsed', 'false');
-  }
-}
-
 function handleSidebarBlankClick() {
-  // If sidebar is collapsed, clicking any blank area will expand it
-  if (isCollapsed.value) {
-    expandSidebar();
+  if (sidebarStore.isCollapsed) {
+    sidebarStore.expandSidebar();
   }
 }
 
