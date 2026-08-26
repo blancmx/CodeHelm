@@ -90,13 +90,13 @@
             <div class="w-10 h-9 flex items-center justify-center flex-shrink-0 relative">
               <IconProjectGrid :size="16" :hovered="isOverviewHovered" />
 
-              <!-- Collapsed Mode Float Badge (Shifted to top-right corner to never cover icon) -->
+              <!-- Collapsed Mode Float Badge (Intact complete circle, covers top-right neatly without clipping) -->
               <span
                 v-if="projectStore.projects.length"
-                class="absolute -top-0.5 right-0.5 min-w-[13px] h-[13px] px-0.5 rounded-full text-[8px] font-mono font-bold flex items-center justify-center border shadow-2xs transition-all duration-200 z-10"
+                class="absolute top-1 right-1 min-w-[15px] h-[15px] px-1 rounded-full text-[9px] font-mono font-bold flex items-center justify-center border shadow-xs transition-all duration-200 z-10 select-none leading-none"
                 :class="[
                   isCollapsed ? 'opacity-100 scale-100' : 'opacity-0 scale-50 pointer-events-none',
-                  themeStore.isDark ? 'bg-[#27272a] text-zinc-200 border-[#3f3f46]' : 'bg-zinc-200 text-zinc-800 border-zinc-300'
+                  themeStore.isDark ? 'bg-[#27272a] text-white border-[#3f3f46]' : 'bg-zinc-200 text-zinc-900 border-zinc-300'
                 ]"
               >
                 {{ projectStore.projects.length }}
@@ -140,10 +140,10 @@
                 :is-running="runnerStore.runningCount > 0"
               />
 
-              <!-- Collapsed Mode Float Badge (Shifted to top-right corner to never cover icon) -->
+              <!-- Collapsed Mode Float Badge (Intact complete circle, covers top-right neatly without clipping) -->
               <span
                 v-if="runnerStore.runningCount > 0"
-                class="absolute -top-0.5 right-0.5 min-w-[13px] h-[13px] px-0.5 rounded-full text-[8px] font-mono font-bold flex items-center justify-center border shadow-2xs transition-all duration-200 z-10"
+                class="absolute top-1 right-1 min-w-[15px] h-[15px] px-1 rounded-full text-[9px] font-mono font-bold flex items-center justify-center border shadow-xs transition-all duration-200 z-10 select-none leading-none"
                 :class="[
                   isCollapsed ? 'opacity-100 scale-100' : 'opacity-0 scale-50 pointer-events-none',
                   themeStore.isDark ? 'bg-white text-black border-zinc-200' : 'bg-black text-white border-zinc-800'
