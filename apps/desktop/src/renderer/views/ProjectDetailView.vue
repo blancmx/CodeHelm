@@ -138,7 +138,7 @@
             class="font-semibold"
             :loading="isLaunching"
             :disabled="isLaunching || !activeProfile || activeProfile.services.filter((s) => s.enabled).length === 0"
-            @click="handleInstallAndLaunch"
+            @click="handleLaunchClick('install')"
           >
             <template #icon>
               <IconZap :size="14" />
@@ -152,7 +152,7 @@
             class="font-semibold shadow-sm"
             :loading="isLaunching"
             :disabled="isLaunching || !activeProfile || activeProfile.services.filter((s) => s.enabled).length === 0"
-            @click="handleLaunchClick"
+            @click="handleLaunchClick('start')"
           >
             <template #icon>
               <IconPlay :size="14" />
@@ -1089,6 +1089,7 @@
     <FirstRunConfirmModal
       v-model:show="confirmModalVisible"
       :profile="activeProfile"
+      :install-dependencies="pendingLaunchMode === 'install'"
       @update-port="handleFirstRunPortOverride"
       @confirm="handleConfirmLaunch"
     />
@@ -1128,6 +1129,7 @@ import type {
   ProcessStatus,
   ReadmeSummaryDto,
   RunProfileDto,
+  RunnerExecutionMode,
   SaveRunProfileInput,
   ServiceConfigDto,
 } from '@codehelm/contracts';
@@ -1166,6 +1168,7 @@ let unsubscribeProgress: (() => void) | null = null;
 const editModalVisible = ref(false);
 const selectedServiceToEdit = ref<ServiceConfigDto | null>(null);
 const confirmModalVisible = ref(false);
+const pendingLaunchMode = ref<RunnerExecutionMode>('start');
 
 const logSearch = ref('');
 const selectedServiceLogFilter = ref('ALL');
@@ -1506,28 +1509,51 @@ async function handleStartAnalysis() {
   }
 }
 
-function handleLaunchClick() {
-  if (!activeProfile.value) return;
-  if (!activeProfile.value.userConfirmedAt) {
-    confirmModalVisible.value = true;
-  } else {
-    handleConfirmLaunch();
-  }
+function handleLaunchClick(mode: RunnerExecutionMode = 'start') {
+  if (!activeProfile.value || isLaunching.value) return;
+  pendingLaunchMode.value = mode;
+  void launchWithExistingApproval(mode);
 }
 
-async function handleInstallAndLaunch() {
+function isExecutionConfirmationRequired(error: unknown): boolean {
+  return error instanceof Error
+    && error.message.includes('Execution confirmation required');
+}
+
+async function launchWithExistingApproval(mode: RunnerExecutionMode) {
   if (!activeProfile.value?.id || isLaunching.value) return;
+  const profileId = activeProfile.value.id;
   try {
     isLaunching.value = true;
-    message.loading('正在检查/安装前置依赖并拉起服务方案...');
-    await runnerStore.installAndStartProfile(activeProfile.value.id);
+    let approvalToken: string;
+    try {
+      approvalToken = await runnerStore.reuseExecutionApproval(profileId, mode);
+    } catch {
+      // The main process deliberately rejects stale or unknown approvals.
+      // Re-open the review instead of falling back to an unguarded runner call.
+      confirmModalVisible.value = true;
+      return;
+    }
+
+    message.loading(
+      mode === 'install' ? '正在检查/安装前置依赖并拉起服务方案...' : '正在按 DAG 拓扑并发拉起服务...'
+    );
+    if (mode === 'install') {
+      await runnerStore.installAndStartProfile(profileId, approvalToken);
+    } else {
+      await runnerStore.startProfile(profileId, approvalToken);
+    }
     // Runtime reconciliation may persist a project-constrained port (for
     // example a backend CORS origin). Reload so cards and launch links show
     // the same port as the running process.
     await loadData();
-    message.success('依赖准备完毕，服务方案已成功启动！');
+    message.success(mode === 'install' ? '依赖准备完毕，服务方案已成功启动！' : '服务方案已启动');
   } catch (err: any) {
-    message.error(err.message || '安装依赖或启动失败');
+    if (isExecutionConfirmationRequired(err)) {
+      confirmModalVisible.value = true;
+    } else {
+      message.error(err.message || (mode === 'install' ? '安装依赖或启动失败' : '启动失败'));
+    }
   } finally {
     isLaunching.value = false;
   }
@@ -1536,6 +1562,7 @@ async function handleInstallAndLaunch() {
 async function handleConfirmLaunch() {
   if (!activeProfile.value?.id || isLaunching.value) return;
   let launchStage = '保存启动配置';
+  const mode = pendingLaunchMode.value;
   try {
     isLaunching.value = true;
     confirmModalVisible.value = false;
@@ -1547,13 +1574,25 @@ async function handleConfirmLaunch() {
     ) as SaveRunProfileInput;
     const savedProfile = await window.codehelm.profiles.save(profilePayload);
     editingProfile.value = savedProfile;
+    launchStage = '获取主进程执行授权';
+    const approvalToken = await runnerStore.confirmExecution(savedProfile.id, mode);
     launchStage = '启动服务';
-    message.loading('正在按 DAG 拓扑并发拉起服务...');
-    await runnerStore.startProfile(savedProfile.id);
+    message.loading(
+      mode === 'install' ? '正在检查/安装前置依赖并拉起服务方案...' : '正在按 DAG 拓扑并发拉起服务...'
+    );
+    if (mode === 'install') {
+      await runnerStore.installAndStartProfile(savedProfile.id, approvalToken);
+    } else {
+      await runnerStore.startProfile(savedProfile.id, approvalToken);
+    }
     await loadData();
-    message.success('服务方案已启动');
+    message.success(mode === 'install' ? '依赖准备完毕，服务方案已成功启动！' : '服务方案已启动');
   } catch (err: any) {
-    message.error(`${launchStage}失败：${err?.message || '未知错误'}`);
+    if (isExecutionConfirmationRequired(err)) {
+      confirmModalVisible.value = true;
+    } else {
+      message.error(`${launchStage}失败：${err?.message || '未知错误'}`);
+    }
   } finally {
     isLaunching.value = false;
   }
@@ -1703,4 +1742,3 @@ function statusBadgeClass(status: ProcessStatus) {
   -moz-osx-font-smoothing: grayscale;
 }
 </style>
-

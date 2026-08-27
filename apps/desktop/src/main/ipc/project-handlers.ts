@@ -10,12 +10,56 @@ import {
   ProfileRepository,
   ProjectRepository,
 } from '@codehelm/database';
-import { AnalyzerEngine, WorkspaceScanner } from '@codehelm/analyzer';
+import {
+  AnalyzerEngine,
+  readUtf8FileWithinLimit,
+  WorkspaceScanner,
+} from '@codehelm/analyzer';
 import { normalizePath } from '@codehelm/shared';
 import fs from 'node:fs';
 import path from 'node:path';
 import { upsertAutoDetectedProfile } from './auto-profile.js';
 import { getPersistentPortAllocator } from './persistent-port-allocator.js';
+
+const DEFAULT_FILE_TREE_DEPTH = 5;
+const MAX_FILE_TREE_DEPTH = 5;
+const MAX_FILE_TREE_NODES = 5_000;
+const MAX_FILE_TREE_ENTRIES_PER_DIRECTORY = 2_000;
+const MAX_README_BYTES = 256 * 1024;
+
+function normalizeFileTreeDepth(value: number | undefined): number {
+  if (value === undefined) return DEFAULT_FILE_TREE_DEPTH;
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw new Error('Invalid file tree depth');
+  }
+  return Math.min(value, MAX_FILE_TREE_DEPTH);
+}
+
+function isRegularFile(filePath: string): boolean {
+  try {
+    return fs.lstatSync(filePath).isFile();
+  } catch {
+    return false;
+  }
+}
+
+interface FileTreeBudget {
+  nodes: number;
+}
+
+async function readDirectoryEntries(directoryPath: string): Promise<fs.Dirent[]> {
+  const directory = await fs.promises.opendir(directoryPath);
+  const entries: fs.Dirent[] = [];
+  try {
+    for await (const entry of directory) {
+      if (entries.length >= MAX_FILE_TREE_ENTRIES_PER_DIRECTORY) break;
+      entries.push(entry);
+    }
+  } finally {
+    await directory.close().catch(() => undefined);
+  }
+  return entries;
+}
 
 export function registerProjectHandlers(db: DatabaseInstance) {
   const projectRepo = new ProjectRepository(db);
@@ -184,10 +228,16 @@ export function registerProjectHandlers(db: DatabaseInstance) {
     '.vscode',
   ]);
 
-  async function buildFileTree(currentDir: string, rootDir: string, currentDepth: number, maxDepth: number): Promise<any[]> {
-    if (currentDepth > maxDepth) return [];
+  async function buildFileTree(
+    currentDir: string,
+    rootDir: string,
+    currentDepth: number,
+    maxDepth: number,
+    budget: FileTreeBudget
+  ): Promise<any[]> {
+    if (currentDepth > maxDepth || budget.nodes >= MAX_FILE_TREE_NODES) return [];
     try {
-      const entries = await fs.promises.readdir(currentDir, { withFileTypes: true });
+      const entries = await readDirectoryEntries(currentDir);
       const nodes: any[] = [];
 
       entries.sort((a, b) => {
@@ -198,14 +248,23 @@ export function registerProjectHandlers(db: DatabaseInstance) {
       });
 
       for (const entry of entries) {
+        if (budget.nodes >= MAX_FILE_TREE_NODES) break;
         if (IGNORED_TREE_DIRS.has(entry.name)) continue;
 
         const fullPath = path.join(currentDir, entry.name);
         const normFull = normalizePath(fullPath);
         const relPath = normalizePath(path.relative(rootDir, fullPath));
+        let entryStat: fs.Stats;
+        try {
+          entryStat = await fs.promises.lstat(fullPath);
+        } catch {
+          continue;
+        }
+        if (entryStat.isSymbolicLink()) continue;
 
-        if (entry.isDirectory()) {
-          const children = await buildFileTree(fullPath, rootDir, currentDepth + 1, maxDepth);
+        if (entryStat.isDirectory()) {
+          budget.nodes += 1;
+          const children = await buildFileTree(fullPath, rootDir, currentDepth + 1, maxDepth, budget);
           nodes.push({
             name: entry.name,
             path: normFull,
@@ -213,20 +272,15 @@ export function registerProjectHandlers(db: DatabaseInstance) {
             type: 'directory',
             children,
           });
-        } else if (entry.isFile()) {
-          let size = 0;
-          try {
-            const stat = await fs.promises.stat(fullPath);
-            size = stat.size;
-          } catch {}
-
+        } else if (entryStat.isFile()) {
+          budget.nodes += 1;
           const ext = path.extname(entry.name).toLowerCase().replace(/^\./, '');
           nodes.push({
             name: entry.name,
             path: normFull,
             relativePath: relPath,
             type: 'file',
-            size,
+            size: entryStat.size,
             extension: ext,
           });
         }
@@ -241,8 +295,8 @@ export function registerProjectHandlers(db: DatabaseInstance) {
   ipcMain.handle(IpcChannels.PROJECTS_GET_FILE_TREE, async (_event, rootPath: string, options?: { maxDepth?: number }) => {
     const normRoot = normalizePath(rootPath);
     if (!fs.existsSync(normRoot)) return [];
-    const maxDepth = options?.maxDepth ?? 5;
-    return buildFileTree(normRoot, normRoot, 1, maxDepth);
+    const maxDepth = normalizeFileTreeDepth(options?.maxDepth);
+    return buildFileTree(normRoot, normRoot, 1, maxDepth, { nodes: 0 });
   });
 
   ipcMain.handle(IpcChannels.PROJECTS_GET_README, async (_event, rootPath: string) => {
@@ -270,20 +324,28 @@ export function registerProjectHandlers(db: DatabaseInstance) {
     let readmePath: string | null = null;
     for (const name of candidateNames) {
       const full = path.join(normRoot, name);
-      if (fs.existsSync(full) && fs.statSync(full).isFile()) {
+      if (isRegularFile(full)) {
         readmePath = full;
         break;
       }
     }
 
     if (!readmePath) {
+      let directory: fs.Dir | undefined;
       try {
-        const files = fs.readdirSync(normRoot);
-        const matched = files.find((f) => /^readme(\.[a-z0-9_-]+)?$/i.test(f));
-        if (matched) {
-          readmePath = path.join(normRoot, matched);
+        directory = fs.opendirSync(normRoot);
+        let entry: fs.Dirent | null;
+        while ((entry = directory.readSync()) !== null) {
+          if (entry.isSymbolicLink() || !entry.isFile()) continue;
+          if (/^readme(\.[a-z0-9_-]+)?$/i.test(entry.name)) {
+            readmePath = path.join(normRoot, entry.name);
+            break;
+          }
         }
       } catch {}
+      finally {
+        directory?.closeSync();
+      }
     }
 
     if (!readmePath) {
@@ -297,7 +359,7 @@ export function registerProjectHandlers(db: DatabaseInstance) {
     }
 
     try {
-      const rawContent = fs.readFileSync(readmePath, 'utf-8');
+      const rawContent = (await readUtf8FileWithinLimit(readmePath, MAX_README_BYTES)).text;
       const lines = rawContent.split(/\r?\n/);
 
       let title = '';

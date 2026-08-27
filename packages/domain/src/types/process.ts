@@ -12,6 +12,8 @@ export type ProcessStatus =
 export interface ProcessFingerprint {
   pid: number;
   startTime: number;
+  /** False means the platform could not observe the creation time at spawn. */
+  identityVerified?: boolean;
   executable: string;
   cwd: string;
   argsSummary: string;

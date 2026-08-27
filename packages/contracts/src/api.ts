@@ -19,6 +19,7 @@ import type {
 import type {
   LogBatchDto,
   RunSessionDto,
+  RunnerExecutionMode,
   ServiceStatusEventDto,
 } from './dto/runner.js';
 import type { AppSettingsDto } from './dto/settings.js';
@@ -50,8 +51,10 @@ export interface CodeHelmApi {
     get(id: string): Promise<RunProfileDto | null>;
   };
   runner: {
-    start(profileId: string): Promise<RunSessionDto>;
-    installAndStart(profileId: string): Promise<RunSessionDto>;
+    confirmExecution(profileId: string, mode: RunnerExecutionMode): Promise<string>;
+    reuseExecutionApproval(profileId: string, mode: RunnerExecutionMode): Promise<string>;
+    start(profileId: string, approvalToken: string): Promise<RunSessionDto>;
+    installAndStart(profileId: string, approvalToken: string): Promise<RunSessionDto>;
     stopSession(sessionId: string): Promise<void>;
     stopService(serviceSessionId: string): Promise<void>;
     restartService(serviceSessionId: string): Promise<void>;

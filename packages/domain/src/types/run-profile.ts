@@ -30,6 +30,13 @@ export interface ServiceConfig {
   cwdRelative: string;
   env: ServiceEnvVar[];
   port?: number;
+  /**
+   * auto: CodeHelm may move the port when it is occupied.
+   * fixed: the project has an external constraint (for example a hard-coded
+   * CORS origin), so changing the port would make a seemingly healthy service
+   * unusable.
+   */
+  portMode?: 'auto' | 'fixed';
   portExtractRegex?: string;
   healthCheck?: HealthCheckConfig;
   dependsOn: string[]; // IDs of other services

@@ -2,7 +2,7 @@
   <n-modal
     v-model:show="visible"
     preset="card"
-    title="首次运行安全确认"
+    :title="installDependencies ? '安装并启动安全确认' : '首次运行安全确认'"
     class="w-680px border shadow-2xl transition-colors duration-200"
     :class="themeStore.isDark ? 'bg-[#121216] border-[#27272a] shadow-black/90' : 'bg-white border-zinc-300 shadow-zinc-400/30'"
     :segmented="{ content: 'soft', footer: 'soft' }"
@@ -14,7 +14,10 @@
       >
         <IconShield :size="16" class="text-zinc-400 flex-shrink-0 mt-0.5" />
         <div>
-          <strong>首次启动安全审核：</strong> 为了保障您的本机与环境安全，CodeHelm 绝不未经用户确认直接执行外部脚本。请审查下方由分析器推断或配置的命令与工作目录。确认后后续将支持一键秒级拉起。
+          <strong>{{ installDependencies ? '安装并启动安全审核：' : '首次启动安全审核：' }}</strong>
+          为了保障您的本机与环境安全，CodeHelm 绝不未经用户确认直接执行外部脚本。请审查下方由分析器推断或配置的命令与工作目录。
+          <template v-if="installDependencies">本次确认还会先按主进程计算的依赖计划安装缺失依赖，再启动服务。</template>
+          <template v-else>确认后当前应用会话内的相同配置将支持一键秒级拉起。</template>
         </div>
       </div>
 
@@ -84,7 +87,7 @@
           <template #icon>
             <IconShield :size="14" />
           </template>
-          安全确认并一键启动
+          {{ installDependencies ? '安全确认、安装并启动' : '安全确认并一键启动' }}
         </n-button>
       </div>
     </template>
@@ -102,6 +105,7 @@ const themeStore = useThemeStore();
 const props = defineProps<{
   show: boolean;
   profile?: RunProfileDto | null;
+  installDependencies?: boolean;
   }>();
 
 const emit = defineEmits<{

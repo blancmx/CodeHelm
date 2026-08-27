@@ -36,9 +36,26 @@ const api: CodeHelmApi = {
     get: (id) => ipcRenderer.invoke(IpcChannels.PROFILES_GET, id),
   },
   runner: {
-    start: (profileId) => ipcRenderer.invoke(IpcChannels.RUNNER_START_SESSION, profileId),
-    installAndStart: (profileId) =>
-      ipcRenderer.invoke(IpcChannels.RUNNER_INSTALL_AND_START, profileId),
+    confirmExecution: (profileId, mode) =>
+      ipcRenderer.invoke(
+        IpcChannels.RUNNER_CONFIRM_EXECUTION,
+        toIpcPayload({ profileId, mode })
+      ),
+    reuseExecutionApproval: (profileId, mode) =>
+      ipcRenderer.invoke(
+        IpcChannels.RUNNER_REUSE_EXECUTION_APPROVAL,
+        toIpcPayload({ profileId, mode })
+      ),
+    start: (profileId, approvalToken) =>
+      ipcRenderer.invoke(
+        IpcChannels.RUNNER_START_SESSION,
+        toIpcPayload({ profileId, approvalToken })
+      ),
+    installAndStart: (profileId, approvalToken) =>
+      ipcRenderer.invoke(
+        IpcChannels.RUNNER_INSTALL_AND_START,
+        toIpcPayload({ profileId, approvalToken })
+      ),
     stopSession: (sessionId) => ipcRenderer.invoke(IpcChannels.RUNNER_STOP_SESSION, sessionId),
     stopService: (serviceSessionId) => ipcRenderer.invoke(IpcChannels.RUNNER_STOP_SERVICE, serviceSessionId),
     restartService: (serviceSessionId) => ipcRenderer.invoke(IpcChannels.RUNNER_RESTART_SERVICE, serviceSessionId),
@@ -74,4 +91,3 @@ const api: CodeHelmApi = {
 };
 
 contextBridge.exposeInMainWorld('codehelm', api);
-

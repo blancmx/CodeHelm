@@ -105,4 +105,18 @@ describe('createDependencyInstallPlans', () => {
       isPythonModuleAvailable: () => true,
     })).toEqual([]);
   });
+
+  it('skips a module cwd that crosses a directory junction', () => {
+    const container = fs.mkdtempSync(path.join(os.tmpdir(), 'codehelm-deps-link-'));
+    tempDirs.push(container);
+    const root = path.join(container, 'project');
+    const outsideModule = path.join(container, 'outside-module');
+    fs.mkdirSync(root);
+    fs.mkdirSync(outsideModule);
+    fs.writeFileSync(path.join(outsideModule, 'package.json'), '{}');
+    fs.writeFileSync(path.join(outsideModule, 'package-lock.json'), '{}');
+    fs.symlinkSync(outsideModule, path.join(root, 'linked-module'), 'junction');
+
+    expect(createDependencyInstallPlans(root, [frontend('linked-module')])).toEqual([]);
+  });
 });

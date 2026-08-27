@@ -133,6 +133,9 @@ export class PythonDetector implements Detector {
     lowerText: string,
     pyprojectPath: string | undefined
   ): Promise<SuggestedCommand | undefined> {
+    const explicitLauncher = await this.detectExplicitWindowsLauncher(context);
+    if (explicitLauncher) return explicitLauncher;
+
     const pythonExecutable = await this.detectPythonExecutable(context, manager);
     const manage = sources.find((source) => path.basename(source.filePath).toLowerCase() === 'manage.py');
     if (manage && /\bdjango\b/i.test(lowerText)) {
@@ -200,6 +203,43 @@ export class PythonDetector implements Detector {
       `${entry.filePath} -> executable Python entry${pyprojectPath ? `; ${pyprojectPath}` : ''}`,
       isGradio ? 0.9 : 0.78
     );
+  }
+
+  private async detectExplicitWindowsLauncher(
+    context: AnalysisContext
+  ): Promise<SuggestedCommand | undefined> {
+    const launchers = context.files
+      .filter((file) => /(?:^|\/)(?:.*(?:启动|start|run|launch).*)\.bat$/i.test(file))
+      .sort((left, right) => left.length - right.length);
+
+    for (const launcher of launchers) {
+      try {
+        const content = await context.readFile(launcher);
+        const quotedValues = [...content.matchAll(/"([^"]*)"/g)].map((match) => match[1]);
+        for (const value of quotedValues.filter((candidate) => /\.exe$/i.test(candidate))) {
+          let relativeExecutable: string;
+          if (path.isAbsolute(value)) {
+            relativeExecutable = path.relative(context.projectRoot, value).replace(/\\/g, '/');
+          } else {
+            relativeExecutable = value.replace(/^%~dp0/i, '').replace(/\\/g, '/').replace(/^\.\//, '');
+          }
+          if (!relativeExecutable || relativeExecutable.startsWith('../')) continue;
+          if (!await context.fileExists(relativeExecutable)) continue;
+
+          return {
+            name: `${path.basename(relativeExecutable, path.extname(relativeExecutable))} Desktop`,
+            executable: relativeExecutable,
+            args: [],
+            type: 'tool',
+            confidence: 1,
+            source: `${launcher} -> explicit desktop executable`,
+          };
+        }
+      } catch {
+        // Ignore malformed launch scripts and continue with source inference.
+      }
+    }
+    return undefined;
   }
 
   private async detectPythonExecutable(

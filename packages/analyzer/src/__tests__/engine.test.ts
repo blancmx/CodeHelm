@@ -218,4 +218,26 @@ describe('Analyzer Engine Full Analysis', () => {
     expect(backend?.suggestedCommands?.[0]?.executable).toBe('.venv/Scripts/python.exe');
     expect(snapshot.modules.some((module) => module.relativePath.includes('.venv'))).toBe(false);
   });
+
+  it('should prefer an explicit Windows desktop launcher over an inferred Flask server', async () => {
+    const executable = path.join(tempDir, 'dist', 'MineBill', 'MineBill.exe');
+    await fs.mkdir(path.dirname(executable), { recursive: true });
+    await fs.writeFile(executable, '');
+    await fs.writeFile(path.join(tempDir, 'app.py'), 'from flask import Flask\napp = Flask(__name__)');
+    await fs.writeFile(
+      path.join(tempDir, '启动记账.bat'),
+      `@echo off\nstart "" "${executable}"\n`
+    );
+
+    const snapshot = await engine.analyze(tempDir);
+    const command = snapshot.modules[0]?.suggestedCommands?.[0];
+
+    expect(command).toMatchObject({
+      name: 'MineBill Desktop',
+      executable: 'dist/MineBill/MineBill.exe',
+      args: [],
+      type: 'tool',
+      confidence: 1,
+    });
+  });
 });

@@ -11,3 +11,4 @@ export * from './detectors/go-detector.js';
 export * from './detectors/rust-detector.js';
 export * from './detectors/database-detector.js';
 export * from './engine/analyzer-engine.js';
+export * from './io/bounded-read.js';

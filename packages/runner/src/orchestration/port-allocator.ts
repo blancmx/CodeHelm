@@ -4,8 +4,16 @@ import type { ServiceConfig } from '@codehelm/domain';
 export const PORT_TOKEN = '{{PORT}}';
 
 export class PortConflictError extends Error {
-  constructor(public readonly port: number, public readonly serviceName: string) {
-    super(`Port ${port} is already in use for manually configured service "${serviceName}"`);
+  constructor(
+    public readonly port: number,
+    public readonly serviceName: string,
+    public readonly reason: 'manual' | 'project_constraint' = 'manual'
+  ) {
+    super(
+      reason === 'project_constraint'
+        ? `Port ${port} is required by project configuration for service "${serviceName}" but is already in use`
+        : `Port ${port} is already in use for manually configured service "${serviceName}"`
+    );
     this.name = 'PortConflictError';
   }
 }
@@ -48,6 +56,9 @@ export async function prepareServicePort(
   const preferredAvailable = !reservedPorts.has(preferredPort) && await isAvailable(preferredPort);
 
   if (!preferredAvailable) {
+    if (service.portMode === 'fixed') {
+      throw new PortConflictError(preferredPort, service.name, 'project_constraint');
+    }
     if (service.source === 'manual') throw new PortConflictError(preferredPort, service.name);
 
     assignedPort = await findAvailablePort(preferredPort + 1, reservedPorts, isAvailable);
@@ -94,6 +105,7 @@ function applyPort(service: ServiceConfig, port: number): ServiceConfig {
     args,
     env,
     port,
+    portMode: service.portMode,
     healthCheck: service.healthCheck
       ? { ...service.healthCheck, port }
       : service.healthCheck,

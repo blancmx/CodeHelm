@@ -1,6 +1,19 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import type { LogEntryDto, ProcessStatus, RunSessionDto, ServiceStatusEventDto } from '@codehelm/contracts';
+import {
+  DEFAULT_MAX_LOG_BUFFER_BYTES,
+  DEFAULT_MAX_LOG_BUFFER_ENTRIES,
+  DEFAULT_MAX_LOG_ENTRY_BYTES,
+  truncateUtf8,
+  utf8ByteLength,
+} from '@codehelm/domain';
+import type {
+  LogEntryDto,
+  ProcessStatus,
+  RunSessionDto,
+  RunnerExecutionMode,
+  ServiceStatusEventDto,
+} from '@codehelm/contracts';
 
 export interface RunnerServiceStatus {
   status: ProcessStatus;
@@ -53,6 +66,28 @@ export function mergeRunSessionStatuses(
   return next;
 }
 
+export function appendBoundedLogs(
+  current: LogEntryDto[],
+  incoming: LogEntryDto[]
+): LogEntryDto[] {
+  const next = [...current];
+  let totalBytes = next.reduce((total, entry) => total + utf8ByteLength(entry.message), 0);
+  for (const entry of incoming) {
+    const boundedEntry = {
+      ...entry,
+      message: truncateUtf8(entry.message, DEFAULT_MAX_LOG_ENTRY_BYTES),
+    };
+    next.push(boundedEntry);
+    totalBytes += utf8ByteLength(boundedEntry.message);
+    while (next.length > DEFAULT_MAX_LOG_BUFFER_ENTRIES || totalBytes > DEFAULT_MAX_LOG_BUFFER_BYTES) {
+      const removed = next.shift();
+      if (!removed) break;
+      totalBytes -= utf8ByteLength(removed.message);
+    }
+  }
+  return next;
+}
+
 export const useRunnerStore = defineStore('runner', () => {
   const currentSession = ref<RunSessionDto | null>(null);
   const serviceStatuses = ref<Map<string, RunnerServiceStatus>>(new Map());
@@ -90,26 +125,33 @@ export const useRunnerStore = defineStore('runner', () => {
     });
 
     window.codehelm.runner.onLogs((batch) => {
-      logs.value.push(...batch.entries);
-      if (logs.value.length > 5000) {
-        logs.value = logs.value.slice(-5000);
-      }
+      logs.value = appendBoundedLogs(logs.value, batch.entries);
     });
   }
 
-  async function startProfile(profileId: string) {
+  async function confirmExecution(profileId: string, mode: RunnerExecutionMode) {
+    if (!window.codehelm) throw new Error('CodeHelm bridge unavailable');
+    return window.codehelm.runner.confirmExecution(profileId, mode);
+  }
+
+  async function reuseExecutionApproval(profileId: string, mode: RunnerExecutionMode) {
+    if (!window.codehelm) throw new Error('CodeHelm bridge unavailable');
+    return window.codehelm.runner.reuseExecutionApproval(profileId, mode);
+  }
+
+  async function startProfile(profileId: string, approvalToken: string) {
     if (!window.codehelm) return null;
     setupListeners();
-    const session = await window.codehelm.runner.start(profileId);
+    const session = await window.codehelm.runner.start(profileId, approvalToken);
     currentSession.value = session;
     serviceStatuses.value = mergeRunSessionStatuses(serviceStatuses.value, session);
     return session;
   }
 
-  async function installAndStartProfile(profileId: string) {
+  async function installAndStartProfile(profileId: string, approvalToken: string) {
     if (!window.codehelm) return null;
     setupListeners();
-    const session = await window.codehelm.runner.installAndStart(profileId);
+    const session = await window.codehelm.runner.installAndStart(profileId, approvalToken);
     currentSession.value = session;
     serviceStatuses.value = mergeRunSessionStatuses(serviceStatuses.value, session);
     return session;
@@ -157,6 +199,8 @@ export const useRunnerStore = defineStore('runner', () => {
     runningCount,
     logs,
     setupListeners,
+    confirmExecution,
+    reuseExecutionApproval,
     startProfile,
     installAndStartProfile,
     stopSession,

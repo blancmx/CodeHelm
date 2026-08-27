@@ -18,6 +18,7 @@ export class Orchestrator {
   private processManager: ProcessManager;
   private logCollector: LogCollector;
   private activeSessions = new Map<string, RunSession>(); // runSessionId -> RunSession
+  private startupTasks = new Map<string, Promise<void>>();
   private statusListeners = new Set<StatusListener>();
 
   constructor() {
@@ -53,6 +54,18 @@ export class Orchestrator {
         'system',
         '[Start Ignored] 当前启动方案已有活动会话，本次重复启动请求已忽略。\n'
       );
+      // A second renderer request can arrive while the first startup is still
+      // performing health checks. Wait for that same startup task so both IPC
+      // callers receive a complete, stable session snapshot.
+      const startupTask = this.startupTasks.get(existingSession.id);
+      if (startupTask) await startupTask;
+
+      // A renderer reload loses its in-memory status map while the main process
+      // and child services keep running. Re-emit the live snapshot so the UI
+      // can rehydrate without launching duplicate processes.
+      for (const service of existingSession.services) {
+        this.notifyStatus(service, existingSession.projectId, existingSession.id);
+      }
       return existingSession;
     }
 
@@ -70,11 +83,20 @@ export class Orchestrator {
     // 1. DAG Topological Layers
     const layers = topologicalSortServices(profile.services);
 
-    // Run execution in background sequence so startSession returns initial session
-    this.executeLayers(projectRoot, profile, runSession, layers).catch((err) => {
-      console.error('Session execution error:', err);
-      runSession.status = 'FAILED';
-    });
+    // Complete the initial launch and health-check pass before resolving the
+    // IPC request. Returning the empty STARTING shell made the renderer report
+    // success even when every child process failed moments later.
+    const startupTask = this.executeLayers(projectRoot, profile, runSession, layers)
+      .catch((err) => {
+        console.error('Session execution error:', err);
+        runSession.status = 'FAILED';
+      });
+    this.startupTasks.set(runSessionId, startupTask);
+    try {
+      await startupTask;
+    } finally {
+      this.startupTasks.delete(runSessionId);
+    }
 
     return runSession;
   }
@@ -139,7 +161,9 @@ export class Orchestrator {
           portPreparationFailed = true;
           failedServiceIds.add(service.id);
           const detail = error instanceof PortConflictError
-            ? `手工配置端口 ${error.port} 已被占用，未自动修改。`
+            ? error.reason === 'project_constraint'
+              ? `项目配置要求固定使用端口 ${error.port}（通常来自 CORS/回调地址），但该端口已被占用。请先停止占用进程。`
+              : `手工配置端口 ${error.port} 已被占用，未自动修改。`
             : error instanceof Error ? error.message : String(error);
           this.logCollector.append(
             profile.projectId,

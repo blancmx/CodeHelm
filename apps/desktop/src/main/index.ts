@@ -4,7 +4,14 @@ import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
 import { createDatabase } from '@codehelm/database';
 import { IpcChannels } from '@codehelm/contracts';
-import { registerAllIpcHandlers } from './ipc/index.js';
+import { registerAllIpcHandlers, stopAllRunnerSessions } from './ipc/index.js';
+import {
+  createTrustedDevRenderer,
+  createTrustedFileRenderer,
+  isExternalHttpUrl,
+  isTrustedRendererUrl,
+  type TrustedRenderer,
+} from './renderer-security.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -27,6 +34,8 @@ app.setPath('sessionData', stableSessionDataPath);
 // Application state
 let mainWindow: BrowserWindow | null = null;
 let db: any = null;
+let trustedRenderer: TrustedRenderer | null = null;
+let isQuitting = false;
 
 // Set Windows taskbar AppUserModelId for stable icon grouping
 if (process.platform === 'win32') {
@@ -108,6 +117,12 @@ async function createWindow() {
     console.log('[Main] Using app icon:', iconPath);
   }
 
+  const devServerUrl = process.env.VITE_DEV_SERVER_URL;
+  const trustedDevRenderer = !app.isPackaged
+    ? createTrustedDevRenderer(devServerUrl)
+    : null;
+  console.log('[Main] VITE_DEV_SERVER_URL:', devServerUrl);
+
   mainWindow = new BrowserWindow({
     title: 'CodeHelm',
     width: 1280,
@@ -126,6 +141,7 @@ async function createWindow() {
       sandbox: false,
     },
   });
+  trustedRenderer = null;
 
   if (iconPath) {
     mainWindow.setIcon(iconPath);
@@ -154,18 +170,19 @@ async function createWindow() {
 
   // Safe navigation: external links open in user default browser
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith('https:') || url.startsWith('http:')) {
+    if (isExternalHttpUrl(url)) {
       shell.openExternal(url);
     }
     return { action: 'deny' };
   });
 
-  mainWindow.webContents.on('will-navigate', (event, url) => {
-    if (!url.startsWith('http://localhost') && !url.startsWith('file://')) {
-      event.preventDefault();
-      shell.openExternal(url);
-    }
-  });
+  const preventUntrustedNavigation = (event: Electron.Event, url: string) => {
+    if (isTrustedRendererUrl(url, trustedRenderer)) return;
+    event.preventDefault();
+    if (isExternalHttpUrl(url)) shell.openExternal(url);
+  };
+  mainWindow.webContents.on('will-navigate', preventUntrustedNavigation);
+  mainWindow.webContents.on('will-redirect', preventUntrustedNavigation);
 
   mainWindow.webContents.on('before-input-event', (event, input) => {
     if (input.key === 'F12' || (input.control && input.shift && input.key.toLowerCase() === 'i')) {
@@ -174,19 +191,20 @@ async function createWindow() {
     }
   });
 
-  const devServerUrl = process.env.VITE_DEV_SERVER_URL;
-  console.log('[Main] VITE_DEV_SERVER_URL:', devServerUrl);
-
-  if (devServerUrl) {
+  if (trustedDevRenderer) {
     try {
-      console.log('[Main] Loading dev server URL:', devServerUrl);
-      await mainWindow.loadURL(devServerUrl);
+      console.log('[Main] Loading trusted dev server URL:', trustedDevRenderer.url);
+      trustedRenderer = trustedDevRenderer.renderer;
+      await mainWindow.loadURL(trustedDevRenderer.url);
       console.log('[Main] Dev server URL loaded successfully');
     } catch (err) {
       console.error('[Main] Error loading dev server URL:', err);
       await loadLocalRenderer(mainWindow);
     }
   } else {
+    if (devServerUrl) {
+      console.error('[Main] Refusing non-loopback VITE_DEV_SERVER_URL:', devServerUrl);
+    }
     await loadLocalRenderer(mainWindow);
   }
 
@@ -212,6 +230,7 @@ async function loadLocalRenderer(window: BrowserWindow): Promise<void> {
     throw new Error(`Renderer entry not found. Checked: ${candidatePaths.join(', ')}`);
   }
   console.log('[Main] Loading local file:', targetPath);
+  trustedRenderer = createTrustedFileRenderer(targetPath);
   await window.loadFile(targetPath);
 }
 
@@ -254,4 +273,15 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
   }
+});
+
+app.on('before-quit', (event) => {
+  if (isQuitting) return;
+  event.preventDefault();
+  isQuitting = true;
+  void stopAllRunnerSessions()
+    .catch((error) => {
+      console.error('[Main] Failed to stop runner sessions during quit:', error);
+    })
+    .finally(() => app.exit(0));
 });

@@ -1,6 +1,7 @@
 import type { AnalysisSnapshot, ServiceConfig } from '@codehelm/domain';
 import type { ProfileRepository } from '@codehelm/database';
 import { generateId } from '@codehelm/shared';
+import { protectProfileSecrets } from './profile-secrets.js';
 
 export const AUTO_PROFILE_NAME = 'Default (Auto-Detected)';
 
@@ -96,6 +97,9 @@ export function mergeDetectedServices(
       id: existing.id,
       runProfileId: existing.runProfileId,
       enabled: existing.enabled,
+      // Auto-refresh must not discard an environment override that belongs to
+      // the existing detected service, especially a protected secret value.
+      env: existing.env,
     };
   });
 
@@ -136,14 +140,16 @@ export async function upsertAutoDetectedProfile(
     ? mergeDetectedServices(autoProfile.services, detectedServices)
     : detectedServices;
 
-  profileRepo.save({
+  const protectedProfile = protectProfileSecrets({
     id: autoProfile?.id,
     projectId,
     name: AUTO_PROFILE_NAME,
     description: '自动基于模块级技术栈、真实脚本与入口文件生成的开发启动方案',
     isDefault: true,
-    failurePolicy: 'block_dependents',
+    failurePolicy: 'block_dependents' as const,
     services,
     userConfirmedAt: autoProfile?.userConfirmedAt,
-  });
+  }).profile;
+
+  profileRepo.save(protectedProfile);
 }

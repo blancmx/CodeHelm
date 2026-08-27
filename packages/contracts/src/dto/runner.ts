@@ -16,6 +16,7 @@ export type ProcessStatus = z.infer<typeof ProcessStatusSchema>;
 export const ProcessFingerprintDtoSchema = z.object({
   pid: z.number(),
   startTime: z.number(),
+  identityVerified: z.boolean().optional(),
   executable: z.string(),
   cwd: z.string(),
   argsSummary: z.string(),
@@ -49,6 +50,23 @@ export const RunSessionDtoSchema = z.object({
   stoppedAt: z.string().optional(),
 });
 export type RunSessionDto = z.infer<typeof RunSessionDtoSchema>;
+
+export const RunnerExecutionModeSchema = z.enum(['start', 'install']);
+export type RunnerExecutionMode = z.infer<typeof RunnerExecutionModeSchema>;
+
+export const RunnerExecutionConfirmationRequestSchema = z.object({
+  profileId: z.string().uuid(),
+  mode: RunnerExecutionModeSchema,
+});
+export type RunnerExecutionConfirmationRequest = z.infer<
+  typeof RunnerExecutionConfirmationRequestSchema
+>;
+
+export const RunnerExecutionRequestSchema = z.object({
+  profileId: z.string().uuid(),
+  approvalToken: z.string().min(1).max(128),
+});
+export type RunnerExecutionRequest = z.infer<typeof RunnerExecutionRequestSchema>;
 
 export const ServiceStatusEventDtoSchema = z.object({
   projectId: z.string(),

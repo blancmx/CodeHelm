@@ -52,9 +52,9 @@ describe('applyRuntimeProfileConstraints', () => {
     fs.writeFileSync(executable, '');
     fs.writeFileSync(path.join(root, '启动记账.bat'), `start "" "${executable}"`);
 
-    const result = applyRuntimeProfileConstraints(root, profile([
-      service('flask', 'backend', '.', 5000),
-    ]));
+    const detected = service('flask', 'backend', '.', 5000);
+    detected.env = [{ key: 'API_TOKEN', value: 'protected-value', isSecret: true }];
+    const result = applyRuntimeProfileConstraints(root, profile([detected]));
 
     expect(result.profile.services[0]).toMatchObject({
       name: 'MineBill Desktop',
@@ -63,6 +63,7 @@ describe('applyRuntimeProfileConstraints', () => {
       args: [],
       cwdRelative: '',
     });
+    expect(result.profile.services[0].env).toEqual(detected.env);
     expect(result.profile.services[0].port).toBeUndefined();
     expect(result.messages[0]).toContain('显式桌面启动器');
   });

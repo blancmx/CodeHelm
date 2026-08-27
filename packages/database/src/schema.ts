@@ -71,6 +71,7 @@ CREATE TABLE IF NOT EXISTS service_configs (
   cwd_relative TEXT NOT NULL,
   env_json TEXT NOT NULL DEFAULT '[]',
   port INTEGER,
+  port_mode TEXT NOT NULL DEFAULT 'auto',
   port_extract_regex TEXT,
   health_check_json TEXT,
   depends_on_json TEXT NOT NULL DEFAULT '[]',

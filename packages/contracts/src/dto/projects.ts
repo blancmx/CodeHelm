@@ -10,7 +10,7 @@ export const ImportProjectInputSchema = z.object({
 export type ImportProjectInput = z.infer<typeof ImportProjectInputSchema>;
 
 export const BatchImportInputSchema = z.object({
-  projects: z.array(ImportProjectInputSchema),
+  projects: z.array(ImportProjectInputSchema).max(100, 'Too many projects in one import request'),
 });
 export type BatchImportInput = z.infer<typeof BatchImportInputSchema>;
 
@@ -90,5 +90,4 @@ export const ReadmeSummaryDtoSchema = z.object({
   rawExcerpt: z.string().optional(),
 });
 export type ReadmeSummaryDto = z.infer<typeof ReadmeSummaryDtoSchema>;
-
 

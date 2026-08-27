@@ -16,6 +16,9 @@ export const ServiceEnvVarDtoSchema = z.object({
   key: z.string(),
   value: z.string(),
   isSecret: z.boolean().optional(),
+  // Renderer sends this marker when an existing secret was not changed.
+  // The main process resolves it against its protected copy.
+  isRedacted: z.boolean().optional(),
 });
 export type ServiceEnvVarDto = z.infer<typeof ServiceEnvVarDtoSchema>;
 

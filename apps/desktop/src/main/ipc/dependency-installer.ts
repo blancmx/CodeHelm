@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import type { ServiceConfig } from '@codehelm/domain';
+import { safeResolvePath } from '@codehelm/shared';
 
 type PackageManager = 'npm' | 'pnpm' | 'yarn' | 'bun';
 
@@ -38,11 +39,27 @@ function isInside(parent: string, child: string): boolean {
   return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
 }
 
+function isRegularFile(filePath: string): boolean {
+  try {
+    return fs.lstatSync(filePath).isFile();
+  } catch {
+    return false;
+  }
+}
+
+function isDirectory(directoryPath: string): boolean {
+  try {
+    return fs.lstatSync(directoryPath).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
 function findManagerRoot(projectRoot: string, moduleRoot: string): { manager: PackageManager; root: string } {
   let current = moduleRoot;
   while (isInside(projectRoot, current)) {
     for (const [manager, lockfiles] of MANAGER_LOCKFILES) {
-      if (lockfiles.some((file) => fs.existsSync(path.join(current, file)))) {
+      if (lockfiles.some((file) => isRegularFile(path.join(current, file)))) {
         return { manager, root: current };
       }
     }
@@ -55,7 +72,10 @@ function findManagerRoot(projectRoot: string, moduleRoot: string): { manager: Pa
 }
 
 function serviceRoot(projectRoot: string, service: ServiceConfig): string {
-  return path.resolve(projectRoot, service.cwdRelative || service.moduleRelativePath || '.');
+  return path.resolve(safeResolvePath(
+    projectRoot,
+    service.cwdRelative || service.moduleRelativePath || '.'
+  ));
 }
 
 export function createDependencyInstallPlans(
@@ -75,13 +95,20 @@ export function createDependencyInstallPlans(
     ));
 
   for (const service of services.filter((entry) => entry.enabled)) {
-    const moduleRoot = serviceRoot(normalizedRoot, service);
+    let moduleRoot: string;
+    try {
+      moduleRoot = serviceRoot(normalizedRoot, service);
+    } catch {
+      // A cwd/module path that crosses a symlink boundary is not an
+      // installable project path.
+      continue;
+    }
     if (!isInside(normalizedRoot, moduleRoot)) continue;
 
-    if (fs.existsSync(path.join(moduleRoot, 'package.json'))) {
+    if (isRegularFile(path.join(moduleRoot, 'package.json'))) {
       const { manager, root: installRoot } = findManagerRoot(normalizedRoot, moduleRoot);
-      const moduleReady = fs.existsSync(path.join(moduleRoot, 'node_modules'));
-      const workspaceReady = fs.existsSync(path.join(installRoot, 'node_modules'));
+      const moduleReady = isDirectory(path.join(moduleRoot, 'node_modules'));
+      const workspaceReady = isDirectory(path.join(installRoot, 'node_modules'));
       if (!moduleReady && !workspaceReady) {
         const key = `node:${manager}:${installRoot.toLowerCase()}`;
         plans.set(key, {
@@ -95,7 +122,7 @@ export function createDependencyInstallPlans(
     }
 
     const requirements = path.join(moduleRoot, 'requirements.txt');
-    if (fs.existsSync(requirements)) {
+    if (isRegularFile(requirements)) {
       const key = `python:${moduleRoot.toLowerCase()}`;
       plans.set(key, {
         key,

@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { RunProfile, ServiceConfig } from '@codehelm/domain';
+import { safeResolvePath } from '@codehelm/shared';
 
 const SOURCE_EXTENSIONS = new Set([
   '.java', '.kt', '.kts', '.groovy', '.js', '.cjs', '.mjs', '.ts', '.tsx',
@@ -38,10 +39,16 @@ function detectExplicitWindowsLauncher(projectRoot: string): string | undefined 
       const content = fs.readFileSync(path.join(projectRoot, launcher.name), 'utf8');
       const quotedValues = [...content.matchAll(/"([^"]*)"/g)].map((match) => match[1]);
       for (const value of quotedValues.filter((candidate) => /\.exe$/i.test(candidate))) {
-        const absolute = path.isAbsolute(value)
-          ? path.resolve(value)
-          : path.resolve(projectRoot, value.replace(/^%~dp0/i, ''));
-        if (!isInside(projectRoot, absolute) || !fs.existsSync(absolute)) continue;
+        let absolute: string;
+        try {
+          absolute = safeResolvePath(
+            projectRoot,
+            path.isAbsolute(value) ? value : value.replace(/^%~dp0/i, '')
+          );
+        } catch {
+          continue;
+        }
+        if (!isInside(projectRoot, absolute) || !fs.lstatSync(absolute).isFile()) continue;
         return path.relative(projectRoot, absolute).replace(/\\/g, '/');
       }
     } catch {
@@ -82,9 +89,17 @@ function collectCandidateFiles(root: string): string[] {
 
 function detectFixedCorsPorts(projectRoot: string, backends: ServiceConfig[]): number[] {
   const ports = new Set<number>();
-  const roots = new Set(
-    backends.map((service) => path.resolve(projectRoot, service.cwdRelative || service.moduleRelativePath || '.'))
-  );
+  const roots = new Set<string>();
+  for (const service of backends) {
+    try {
+      roots.add(safeResolvePath(
+        projectRoot,
+        service.cwdRelative || service.moduleRelativePath || '.'
+      ));
+    } catch {
+      // Ignore service roots that cross the physical workspace boundary.
+    }
+  }
 
   for (const root of roots) {
     for (const file of collectCandidateFiles(root)) {
@@ -144,7 +159,7 @@ export function applyRuntimeProfileConstraints(
         executable: explicitLauncher,
         args: [],
         cwdRelative: '',
-        env: [],
+        env: current.env,
         port: undefined,
         portMode: 'auto',
         healthCheck: undefined,

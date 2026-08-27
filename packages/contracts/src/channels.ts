@@ -23,6 +23,8 @@ export const IpcChannels = {
   PROFILES_GET: 'codehelm:profiles:get',
 
   // Runner
+  RUNNER_CONFIRM_EXECUTION: 'codehelm:runner:confirm-execution',
+  RUNNER_REUSE_EXECUTION_APPROVAL: 'codehelm:runner:reuse-execution-approval',
   RUNNER_START_SESSION: 'codehelm:runner:start-session',
   RUNNER_INSTALL_AND_START: 'codehelm:runner:install-and-start',
   RUNNER_STOP_SESSION: 'codehelm:runner:stop-session',

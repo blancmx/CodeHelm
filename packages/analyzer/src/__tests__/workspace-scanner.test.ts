@@ -56,4 +56,24 @@ describe('WorkspaceScanner import preview', () => {
     expect(web?.port).toBe(4310);
     expect(web?.tags).toEqual(expect.arrayContaining(['Vue 3', 'Vite', 'TypeScript']));
   });
+
+  it('does not inspect a project reached through a directory junction', async () => {
+    const outsideProject = path.join(tempDir, 'outside-project');
+    await fs.mkdir(outsideProject);
+    await fs.writeFile(
+      path.join(outsideProject, 'package.json'),
+      JSON.stringify({ name: 'outside-project', scripts: { start: 'node server.js' } })
+    );
+    await fs.symlink(outsideProject, path.join(tempDir, 'linked-project'), 'junction');
+
+    const projects = await new WorkspaceScanner().scan(tempDir, { maxDepth: 1 });
+
+    expect(projects.some((project) => project.rootPath.endsWith('linked-project'))).toBe(false);
+    expect(projects.some((project) => project.name === 'outside-project')).toBe(true);
+  });
+
+  it('rejects invalid scan depth instead of recursing without a bound', async () => {
+    await expect(new WorkspaceScanner().scan(tempDir, { maxDepth: Number.POSITIVE_INFINITY }))
+      .rejects.toThrow('workspace scan depth');
+  });
 });

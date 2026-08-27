@@ -1,13 +1,22 @@
 import fs from 'node:fs/promises';
 import fsSync from 'node:fs';
+import type { Dir } from 'node:fs';
 import path from 'node:path';
 import type { DiscoveredProjectDto } from '@codehelm/contracts';
 import { generateId, normalizePath } from '@codehelm/shared';
 import { parseJson } from '../parsers/index.js';
+import { readUtf8FileWithinLimit } from '../io/bounded-read.js';
 
 export interface WorkspaceScannerOptions {
   maxDepth?: number;
 }
+
+export const DEFAULT_WORKSPACE_SCAN_DEPTH = 2;
+export const MAX_WORKSPACE_SCAN_DEPTH = 4;
+export const MAX_WORKSPACE_SCAN_RESULTS = 500;
+export const MAX_WORKSPACE_SCAN_ENTRIES_PER_DIRECTORY = 2_000;
+export const MAX_WORKSPACE_INSPECTION_FILE_BYTES = 512 * 1024;
+export const MAX_WORKSPACE_PYTHON_FILES = 200;
 
 const IGNORED_DIRS = new Set([
   'node_modules',
@@ -31,6 +40,34 @@ const IGNORED_DIRS = new Set([
   'tmp',
 ]);
 
+function isRegularFile(filePath: string): boolean {
+  try {
+    return fsSync.lstatSync(filePath).isFile();
+  } catch {
+    return false;
+  }
+}
+
+function isDirectory(directoryPath: string): boolean {
+  try {
+    return fsSync.lstatSync(directoryPath).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+function normalizeMaxDepth(value: number | undefined): number {
+  if (value === undefined) return DEFAULT_WORKSPACE_SCAN_DEPTH;
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw new Error('Invalid workspace scan depth');
+  }
+  return Math.min(value, MAX_WORKSPACE_SCAN_DEPTH);
+}
+
+async function readInspectionFile(filePath: string): Promise<string> {
+  return (await readUtf8FileWithinLimit(filePath, MAX_WORKSPACE_INSPECTION_FILE_BYTES)).text;
+}
+
 function parsePort(text: string): number | undefined {
   const patterns = [
     /(?:--port|-p)\s*[= ]\s*(\d{2,5})/i,
@@ -52,7 +89,7 @@ function pythonModuleName(relativeFile: string): string {
 export class WorkspaceScanner {
   async scan(rootPath: string, options: WorkspaceScannerOptions = {}): Promise<DiscoveredProjectDto[]> {
     const normalizedRoot = normalizePath(rootPath);
-    const maxDepth = options.maxDepth ?? 2;
+    const maxDepth = normalizeMaxDepth(options.maxDepth);
     const results: DiscoveredProjectDto[] = [];
     const scannedPaths = new Set<string>();
 
@@ -77,45 +114,57 @@ export class WorkspaceScanner {
     results: DiscoveredProjectDto[],
     scannedPaths: Set<string>
   ): Promise<void> {
-    if (currentDepth > maxDepth) return;
+    if (currentDepth > maxDepth || results.length >= MAX_WORKSPACE_SCAN_RESULTS) return;
 
-    let entries: string[];
+    let directory: Dir;
     try {
-      entries = await fs.readdir(currentDir);
+      directory = await fs.opendir(currentDir);
     } catch {
       return;
     }
 
-    for (const entry of entries) {
-      if (IGNORED_DIRS.has(entry) || entry.startsWith('.')) continue;
+    let inspectedEntries = 0;
+    try {
+      for await (const directoryEntry of directory) {
+        if (
+          inspectedEntries >= MAX_WORKSPACE_SCAN_ENTRIES_PER_DIRECTORY
+          || results.length >= MAX_WORKSPACE_SCAN_RESULTS
+        ) break;
+        inspectedEntries += 1;
 
-      const subPath = path.join(currentDir, entry);
-      let stat;
-      try {
-        stat = await fs.stat(subPath);
-      } catch {
-        continue;
-      }
+        const entry = directoryEntry.name;
+        if (IGNORED_DIRS.has(entry) || entry.startsWith('.')) continue;
 
-      if (!stat.isDirectory()) continue;
+        const subPath = path.join(currentDir, entry);
+        let stat;
+        try {
+          stat = await fs.lstat(subPath);
+        } catch {
+          continue;
+        }
 
-      // Inspect if subPath is a project
-      const normalizedSub = normalizePath(subPath);
-      if (!scannedPaths.has(normalizedSub)) {
-        const project = await this.inspectDirectory(normalizedSub, workspaceRoot);
-        if (project) {
-          results.push(project);
-          scannedPaths.add(normalizedSub);
-          // If this directory is already a detected project (like a next.js app or python app),
-          // don't descend deeper into its source code unless it's a monorepo workspace (like packages/)
-          if (entry !== 'packages' && entry !== 'apps' && entry !== 'modules') {
-            continue;
+        if (stat.isSymbolicLink() || !stat.isDirectory()) continue;
+
+        // Inspect if subPath is a project
+        const normalizedSub = normalizePath(subPath);
+        if (!scannedPaths.has(normalizedSub)) {
+          const project = await this.inspectDirectory(normalizedSub, workspaceRoot);
+          if (project) {
+            results.push(project);
+            scannedPaths.add(normalizedSub);
+            // If this directory is already a detected project (like a next.js app or python app),
+            // don't descend deeper into its source code unless it's a monorepo workspace (like packages/)
+            if (entry !== 'packages' && entry !== 'apps' && entry !== 'modules') {
+              continue;
+            }
           }
         }
-      }
 
-      // Descend into next level
-      await this.scanRecursive(subPath, workspaceRoot, currentDepth + 1, maxDepth, results, scannedPaths);
+        // Descend into next level
+        await this.scanRecursive(subPath, workspaceRoot, currentDepth + 1, maxDepth, results, scannedPaths);
+      }
+    } finally {
+      await directory.close().catch(() => undefined);
     }
   }
 
@@ -123,26 +172,26 @@ export class WorkspaceScanner {
     const dirName = path.basename(dirPath) || 'project';
     const relativePath = path.relative(workspaceRoot, dirPath) || '.';
 
-    const hasPackageJson = fsSync.existsSync(path.join(dirPath, 'package.json'));
-    const hasRequirementsTxt = fsSync.existsSync(path.join(dirPath, 'requirements.txt'));
-    const hasPyproject = fsSync.existsSync(path.join(dirPath, 'pyproject.toml'));
-    const hasPipfile = fsSync.existsSync(path.join(dirPath, 'Pipfile'));
-    const hasMainPy = fsSync.existsSync(path.join(dirPath, 'main.py')) || fsSync.existsSync(path.join(dirPath, 'app.py'));
-    const hasIndexHtml = fsSync.existsSync(path.join(dirPath, 'index.html'));
-    const hasCargoToml = fsSync.existsSync(path.join(dirPath, 'Cargo.toml'));
-    const hasGoMod = fsSync.existsSync(path.join(dirPath, 'go.mod'));
-    const hasPomXml = fsSync.existsSync(path.join(dirPath, 'pom.xml'));
-    const hasBuildGradle = fsSync.existsSync(path.join(dirPath, 'build.gradle'));
+    const hasPackageJson = isRegularFile(path.join(dirPath, 'package.json'));
+    const hasRequirementsTxt = isRegularFile(path.join(dirPath, 'requirements.txt'));
+    const hasPyproject = isRegularFile(path.join(dirPath, 'pyproject.toml'));
+    const hasPipfile = isRegularFile(path.join(dirPath, 'Pipfile'));
+    const hasMainPy = isRegularFile(path.join(dirPath, 'main.py')) || isRegularFile(path.join(dirPath, 'app.py'));
+    const hasIndexHtml = isRegularFile(path.join(dirPath, 'index.html'));
+    const hasCargoToml = isRegularFile(path.join(dirPath, 'Cargo.toml'));
+    const hasGoMod = isRegularFile(path.join(dirPath, 'go.mod'));
+    const hasPomXml = isRegularFile(path.join(dirPath, 'pom.xml'));
+    const hasBuildGradle = isRegularFile(path.join(dirPath, 'build.gradle'));
 
     const hasEnvExample =
-      fsSync.existsSync(path.join(dirPath, '.env.example')) || fsSync.existsSync(path.join(dirPath, '.env.sample'));
-    const hasEnv = fsSync.existsSync(path.join(dirPath, '.env'));
+      isRegularFile(path.join(dirPath, '.env.example')) || isRegularFile(path.join(dirPath, '.env.sample'));
+    const hasEnv = isRegularFile(path.join(dirPath, '.env'));
 
     // --- Case 1: Node.js / Web Project ---
     if (hasPackageJson) {
       let pkg: any = {};
       try {
-        const pkgContent = await fs.readFile(path.join(dirPath, 'package.json'), 'utf-8');
+        const pkgContent = await readInspectionFile(path.join(dirPath, 'package.json'));
         pkg = parseJson(pkgContent) || {};
       } catch {
         // ignore
@@ -158,15 +207,15 @@ export class WorkspaceScanner {
         : 'npm';
       let lockSearchPath = dirPath;
       while (lockSearchPath.startsWith(workspaceRoot)) {
-        if (fsSync.existsSync(path.join(lockSearchPath, 'pnpm-lock.yaml'))) {
+        if (isRegularFile(path.join(lockSearchPath, 'pnpm-lock.yaml'))) {
           pm = 'pnpm';
           break;
         }
-        if (fsSync.existsSync(path.join(lockSearchPath, 'yarn.lock'))) {
+        if (isRegularFile(path.join(lockSearchPath, 'yarn.lock'))) {
           pm = 'yarn';
           break;
         }
-        if (fsSync.existsSync(path.join(lockSearchPath, 'bun.lockb')) || fsSync.existsSync(path.join(lockSearchPath, 'bun.lock'))) {
+        if (isRegularFile(path.join(lockSearchPath, 'bun.lockb')) || isRegularFile(path.join(lockSearchPath, 'bun.lock'))) {
           pm = 'bun';
           break;
         }
@@ -222,7 +271,7 @@ export class WorkspaceScanner {
       if (deps['@tauri-apps/api']) tags.push('Tauri');
 
       // Check if node_modules exists
-      const hasNodeModules = fsSync.existsSync(path.join(dirPath, 'node_modules'));
+      const hasNodeModules = isDirectory(path.join(dirPath, 'node_modules'));
 
       // Recommended run command
       let runCmd = `${pm} start`;
@@ -257,12 +306,23 @@ export class WorkspaceScanner {
     let pythonFiles: string[] = [];
     try {
       const collectPythonFiles = (currentPath: string, relativeBase: string, depth: number) => {
-        if (depth > 2) return;
-        for (const entry of fsSync.readdirSync(currentPath, { withFileTypes: true })) {
-          if (entry.name.startsWith('.') || IGNORED_DIRS.has(entry.name)) continue;
-          const relativeEntry = relativeBase ? path.join(relativeBase, entry.name) : entry.name;
-          if (entry.isFile() && entry.name.endsWith('.py')) pythonFiles.push(relativeEntry);
-          else if (entry.isDirectory()) collectPythonFiles(path.join(currentPath, entry.name), relativeEntry, depth + 1);
+        if (depth > 2 || pythonFiles.length >= MAX_WORKSPACE_PYTHON_FILES) return;
+        const directory = fsSync.opendirSync(currentPath);
+        try {
+          let entry: fsSync.Dirent | null;
+          while (
+            pythonFiles.length < MAX_WORKSPACE_PYTHON_FILES
+            && (entry = directory.readSync()) !== null
+          ) {
+            if (entry.name.startsWith('.') || IGNORED_DIRS.has(entry.name)) continue;
+            const relativeEntry = relativeBase ? path.join(relativeBase, entry.name) : entry.name;
+            if (entry.isFile() && entry.name.endsWith('.py')) pythonFiles.push(relativeEntry);
+            else if (entry.isDirectory()) {
+              collectPythonFiles(path.join(currentPath, entry.name), relativeEntry, depth + 1);
+            }
+          }
+        } finally {
+          directory.closeSync();
         }
       };
       collectPythonFiles(dirPath, '', 0);
@@ -278,19 +338,19 @@ export class WorkspaceScanner {
       let reqContent = '';
       if (hasRequirementsTxt) {
         try {
-          reqContent = await fs.readFile(path.join(dirPath, 'requirements.txt'), 'utf-8');
+          reqContent = await readInspectionFile(path.join(dirPath, 'requirements.txt'));
         } catch {
           // ignore
         }
       }
       if (hasPyproject) {
         try {
-          reqContent += '\n' + await fs.readFile(path.join(dirPath, 'pyproject.toml'), 'utf-8');
+          reqContent += '\n' + await readInspectionFile(path.join(dirPath, 'pyproject.toml'));
         } catch {}
       }
       if (hasPipfile) {
         try {
-          reqContent += '\n' + await fs.readFile(path.join(dirPath, 'Pipfile'), 'utf-8');
+          reqContent += '\n' + await readInspectionFile(path.join(dirPath, 'Pipfile'));
         } catch {}
       }
 
@@ -303,7 +363,7 @@ export class WorkspaceScanner {
       });
       for (const pyF of prioritizedPythonFiles.slice(0, 20)) {
         try {
-          const code = await fs.readFile(path.join(dirPath, pyF), 'utf-8');
+          const code = await readInspectionFile(path.join(dirPath, pyF));
           combinedPyCode += '\n' + code;
           pythonCode.set(pyF, code);
         } catch {}
@@ -313,12 +373,12 @@ export class WorkspaceScanner {
 
       const isStreamlit =
         allPyText.includes('streamlit') ||
-        fsSync.existsSync(path.join(dirPath, 'streamlit_app.py')) ||
-        fsSync.existsSync(path.join(dirPath, 'app_streamlit.py'));
+        isRegularFile(path.join(dirPath, 'streamlit_app.py')) ||
+        isRegularFile(path.join(dirPath, 'app_streamlit.py'));
       const isFastAPI = allPyText.includes('fastapi') || allPyText.includes('uvicorn');
       const isFlask = allPyText.includes('flask');
       const isGradio = allPyText.includes('gradio');
-      const isDjango = fsSync.existsSync(path.join(dirPath, 'manage.py')) || allPyText.includes('django');
+      const isDjango = isRegularFile(path.join(dirPath, 'manage.py')) || allPyText.includes('django');
       const isPygame = allPyText.includes('pygame');
       const isTurtle = allPyText.includes('turtle');
       const isTkinter = allPyText.includes('tkinter');
@@ -339,17 +399,17 @@ export class WorkspaceScanner {
       };
 
       const detectedSourcePort = parsePort(combinedPyCode);
-      const usesUv = fsSync.existsSync(path.join(dirPath, 'uv.lock')) || /\[tool\.uv\]/i.test(reqContent);
-      const usesPoetry = fsSync.existsSync(path.join(dirPath, 'poetry.lock')) || /\[tool\.poetry\]/i.test(reqContent);
+      const usesUv = isRegularFile(path.join(dirPath, 'uv.lock')) || /\[tool\.uv\]/i.test(reqContent);
+      const usesPoetry = isRegularFile(path.join(dirPath, 'poetry.lock')) || /\[tool\.poetry\]/i.test(reqContent);
       const pythonPrefix = usesUv ? 'uv run ' : usesPoetry ? 'poetry run ' : '';
 
       let runCmd = `python ${primaryEntryPy}`;
       if (isStreamlit) {
         framework = 'Streamlit AI App';
         port = 8501;
-        const targetFile = fsSync.existsSync(path.join(dirPath, 'streamlit_app.py'))
+        const targetFile = isRegularFile(path.join(dirPath, 'streamlit_app.py'))
           ? 'streamlit_app.py'
-          : fsSync.existsSync(path.join(dirPath, 'app.py'))
+          : isRegularFile(path.join(dirPath, 'app.py'))
           ? 'app.py'
           : primaryEntryPy;
         runCmd = `${pythonPrefix}streamlit run ${targetFile} --server.port ${detectedSourcePort ?? port}`;
@@ -400,9 +460,9 @@ export class WorkspaceScanner {
       }
 
       const hasVenv =
-        fsSync.existsSync(path.join(dirPath, '.venv')) ||
-        fsSync.existsSync(path.join(dirPath, 'venv')) ||
-        fsSync.existsSync(path.join(dirPath, 'env'));
+        isDirectory(path.join(dirPath, '.venv')) ||
+        isDirectory(path.join(dirPath, 'venv')) ||
+        isDirectory(path.join(dirPath, 'env'));
 
       const installCmd = usesUv
         ? 'uv sync'

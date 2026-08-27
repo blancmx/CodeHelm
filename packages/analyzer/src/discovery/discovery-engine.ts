@@ -2,8 +2,12 @@ import fg from 'fast-glob';
 import ignore from 'ignore';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { normalizePath } from '@codehelm/shared';
+import { normalizePath, safeResolvePath } from '@codehelm/shared';
 import type { DiscoveryContext } from '../types.js';
+import {
+  DEFAULT_MAX_ANALYZER_FILE_BYTES,
+  readUtf8FileWithinLimit,
+} from '../io/bounded-read.js';
 
 export const DEFAULT_IGNORES = [
   '.git/**',
@@ -26,6 +30,10 @@ export const DEFAULT_IGNORES = [
   '.turbo/**',
   'coverage/**',
   '.cache/**',
+  '.pytest_cache/**',
+  '**/.pytest_cache/**',
+  '__pycache__/**',
+  '**/__pycache__/**',
   'bin/**',
   'obj/**',
   '*.sqlite',
@@ -87,15 +95,34 @@ export const CONFIG_PATTERNS = [
   '.env.sample',
 ];
 
+export const DEFAULT_MAX_DISCOVERY_FILES = 50_000;
+export const MAX_DISCOVERY_FILES = 50_000;
+
 export interface DiscoveryOptions {
   maxFiles?: number;
+  maxFileBytes?: number;
   customIgnores?: string[];
   signal?: AbortSignal;
 }
 
+function isMissingFileError(error: unknown): boolean {
+  return typeof error === 'object'
+    && error !== null
+    && 'code' in error
+    && (error as { code?: unknown }).code === 'ENOENT';
+}
+
+function normalizeMaxFiles(value: number | undefined): number {
+  if (value === undefined) return DEFAULT_MAX_DISCOVERY_FILES;
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    throw new Error('Invalid analyzer file count limit');
+  }
+  return Math.min(value, MAX_DISCOVERY_FILES);
+}
+
 export class DiscoveryEngine {
   async discover(projectRoot: string, options: DiscoveryOptions = {}): Promise<DiscoveryContext> {
-    const maxFiles = options.maxFiles ?? 50000;
+    const maxFiles = normalizeMaxFiles(options.maxFiles);
     const normalizedRoot = normalizePath(projectRoot);
 
     // Setup gitignore matcher
@@ -107,9 +134,19 @@ export class DiscoveryEngine {
 
     const gitignorePath = path.join(normalizedRoot, '.gitignore');
     try {
-      const gitignoreContent = await fs.readFile(gitignorePath, 'utf-8');
-      ig.add(gitignoreContent);
-    } catch {
+      const gitignoreStat = await fs.lstat(gitignorePath);
+      if (!gitignoreStat.isSymbolicLink() && gitignoreStat.isFile()) {
+        const gitignoreContent = (await readUtf8FileWithinLimit(
+          safeResolvePath(normalizedRoot, '.gitignore'),
+          options.maxFileBytes ?? DEFAULT_MAX_ANALYZER_FILE_BYTES,
+          options.signal
+        )).text;
+        ig.add(gitignoreContent);
+      }
+    } catch (error) {
+      if (!isMissingFileError(error)) {
+        throw error;
+      }
       // No .gitignore, continue
     }
 
@@ -140,6 +177,17 @@ export class DiscoveryEngine {
       if (relPath && ig.ignores(relPath)) {
         continue;
       }
+
+      // fast-glob does not follow directory links, but file links can still
+      // be returned by a provider. Never expose a linked file to detectors,
+      // because later reads would otherwise follow it outside the workspace.
+      let entryStat;
+      try {
+        entryStat = await fs.lstat(safeResolvePath(normalizedRoot, relPath));
+      } catch {
+        continue;
+      }
+      if (entryStat.isSymbolicLink() || !entryStat.isFile()) continue;
 
       allFiles.push(relPath);
 

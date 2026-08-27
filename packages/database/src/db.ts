@@ -17,5 +17,11 @@ export function createDatabase(dbFilePath: string): DatabaseInstance {
   // Initialize tables
   db.exec(SCHEMA_SQL);
 
+  // Lightweight forward-only migrations for databases created by older builds.
+  const serviceColumns = db.prepare('PRAGMA table_info(service_configs)').all() as Array<{ name: string }>;
+  if (!serviceColumns.some((column) => column.name === 'port_mode')) {
+    db.exec("ALTER TABLE service_configs ADD COLUMN port_mode TEXT NOT NULL DEFAULT 'auto'");
+  }
+
   return db;
 }

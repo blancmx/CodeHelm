@@ -5,6 +5,8 @@ import { registerAnalysisHandlers } from './analysis-handlers.js';
 import { registerRunnerHandlers } from './runner-handlers.js';
 import { registerSettingsHandlers } from './settings-handlers.js';
 
+export { stopAllRunnerSessions } from './runner-handlers.js';
+
 export function registerAllIpcHandlers(db: DatabaseInstance) {
   registerProjectHandlers(db);
   registerProfileHandlers(db);

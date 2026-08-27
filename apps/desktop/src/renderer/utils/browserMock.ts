@@ -8,6 +8,7 @@ import type {
   AnalysisSnapshotDto,
   RunProfileDto,
   RunSessionDto,
+  RunnerExecutionMode,
   AppSettingsDto,
   ServiceStatusEventDto,
   LogBatchDto,
@@ -17,12 +18,40 @@ import type {
 
 const STORAGE_KEY_PROJECTS = 'codehelm_browser_mock_projects_v5';
 const STORAGE_KEY_SETTINGS = 'codehelm_browser_mock_settings_v5';
+const mockExecutionApprovals = new Set<string>();
+
+function executionApprovalKey(profileId: string, mode: RunnerExecutionMode): string {
+  return `${profileId}:${mode}`;
+}
 
 interface MockProjectData {
   project: ProjectDto;
   summary: ProjectSummaryDto;
   snapshot: AnalysisSnapshotDto;
   fileTree?: FileTreeNodeDto[];
+  customProfile?: RunProfileDto;
+}
+
+function redactMockProfile(profile: RunProfileDto): { profile: RunProfileDto; changed: boolean } {
+  let changed = false;
+  const services = profile.services.map((service) => ({
+    ...service,
+    env: service.env.map((entry) => {
+      if (!entry.isSecret) return { ...entry };
+      if (entry.value || !entry.isRedacted) changed = true;
+      return {
+        key: entry.key,
+        value: '',
+        isSecret: true,
+        isRedacted: true,
+      };
+    }),
+  }));
+
+  return {
+    profile: { ...profile, services },
+    changed,
+  };
 }
 
 const defaultMockData: MockProjectData[] = [
@@ -160,6 +189,13 @@ function getStoredMockData(): MockProjectData[] {
             item.summary.rootPath = item.summary.rootPath?.replace('E:/projects/', 'E:/Aai/AllProject/');
           }
           changed = true;
+        }
+        if (item.customProfile) {
+          const redacted = redactMockProfile(item.customProfile);
+          if (redacted.changed) {
+            item.customProfile = redacted.profile;
+            changed = true;
+          }
         }
       }
       if (changed) {
@@ -1077,6 +1113,10 @@ export function setupBrowserMock() {
 
     profiles: {
       async save(input) {
+        if (input.id) {
+          mockExecutionApprovals.delete(executionApprovalKey(input.id, 'start'));
+          mockExecutionApprovals.delete(executionApprovalKey(input.id, 'install'));
+        }
         const profile: RunProfileDto = {
           id: input.id || generateUuid(),
           projectId: input.projectId,
@@ -1087,19 +1127,20 @@ export function setupBrowserMock() {
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         };
+        const safeProfile = redactMockProfile(profile).profile;
         const list = getStoredMockData();
         const found = list.find((item) => item.project.id === input.projectId);
         if (found) {
-          (found as any).customProfile = profile;
+          found.customProfile = safeProfile;
           saveStoredMockData(list);
         }
-        return profile;
+        return safeProfile;
       },
       async list(projectId: string): Promise<RunProfileDto[]> {
         const list = getStoredMockData();
         const found = list.find((item) => item.project.id === projectId);
-        if ((found as any)?.customProfile) {
-          return [(found as any).customProfile];
+        if (found?.customProfile) {
+          return [redactMockProfile(found.customProfile).profile];
         }
 
         const folderName = found?.project.name || 'Project';
@@ -1221,7 +1262,19 @@ export function setupBrowserMock() {
     },
 
     runner: {
-      async start(profileId: string): Promise<RunSessionDto> {
+      async confirmExecution(_profileId: string, _mode: RunnerExecutionMode): Promise<string> {
+        mockExecutionApprovals.add(executionApprovalKey(_profileId, _mode));
+        return 'browser-mock-execution-approval';
+      },
+
+      async reuseExecutionApproval(profileId: string, mode: RunnerExecutionMode): Promise<string> {
+        if (!mockExecutionApprovals.has(executionApprovalKey(profileId, mode))) {
+          throw new Error('Execution confirmation required or expired.');
+        }
+        return 'browser-mock-execution-approval';
+      },
+
+      async start(profileId: string, _approvalToken: string): Promise<RunSessionDto> {
         const sessionId = generateUuid();
         const list = getStoredMockData();
         let targetProfile: RunProfileDto | undefined;
@@ -1337,8 +1390,8 @@ export function setupBrowserMock() {
         return session;
       },
 
-      async installAndStart(profileId: string) {
-        return this.start(profileId);
+      async installAndStart(profileId: string, approvalToken: string) {
+        return this.start(profileId, approvalToken);
       },
 
       async stopSession(sessionId: string) {

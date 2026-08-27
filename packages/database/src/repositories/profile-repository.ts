@@ -25,6 +25,7 @@ interface ServiceConfigRow {
   cwd_relative: string;
   env_json: string;
   port: number | null;
+  port_mode: string;
   port_extract_regex: string | null;
   health_check_json: string | null;
   depends_on_json: string;
@@ -83,11 +84,11 @@ export class ProfileRepository {
       const stmtService = this.db.prepare(`
         INSERT INTO service_configs (
           id, run_profile_id, name, type, module_relative_path, executable, args_json,
-          cwd_relative, env_json, port, port_extract_regex, health_check_json,
+          cwd_relative, env_json, port, port_mode, port_extract_regex, health_check_json,
           depends_on_json, enabled, source, start_timeout_ms, stop_timeout_ms
         ) VALUES (
           @id, @run_profile_id, @name, @type, @module_relative_path, @executable, @args_json,
-          @cwd_relative, @env_json, @port, @port_extract_regex, @health_check_json,
+          @cwd_relative, @env_json, @port, @port_mode, @port_extract_regex, @health_check_json,
           @depends_on_json, @enabled, @source, @start_timeout_ms, @stop_timeout_ms
         )
       `);
@@ -105,6 +106,7 @@ export class ProfileRepository {
           cwd_relative: s.cwdRelative,
           env_json: JSON.stringify(s.env),
           port: s.port ?? null,
+          port_mode: s.portMode ?? 'auto',
           port_extract_regex: s.portExtractRegex ?? null,
           health_check_json: s.healthCheck ? JSON.stringify(s.healthCheck) : null,
           depends_on_json: JSON.stringify(s.dependsOn),
@@ -161,6 +163,7 @@ export class ProfileRepository {
       cwdRelative: r.cwd_relative,
       env: JSON.parse(r.env_json || '[]') as ServiceEnvVar[],
       port: r.port ?? undefined,
+      portMode: r.port_mode === 'fixed' ? 'fixed' : 'auto',
       portExtractRegex: r.port_extract_regex ?? undefined,
       healthCheck: r.health_check_json ? JSON.parse(r.health_check_json) : undefined,
       dependsOn: JSON.parse(r.depends_on_json || '[]'),

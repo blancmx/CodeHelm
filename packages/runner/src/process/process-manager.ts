@@ -3,6 +3,7 @@ import type { ChildProcess } from 'node:child_process';
 import type { ProcessFingerprint, ServiceConfig, ServiceSession } from '@codehelm/domain';
 import { generateId, safeResolvePath } from '@codehelm/shared';
 import { killProcessTree } from './tree-killer.js';
+import { ProcessVerifier } from './process-verifier.js';
 
 interface ActiveProcess {
   session: ServiceSession;
@@ -71,9 +72,11 @@ export class ProcessManager {
       session.pid = child.pid;
 
       if (child.pid) {
+        const observedStartTime = ProcessVerifier.getProcessStartTime(child.pid);
         const fingerprint: ProcessFingerprint = {
           pid: child.pid,
-          startTime,
+          startTime: observedStartTime ?? startTime,
+          identityVerified: observedStartTime !== undefined,
           executable: service.executable,
           cwd,
           argsSummary: service.args.join(' '),
@@ -125,10 +128,44 @@ export class ProcessManager {
 
     active.session.status = 'STOPPING';
 
-    if (active.session.pid) {
-      await killProcessTree(active.session.pid, 'SIGTERM', timeoutMs);
-    } else if (active.child) {
-      active.child.kill();
+    const pid = active.session.pid;
+    const child = active.child;
+    const isOwnedChild = () => Boolean(
+      pid
+      && ProcessVerifier.isActiveChildProcess(pid, child)
+      && ProcessVerifier.isFingerprintCurrent(pid, active.session.fingerprint) !== false
+    );
+    const canForceKill = () => Boolean(
+      isOwnedChild()
+      && pid
+      && ProcessVerifier.isFingerprintCurrent(pid, active.session.fingerprint) === true
+    );
+    const isStillRunning = () => Boolean(
+      pid
+      && child
+      && child.pid === pid
+      && ProcessVerifier.isPidAlive(pid)
+    );
+    const fallbackKill = (signal: string) => {
+      if (pid && child && ProcessVerifier.isActiveChildProcess(pid, child)) {
+        child.kill(signal as NodeJS.Signals);
+      }
+    };
+
+    if (pid && isOwnedChild()) {
+      await killProcessTree(
+        pid,
+        'SIGTERM',
+        timeoutMs,
+        isOwnedChild,
+        canForceKill,
+        isStillRunning,
+        fallbackKill
+      );
+    } else if (!pid && child && child.exitCode === null && child.signalCode === null) {
+      // A child object without a live PID cannot be safely tree-killed. Let
+      // Node signal only the still-owned child handle instead.
+      child.kill();
     }
 
     active.session.status = 'STOPPED';

@@ -760,16 +760,6 @@ function handleSelectFilter(val: string) {
   updateIndicator();
 }
 
-watch([() => activeFilter.value, () => filterOptions.value], () => {
-  if (activeFilter.value !== 'ALL' && filterOptions.value.length > 0) {
-    if (!filterOptions.value.some((o) => o.value === activeFilter.value)) {
-      activeFilter.value = 'ALL';
-      sessionStorage.setItem('codehelm_overview_filter', 'ALL');
-    }
-  }
-  updateIndicator();
-}, { deep: true });
-
 onMounted(() => {
   updateIndicator();
   // Ensure indicator updates once child refs are mounted
@@ -928,6 +918,16 @@ const filterOptions = computed(() => {
 
   return res;
 });
+
+watch([() => activeFilter.value, () => filterOptions.value], () => {
+  if (activeFilter.value !== 'ALL' && filterOptions.value.length > 0) {
+    if (!filterOptions.value.some((o) => o.value === activeFilter.value)) {
+      activeFilter.value = 'ALL';
+      sessionStorage.setItem('codehelm_overview_filter', 'ALL');
+    }
+  }
+  updateIndicator();
+}, { deep: true });
 
 const filteredProjects = computed(() => {
   const list = projectStore.projects || [];

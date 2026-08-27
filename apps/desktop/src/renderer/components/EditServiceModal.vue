@@ -129,9 +129,10 @@
               <n-input
                 v-model:value="item.value"
                 :type="item.isSecret && !item.showPlain ? 'password' : 'text'"
-                placeholder="VALUE"
+                :placeholder="item.isRedacted ? '已保存的秘密（留空保留，输入新值替换）' : 'VALUE'"
                 class="w-full font-mono text-xs"
                 size="small"
+                @update:value="item.isRedacted = false"
               />
               <button
                 v-if="item.isSecret"
@@ -234,6 +235,7 @@ interface FormEnvItem {
   key: string;
   value: string;
   isSecret: boolean;
+  isRedacted?: boolean;
   showPlain?: boolean;
 }
 
@@ -285,8 +287,9 @@ watch(
       if (val.env && Array.isArray(val.env)) {
         form.env = val.env.map((e) => ({
           key: e.key,
-          value: e.value,
+          value: e.isRedacted ? '' : e.value,
           isSecret: !!e.isSecret,
+          isRedacted: !!e.isRedacted,
           showPlain: false,
         }));
       } else {
@@ -341,6 +344,7 @@ function handleSave() {
       key: item.key.trim(),
       value: item.value,
       isSecret: item.isSecret,
+      ...(item.isRedacted ? { isRedacted: true } : {}),
     }));
 
   let healthCheck: any = { type: healthCheckType.value };
@@ -367,6 +371,7 @@ function handleSave() {
     cwdRelative: form.cwdRelative.trim(),
     moduleRelativePath: form.moduleRelativePath || '',
     port: form.port,
+    portMode: 'fixed',
     dependsOn: form.dependsOn,
     enabled: form.enabled,
     // Saving from this dialog is an explicit user override. Manual services keep

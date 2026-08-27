@@ -1,6 +1,19 @@
-import { describe, expect, it } from 'vitest';
-import type { AnalysisSnapshot, ProjectModule, SuggestedCommand } from '@codehelm/domain';
-import { buildDetectedServices, mergeDetectedServices } from '../auto-profile.js';
+import { describe, expect, it, vi } from 'vitest';
+import type { AnalysisSnapshot, ProjectModule, RunProfile, SuggestedCommand } from '@codehelm/domain';
+import {
+  AUTO_PROFILE_NAME,
+  buildDetectedServices,
+  mergeDetectedServices,
+  upsertAutoDetectedProfile,
+} from '../auto-profile.js';
+
+const storage = vi.hoisted(() => ({
+  isEncryptionAvailable: vi.fn(() => true),
+  encryptString: vi.fn((value: string) => Buffer.from(`cipher:${value}`)),
+  decryptString: vi.fn((value: Buffer) => value.toString().replace(/^cipher:/, '')),
+}));
+
+vi.mock('electron', () => ({ safeStorage: storage }));
 
 function command(type: SuggestedCommand['type'], name: string, port?: number): SuggestedCommand {
   return {
@@ -101,5 +114,53 @@ describe('auto-detected run profile', () => {
     };
 
     expect(buildDetectedServices(snapshot)).toHaveLength(1);
+  });
+
+  it('protects and preserves environment values during auto-profile refresh', async () => {
+    const snapshot: AnalysisSnapshot = {
+      id: 'snapshot',
+      projectId: 'project',
+      analyzerVersion: '1.1.0',
+      status: 'completed',
+      primaryLanguage: 'JavaScript',
+      languages: [],
+      modules: [module('web', [command('frontend', 'Web', 5173)])],
+      startedAt: new Date(0).toISOString(),
+      completedAt: new Date(0).toISOString(),
+    };
+    const detected = buildDetectedServices(snapshot)[0];
+    const existing: RunProfile = {
+      id: 'profile-1',
+      projectId: 'project',
+      name: AUTO_PROFILE_NAME,
+      isDefault: true,
+      failurePolicy: 'block_dependents',
+      services: [{
+        ...detected,
+        id: 'service-1',
+        runProfileId: 'profile-1',
+        env: [{ key: 'API_TOKEN', value: 'legacy-secret', isSecret: true }],
+      }],
+      createdAt: new Date(0).toISOString(),
+      updatedAt: new Date(0).toISOString(),
+    };
+    let saved: RunProfile | null = null;
+    const repo = {
+      findByProjectId: () => [existing],
+      save: (profile: RunProfile) => {
+        saved = profile;
+        return profile;
+      },
+    };
+
+    await upsertAutoDetectedProfile(repo as never, 'project', snapshot);
+
+    expect(saved).not.toBeNull();
+    const persisted = saved as unknown as RunProfile;
+    expect(persisted.services[0].env[0].value).toContain('codehelm-secret-v1:');
+    expect(storage.decryptString(Buffer.from(
+      persisted.services[0].env[0].value.replace('codehelm-secret-v1:', ''),
+      'base64'
+    ))).toBe('legacy-secret');
   });
 });

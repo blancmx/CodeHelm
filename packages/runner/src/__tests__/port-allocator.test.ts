@@ -51,4 +51,11 @@ describe('runtime port allocation', () => {
       prepareServicePort(service('manual'), new Set(), async () => false)
     ).rejects.toBeInstanceOf(PortConflictError);
   });
+
+  it('fails instead of remapping a project-constrained port', async () => {
+    const constrained = { ...service('detected'), portMode: 'fixed' as const };
+    await expect(
+      prepareServicePort(constrained, new Set(), async () => false)
+    ).rejects.toMatchObject({ reason: 'project_constraint', port: 5173 });
+  });
 });

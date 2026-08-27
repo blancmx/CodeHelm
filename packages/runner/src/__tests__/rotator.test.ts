@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { LogRotator } from '../logs/log-rotator.js';
 import { ProcessVerifier } from '../process/process-verifier.js';
+import type { ChildProcess } from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
@@ -54,5 +55,20 @@ describe('LogRotator & ProcessVerifier', () => {
 
     const isFakeDead = ProcessVerifier.isPidAlive(99999999);
     expect(isFakeDead).toBe(false);
+  });
+
+  it('does not treat a mismatched historical PID fingerprint as owned', () => {
+    expect(ProcessVerifier.verifyHistoricalProcess(process.pid, {
+      pid: process.pid + 1,
+      startTime: Date.now(),
+      executable: process.execPath,
+      cwd: process.cwd(),
+      argsSummary: '',
+    })).toBe('ORPHANED');
+  });
+
+  it('rejects an exited ChildProcess before PID-based tree termination', () => {
+    const child = { pid: process.pid, exitCode: 0, signalCode: null } as unknown as ChildProcess;
+    expect(ProcessVerifier.isActiveChildProcess(process.pid, child)).toBe(false);
   });
 });

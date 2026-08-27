@@ -43,6 +43,8 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5173,
+    // Keep the desktop shell away from the conventional Vite application port.
+    // Imported projects often hard-code http://localhost:5173 in CORS rules.
+    port: 15173,
   },
 });
