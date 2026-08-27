@@ -14,6 +14,12 @@ export const BatchImportInputSchema = z.object({
 });
 export type BatchImportInput = z.infer<typeof BatchImportInputSchema>;
 
+export const WorkspaceScanInputSchema = z.object({
+  rootPath: z.string().min(1).max(32768),
+  maxDepth: z.number().int().min(0).max(4).default(2),
+}).strict();
+export type WorkspaceScanInput = z.infer<typeof WorkspaceScanInputSchema>;
+
 export const DiscoveredProjectDtoSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -46,6 +52,35 @@ export const ProjectDtoSchema = z.object({
   lastRunAt: z.string().optional(),
 });
 export type ProjectDto = z.infer<typeof ProjectDtoSchema>;
+
+export const ProjectTaskProgressDtoSchema = z.object({
+  taskId: z.string(),
+  kind: z.enum(['scan', 'import']),
+  status: z.enum(['running', 'cancelling', 'completed', 'partial', 'failed', 'cancelled']),
+  stage: z.string(),
+  completedCount: z.number().int().nonnegative(),
+  totalCount: z.number().int().nonnegative(),
+  scannedDirectories: z.number().int().nonnegative(),
+  foundProjects: z.number().int().nonnegative(),
+  scannedFiles: z.number().int().nonnegative(),
+  errorMessage: z.string().optional(),
+});
+export type ProjectTaskProgressDto = z.infer<typeof ProjectTaskProgressDtoSchema>;
+
+export const ProjectImportResultDtoSchema = z.object({
+  rootPath: z.string(),
+  name: z.string(),
+  project: ProjectDtoSchema.optional(),
+  status: z.enum(['imported', 'completed', 'existing', 'failed', 'cancelled']),
+  errorMessage: z.string().optional(),
+});
+export type ProjectImportResultDto = z.infer<typeof ProjectImportResultDtoSchema>;
+
+export const ProjectTaskDtoSchema = ProjectTaskProgressDtoSchema.extend({
+  discovered: z.array(DiscoveredProjectDtoSchema),
+  results: z.array(ProjectImportResultDtoSchema),
+});
+export type ProjectTaskDto = z.infer<typeof ProjectTaskDtoSchema>;
 
 export const ProjectSummaryDtoSchema = z.object({
   id: z.string().uuid(),
@@ -90,4 +125,3 @@ export const ReadmeSummaryDtoSchema = z.object({
   rawExcerpt: z.string().optional(),
 });
 export type ReadmeSummaryDto = z.infer<typeof ReadmeSummaryDtoSchema>;
-

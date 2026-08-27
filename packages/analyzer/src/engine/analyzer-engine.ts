@@ -20,7 +20,7 @@ import { GoDetector } from '../detectors/go-detector.js';
 import { RustDetector } from '../detectors/rust-detector.js';
 import { DatabaseDetector } from '../detectors/database-detector.js';
 import { parseJson } from '../parsers/index.js';
-import type { AnalysisContext, Detector, ProjectAnalyzer } from '../types.js';
+import type { AnalysisContext, AnalysisProgressCallback, Detector, ProjectAnalyzer } from '../types.js';
 import {
   DEFAULT_MAX_ANALYZER_FILE_BYTES,
   DEFAULT_MAX_ANALYZER_TOTAL_READ_BYTES,
@@ -106,6 +106,7 @@ export interface AnalyzerEngineOptions {
   maxFiles?: number;
   maxFileBytes?: number;
   maxTotalReadBytes?: number;
+  failOnLimit?: boolean;
 }
 
 export class AnalyzerEngine implements ProjectAnalyzer {
@@ -138,37 +139,44 @@ export class AnalyzerEngine implements ProjectAnalyzer {
 
   async analyze(
     projectRoot: string,
-    onProgress?: (percent: number, file: string) => void
+    onProgress?: AnalysisProgressCallback
   ): Promise<AnalysisSnapshot> {
     const controller = new AbortController();
     this.abortController = controller;
     const startTime = new Date().toISOString();
     const snapshotId = generateId();
     const normalizedRoot = normalizePath(projectRoot);
+    let scannedFiles = 0;
+    const report = (percent: number, stage: string) => onProgress?.(percent, stage, scannedFiles);
 
     try {
-      onProgress?.(10, '正在发现项目文件与忽略规则...');
+      report(0, '正在发现项目文件与忽略规则...');
 
       // 1. Discovery
       const discoveryContext = await this.discoveryEngine.discover(normalizedRoot, {
         maxFiles: this.options.maxFiles,
         maxFileBytes: this.options.maxFileBytes,
         signal: controller.signal,
+        failOnLimit: this.options.failOnLimit,
+        onProgress: (count) => {
+          scannedFiles = count;
+          report(0, '正在发现项目文件（总量待确定）...');
+        },
       });
       throwIfAnalysisCancelled(controller.signal);
 
-      onProgress?.(30, '正在统计编程语言体量...');
+      report(30, '正在统计编程语言体量...');
 
       // 2. Language Stats
       const langStats = calculateLanguageStats(discoveryContext.files);
       throwIfAnalysisCancelled(controller.signal);
 
-      onProgress?.(50, '正在识别子模块与工作空间...');
+      report(50, '正在识别子模块与工作空间...');
 
       // 3. Module Detection
       const modules = discoverModules(discoveryContext);
 
-      onProgress?.(70, '正在执行技术栈探测器...');
+      report(70, '正在执行技术栈探测器...');
 
       // 4. Create Analysis Context
       const readBudget = new ReadBudget(
@@ -233,7 +241,8 @@ export class AnalyzerEngine implements ProjectAnalyzer {
       // 5. Run detectors independently per module. A file belongs to its deepest module,
       // preventing a monorepo root from inheriting every child framework and command.
       const modulePaths = modules.map((module) => module.relativePath);
-      for (const mod of modules) {
+      for (const [moduleIndex, mod] of modules.entries()) {
+        report(70 + Math.floor(25 * moduleIndex / Math.max(1, modules.length)), `正在识别模块：${mod.name}`);
         throwIfAnalysisCancelled(controller.signal);
         mod.snapshotId = snapshotId;
         const owns = (filePath: string) => ownerModule(filePath, modulePaths) === mod.relativePath;
@@ -269,7 +278,7 @@ export class AnalyzerEngine implements ProjectAnalyzer {
       }
 
       throwIfAnalysisCancelled(controller.signal);
-      onProgress?.(100, '分析完成');
+      report(100, '分析完成');
 
       return {
         id: snapshotId,

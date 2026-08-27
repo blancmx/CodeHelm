@@ -13,7 +13,11 @@ import { ProfileRepository, ProjectRepository } from '@codehelm/database';
 import { killProcessTree, Orchestrator } from '@codehelm/runner';
 import { spawn } from 'node:child_process';
 import type { ChildProcess } from 'node:child_process';
-import { createDependencyInstallPlans, type DependencyInstallPlan } from './dependency-installer.js';
+import {
+  checkPythonModuleAvailable,
+  createDependencyInstallPlans,
+  type DependencyInstallPlan,
+} from './dependency-installer.js';
 import {
   createExecutionConfigurationFingerprint,
   createExecutionFingerprint,
@@ -22,6 +26,7 @@ import {
 } from './execution-approval.js';
 import { applyRuntimeProfileConstraints } from './runtime-profile-constraints.js';
 import { decryptProfileSecrets, protectProfileSecrets } from './profile-secrets.js';
+import type { LogStorage } from './log-storage.js';
 
 const orchestrator = new Orchestrator();
 const activeInstallerProcesses = new Set<ChildProcess>();
@@ -69,7 +74,7 @@ function requireStartedSession(session: Awaited<ReturnType<Orchestrator['startSe
   );
 }
 
-export function registerRunnerHandlers(db: DatabaseInstance) {
+export function registerRunnerHandlers(db: DatabaseInstance, logs?: LogStorage) {
   const profileRepo = new ProfileRepository(db);
   const projectRepo = new ProjectRepository(db);
   const executionApprovals = new ExecutionApprovalGuard();
@@ -99,6 +104,7 @@ export function registerRunnerHandlers(db: DatabaseInstance) {
   });
 
   orchestrator.onLogs((batch) => {
+    logs?.accept(batch);
     const windows = BrowserWindow.getAllWindows();
     for (const win of windows) {
       if (!win.isDestroyed()) {
@@ -130,6 +136,17 @@ export function registerRunnerHandlers(db: DatabaseInstance) {
   async function runDependencyPlan(plan: DependencyInstallPlan): Promise<void> {
     if (runnerShutdownRequested) {
       throw new Error('Runner shutdown in progress');
+    }
+    // The caller consumes the profile-bound approval token before this runtime check.
+    if (
+      plan.pythonModuleCheck
+      && checkPythonModuleAvailable(plan.executable, plan.pythonModuleCheck.moduleName, plan.cwd)
+    ) {
+      broadcastLog(
+        'CodeHelm Installer',
+        `[Dependency] ${plan.label} 已存在，跳过安装。\n`
+      );
+      return;
     }
     broadcastLog(
       'CodeHelm Installer',

@@ -80,3 +80,9 @@ export const AnalysisProgressDtoSchema = z.object({
   currentFile: z.string().optional(),
 });
 export type AnalysisProgressDto = z.infer<typeof AnalysisProgressDtoSchema>;
+
+export const AnalysisTaskDtoSchema = AnalysisProgressDtoSchema.extend({
+  status: z.enum(['running', 'cancelling', 'saving', 'completed', 'failed', 'cancelled']),
+  errorMessage: z.string().optional(),
+});
+export type AnalysisTaskDto = z.infer<typeof AnalysisTaskDtoSchema>;

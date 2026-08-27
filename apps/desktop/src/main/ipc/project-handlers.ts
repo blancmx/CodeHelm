@@ -3,23 +3,19 @@ import type { Database as DatabaseInstance } from 'better-sqlite3';
 import {
   IpcChannels,
   ImportProjectInputSchema,
-  BatchImportInputSchema,
 } from '@codehelm/contracts';
 import {
-  AnalysisRepository,
-  ProfileRepository,
   ProjectRepository,
 } from '@codehelm/database';
 import {
-  AnalyzerEngine,
   readUtf8FileWithinLimit,
-  WorkspaceScanner,
 } from '@codehelm/analyzer';
 import { normalizePath } from '@codehelm/shared';
 import fs from 'node:fs';
 import path from 'node:path';
-import { upsertAutoDetectedProfile } from './auto-profile.js';
-import { getPersistentPortAllocator } from './persistent-port-allocator.js';
+import { getProjectTasks } from './project-task-service.js';
+import { getAnalysisTasks } from './analysis-service.js';
+import type { AnalysisTasks } from './analysis-tasks.js';
 
 const DEFAULT_FILE_TREE_DEPTH = 5;
 const MAX_FILE_TREE_DEPTH = 5;
@@ -61,34 +57,22 @@ async function readDirectoryEntries(directoryPath: string): Promise<fs.Dirent[]>
   return entries;
 }
 
-export function registerProjectHandlers(db: DatabaseInstance) {
+export function registerProjectHandlers(db: DatabaseInstance, tasks: AnalysisTasks = getAnalysisTasks(db)) {
   const projectRepo = new ProjectRepository(db);
-  const analysisRepo = new AnalysisRepository(db);
-  const profileRepo = new ProfileRepository(db);
-  const workspaceScanner = new WorkspaceScanner();
-  const analyzerEngine = new AnalyzerEngine();
-  const portAllocator = getPersistentPortAllocator(db);
-
-  // Helper to run quick analysis and auto-generate default RunProfile
-  async function autoAnalyzeAndProfile(projectId: string, rootPath: string) {
-    try {
-      const existingProfiles = profileRepo.findByProjectId(projectId);
-      if (existingProfiles.length > 0) return;
-
-      const snapshot = await analyzerEngine.analyze(rootPath);
-      snapshot.projectId = projectId;
-      analysisRepo.save(snapshot);
-
-      db.prepare('UPDATE projects SET last_analyzed_at = ? WHERE id = ?').run(
-        new Date().toISOString(),
-        projectId
-      );
-
-      await upsertAutoDetectedProfile(profileRepo, projectId, snapshot, portAllocator);
-    } catch (err) {
-      console.warn(`Auto analyze failed for project ${projectId}:`, err);
+  const jobs = getProjectTasks(db, tasks);
+  const owners = new WeakSet<Electron.WebContents>();
+  const trackOwner = (event: Electron.IpcMainInvokeEvent) => {
+    if (owners.has(event.sender)) return;
+    owners.add(event.sender);
+    event.sender.once('destroyed', () => { void jobs.stopActive(); });
+  };
+  const finishLegacy = async (taskId: string) => {
+    const state = await jobs.wait(taskId);
+    if (state.status !== 'completed') {
+      throw new Error(state.errorMessage || state.results.find((item) => item.errorMessage)?.errorMessage || state.stage);
     }
-  }
+    return state;
+  };
 
   ipcMain.handle(IpcChannels.PROJECTS_SELECT_DIRECTORY, async () => {
     const result = await dialog.showOpenDialog({
@@ -108,78 +92,33 @@ export function registerProjectHandlers(db: DatabaseInstance) {
     };
   });
 
-  // Scan workspace parent directory for batch discovery
-  ipcMain.handle(
-    IpcChannels.PROJECTS_SCAN_WORKSPACE,
-    async (_event, rootPath: string, options?: { maxDepth?: number }) => {
-      const normalizedRoot = normalizePath(rootPath);
-      if (!fs.existsSync(normalizedRoot)) {
-        throw new Error(`目录不存在: ${normalizedRoot}`);
-      }
-      return workspaceScanner.scan(normalizedRoot, options);
-    }
-  );
-
-  ipcMain.handle(IpcChannels.PROJECTS_IMPORT, async (_event, rawInput) => {
-    const input = ImportProjectInputSchema.parse(rawInput);
-    const normalizedRoot = normalizePath(input.rootPath);
-
-    if (!fs.existsSync(normalizedRoot)) {
-      throw new Error(`目录不存在: ${normalizedRoot}`);
-    }
-
-    const stat = fs.statSync(normalizedRoot);
-    if (!stat.isDirectory()) {
-      throw new Error(`指定路径不是目录: ${normalizedRoot}`);
-    }
-
-    const existing = projectRepo.findByRootPath(normalizedRoot);
-    if (existing) {
-      return existing;
-    }
-
-    const projectName = input.name || path.basename(normalizedRoot);
-    const project = projectRepo.create({
-      name: projectName,
-      rootPath: normalizedRoot,
-      tags: input.tags,
-      color: input.color,
-      icon: input.icon,
-    });
-
-    // Wait for analysis so the detail page receives a usable profile immediately.
-    await autoAnalyzeAndProfile(project.id, normalizedRoot);
-
-    return project;
+  ipcMain.handle(IpcChannels.PROJECTS_START_SCAN, (event, input) => {
+    trackOwner(event);
+    return jobs.startScan(input);
   });
+  ipcMain.handle(IpcChannels.PROJECTS_START_IMPORT, (event, input) => {
+    trackOwner(event);
+    return jobs.startImport(input);
+  });
+  ipcMain.handle(IpcChannels.PROJECTS_GET_TASK, (_event, taskId: string) => jobs.get(taskId));
+  ipcMain.handle(IpcChannels.PROJECTS_CANCEL_TASK, (_event, taskId: string) => jobs.cancel(taskId));
 
-  // Batch import multiple projects
-  ipcMain.handle(IpcChannels.PROJECTS_BATCH_IMPORT, async (_event, rawInput) => {
-    const parsed = BatchImportInputSchema.parse(rawInput);
-    const results = [];
-
-    for (const item of parsed.projects) {
-      const normalizedRoot = normalizePath(item.rootPath);
-      if (!fs.existsSync(normalizedRoot)) continue;
-
-      let project = projectRepo.findByRootPath(normalizedRoot);
-      if (!project) {
-        const projectName = item.name || path.basename(normalizedRoot);
-        project = projectRepo.create({
-          name: projectName,
-          rootPath: normalizedRoot,
-          tags: item.tags,
-          color: item.color,
-          icon: item.icon,
-        });
-      }
-
-      // Keep batch results deterministic: each returned project has completed its initial analysis.
-      await autoAnalyzeAndProfile(project.id, normalizedRoot);
-      results.push(project);
-    }
-
-    return results;
+  // Compatibility callers also use workers; partial failures must not masquerade as success.
+  ipcMain.handle(IpcChannels.PROJECTS_SCAN_WORKSPACE, async (event, rootPath: string, options?: { maxDepth?: number }) => {
+    trackOwner(event);
+    const { taskId } = jobs.startScan({ rootPath, maxDepth: options?.maxDepth ?? 2 });
+    return (await finishLegacy(taskId)).discovered;
+  });
+  ipcMain.handle(IpcChannels.PROJECTS_IMPORT, async (event, rawInput) => {
+    trackOwner(event);
+    const input = ImportProjectInputSchema.parse(rawInput);
+    const { taskId } = jobs.startImport({ projects: [input] });
+    return (await finishLegacy(taskId)).results[0].project!;
+  });
+  ipcMain.handle(IpcChannels.PROJECTS_BATCH_IMPORT, async (event, rawInput) => {
+    trackOwner(event);
+    const { taskId } = jobs.startImport(rawInput);
+    return (await finishLegacy(taskId)).results.map((item) => item.project!);
   });
 
   ipcMain.handle(IpcChannels.PROJECTS_LIST, async () => {
@@ -191,12 +130,19 @@ export function registerProjectHandlers(db: DatabaseInstance) {
   });
 
   ipcMain.handle(IpcChannels.PROJECTS_REMOVE, async (_event, id: string) => {
+    const project = projectRepo.findById(id);
+    if (project) await jobs.stopForPath(project.rootPath);
+    await tasks.cancelProject(id);
     projectRepo.delete(id);
     return { success: true };
   });
 
   ipcMain.handle(IpcChannels.PROJECTS_UPDATE, async (_event, id: string, patch: any) => {
     const project = projectRepo.findById(id);
+    if (patch.rootPath && project) {
+      await jobs.stopForPath(project.rootPath);
+      await tasks.cancelProject(id);
+    }
     if (!project) return null;
     if (patch.name) project.name = patch.name;
     if (patch.rootPath) project.rootPath = normalizePath(patch.rootPath);

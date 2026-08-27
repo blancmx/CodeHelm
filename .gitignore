@@ -7,6 +7,10 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Runner source files are not runtime log output.
+!packages/runner/src/logs/
+!packages/runner/src/logs/*.ts
+
 # Diagnostic and coverage
 coverage
 *.lcov

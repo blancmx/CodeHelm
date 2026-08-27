@@ -9,6 +9,7 @@ import { readUtf8FileWithinLimit } from '../io/bounded-read.js';
 
 export interface WorkspaceScannerOptions {
   maxDepth?: number;
+  onProgress?: (scannedDirectories: number, foundProjects: number) => void;
 }
 
 export const DEFAULT_WORKSPACE_SCAN_DEPTH = 2;
@@ -92,6 +93,12 @@ export class WorkspaceScanner {
     const maxDepth = normalizeMaxDepth(options.maxDepth);
     const results: DiscoveredProjectDto[] = [];
     const scannedPaths = new Set<string>();
+    const rootStat = await fs.lstat(normalizedRoot);
+    if (!rootStat.isDirectory() || rootStat.isSymbolicLink()) throw new Error('工作区目录不可用或为链接');
+    const rootDirectory = await fs.opendir(normalizedRoot);
+    await rootDirectory.close();
+    let scannedDirectories = 0;
+    const inspected = () => options.onProgress?.(++scannedDirectories, results.length);
 
     // 1. Check if the root directory itself is a project
     const rootProject = await this.inspectDirectory(normalizedRoot, normalizedRoot);
@@ -99,9 +106,10 @@ export class WorkspaceScanner {
       results.push(rootProject);
       scannedPaths.add(normalizedRoot);
     }
+    inspected();
 
     // 2. Scan subdirectories up to maxDepth
-    await this.scanRecursive(normalizedRoot, normalizedRoot, 1, maxDepth, results, scannedPaths);
+    await this.scanRecursive(normalizedRoot, normalizedRoot, 1, maxDepth, results, scannedPaths, inspected);
 
     return results;
   }
@@ -112,7 +120,8 @@ export class WorkspaceScanner {
     currentDepth: number,
     maxDepth: number,
     results: DiscoveredProjectDto[],
-    scannedPaths: Set<string>
+    scannedPaths: Set<string>,
+    inspected: () => void,
   ): Promise<void> {
     if (currentDepth > maxDepth || results.length >= MAX_WORKSPACE_SCAN_RESULTS) return;
 
@@ -149,6 +158,8 @@ export class WorkspaceScanner {
         const normalizedSub = normalizePath(subPath);
         if (!scannedPaths.has(normalizedSub)) {
           const project = await this.inspectDirectory(normalizedSub, workspaceRoot);
+          // Count actual inspected directories, not an estimated percentage.
+          inspected();
           if (project) {
             results.push(project);
             scannedPaths.add(normalizedSub);
@@ -161,7 +172,7 @@ export class WorkspaceScanner {
         }
 
         // Descend into next level
-        await this.scanRecursive(subPath, workspaceRoot, currentDepth + 1, maxDepth, results, scannedPaths);
+        await this.scanRecursive(subPath, workspaceRoot, currentDepth + 1, maxDepth, results, scannedPaths, inspected);
       }
     } finally {
       await directory.close().catch(() => undefined);

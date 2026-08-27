@@ -319,6 +319,7 @@ export class Orchestrator {
       }
     }
     this.activeSessions.clear();
+    this.logCollector.flush();
   }
 
   getActiveSessions(): RunSession[] {

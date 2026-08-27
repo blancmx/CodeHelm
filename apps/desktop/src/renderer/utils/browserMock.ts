@@ -15,6 +15,7 @@ import type {
   FileTreeNodeDto,
   ReadmeSummaryDto,
 } from '@codehelm/contracts';
+import { AppSettingsDtoSchema, AppSettingsPatchSchema } from '@codehelm/contracts';
 
 const STORAGE_KEY_PROJECTS = 'codehelm_browser_mock_projects_v5';
 const STORAGE_KEY_SETTINGS = 'codehelm_browser_mock_settings_v5';
@@ -664,6 +665,11 @@ export function setupBrowserMock() {
 
   const mockApi: CodeHelmApi = {
     projects: {
+      async startScan() { throw new Error('浏览器预览不执行本地扫描，请使用 CodeHelm 桌面端'); },
+      async startImport() { throw new Error('浏览器预览不执行本地导入，请使用 CodeHelm 桌面端'); },
+      async getTask() { return null; },
+      async cancelTask() { return { cancelled: false }; },
+      onTaskProgress() { return () => {}; },
       async selectDirectory() {
         if (typeof (window as any).showDirectoryPicker === 'function') {
           try {
@@ -1054,16 +1060,11 @@ export function setupBrowserMock() {
     },
 
     analysis: {
-      async start(projectId: string) {
-        const list = getStoredMockData();
-        const found = list.find((item) => item.project.id === projectId);
-        if (found) {
-          found.project.lastAnalyzedAt = new Date().toISOString();
-          saveStoredMockData(list);
-        }
-        return { taskId: `task-${projectId}` };
+      async start() {
+        throw new Error('浏览器预览不执行本地扫描，请在 CodeHelm 桌面端分析项目');
       },
-      async cancel() {},
+      async cancel() { return { cancelled: false }; },
+      async getTask() { return null; },
       async getLatest(projectId: string): Promise<AnalysisSnapshotDto | null> {
         const list = getStoredMockData();
         const found = list.find((item) => item.project.id === projectId);
@@ -1470,10 +1471,18 @@ export function setupBrowserMock() {
       },
       async update(patch) {
         const current = await this.get();
-        const updated = { ...current, ...patch };
+        const updated = AppSettingsDtoSchema.parse({ ...current, ...AppSettingsPatchSchema.parse(patch) });
         localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(updated));
         return updated;
       },
+      async getLogStatus() {
+        return {
+          available: false, directory: '', fileCount: 0, totalBytes: 0,
+          pendingBytes: 0, droppedEntries: 0, lastError: null,
+        };
+      },
+      async clearLogs() { throw new Error('浏览器预览不支持清理桌面日志'); },
+      async openLogDirectory() { throw new Error('浏览器预览不支持打开桌面日志目录'); },
     },
 
     window: {

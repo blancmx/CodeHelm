@@ -103,6 +103,9 @@ export interface DiscoveryOptions {
   maxFileBytes?: number;
   customIgnores?: string[];
   signal?: AbortSignal;
+  onProgress?: (scannedFiles: number) => void;
+  /** Desktop tasks must not present a truncated scan as a complete result. */
+  failOnLimit?: boolean;
 }
 
 function isMissingFileError(error: unknown): boolean {
@@ -124,6 +127,8 @@ export class DiscoveryEngine {
   async discover(projectRoot: string, options: DiscoveryOptions = {}): Promise<DiscoveryContext> {
     const maxFiles = normalizeMaxFiles(options.maxFiles);
     const normalizedRoot = normalizePath(projectRoot);
+    const rootStat = await fs.lstat(normalizedRoot);
+    if (!rootStat.isDirectory() || rootStat.isSymbolicLink()) throw new Error('项目目录不可用或为链接');
 
     // Setup gitignore matcher
     const ig = ignore();
@@ -189,7 +194,12 @@ export class DiscoveryEngine {
       }
       if (entryStat.isSymbolicLink() || !entryStat.isFile()) continue;
 
+      if (allFiles.length >= maxFiles) {
+        options.onProgress?.(allFiles.length);
+        throw new Error(`扫描文件数超过上限 ${maxFiles}，未保存不完整的分析结果。请调整扫描上限或 .gitignore。`);
+      }
       allFiles.push(relPath);
+      if (allFiles.length % 100 === 0) options.onProgress?.(allFiles.length);
 
       const fileName = path.basename(relPath);
       if (this.matchesPattern(fileName, MANIFEST_PATTERNS)) {
@@ -199,11 +209,12 @@ export class DiscoveryEngine {
         configFiles.push(relPath);
       }
 
-      if (allFiles.length >= maxFiles) {
+      if (allFiles.length >= maxFiles && !options.failOnLimit) {
         break;
       }
     }
 
+    options.onProgress?.(allFiles.length);
     return {
       projectRoot: normalizedRoot,
       files: allFiles,

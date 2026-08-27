@@ -3,6 +3,27 @@ import { ProcessManager } from '../process/process-manager.js';
 import { HealthChecker } from '../health/health-checker.js';
 import net from 'node:net';
 import type { ServiceConfig } from '@codehelm/domain';
+import { SecretRedactor } from '../logs/secret-redactor.js';
+
+describe('streaming secret redaction', () => {
+  it('redacts secrets at every byte boundary without breaking multibyte output', () => {
+    const text = Buffer.from('正常 token=密钥-value-123 done');
+    for (let boundary = 0; boundary <= text.length; boundary++) {
+      const redactor = new SecretRedactor(['密钥-value-123']);
+      const result = redactor.write(text.subarray(0, boundary)) + redactor.write(text.subarray(boundary)) + redactor.end();
+      expect(result).toBe('正常 token=[REDACTED] done');
+    }
+  });
+
+  it('masks an unfinished secret prefix on close and keeps stdout/stderr buffers isolated', () => {
+    const stdout = new SecretRedactor(['token-value']);
+    const stderr = new SecretRedactor(['token-value']);
+    expect(stdout.write(Buffer.from('token-'))).toBe('');
+    expect(stderr.write(Buffer.from('value!')) + stderr.end()).toBe('value!');
+    expect(stdout.end()).toBe('[REDACTED]');
+    expect(stdout.end()).toBe('');
+  });
+});
 
 describe('ProcessManager & HealthChecker', () => {
   const pm = new ProcessManager();

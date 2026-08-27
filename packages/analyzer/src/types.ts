@@ -32,6 +32,8 @@ export interface Detector {
 }
 
 export interface ProjectAnalyzer {
-  analyze(projectRoot: string, onProgress?: (percent: number, file: string) => void): Promise<AnalysisSnapshot>;
+  analyze(projectRoot: string, onProgress?: AnalysisProgressCallback): Promise<AnalysisSnapshot>;
   cancel(): void;
 }
+
+export type AnalysisProgressCallback = (percent: number, stage: string, scannedFiles: number) => void;

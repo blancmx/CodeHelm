@@ -18,6 +18,8 @@
         type="primary"
         size="small"
         class="font-semibold shadow-sm"
+        :loading="saving"
+        :disabled="!loaded || saving"
         @click="handleSave"
       >
         保存设置
@@ -40,8 +42,10 @@
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-3.5 pt-1 relative z-20">
           <!-- Dark Option -->
-          <div
-            class="border rounded-xl p-4 cursor-pointer flex items-center justify-between transition-all duration-200 select-none group relative z-20 active:scale-[0.98]"
+          <button
+            type="button"
+            :aria-pressed="themeStore.mode === 'dark'"
+            class="theme-option border rounded-xl p-4 cursor-pointer flex items-center justify-between transition-all duration-200 select-none group relative z-20"
             :class="themeStore.mode === 'dark'
               ? (themeStore.isDark ? 'bg-[#18181b] border-white shadow-sm ring-1 ring-white/20' : 'bg-black border-black text-white shadow-sm')
               : (themeStore.isDark ? 'bg-[#18181b] border-[#27272a] hover:border-zinc-500' : 'bg-zinc-50 border-zinc-200 hover:border-zinc-300')"
@@ -56,11 +60,13 @@
               <div class="text-xs font-bold" :class="themeStore.isDark ? 'text-white' : 'text-zinc-950'">暗黑模式</div>
             </div>
             <IconCheck v-if="themeStore.mode === 'dark'" :size="16" :class="themeStore.isDark ? 'text-white' : 'text-black'" />
-          </div>
+          </button>
 
           <!-- Light Option -->
-          <div
-            class="border rounded-xl p-4 cursor-pointer flex items-center justify-between transition-all duration-200 select-none group relative z-20 active:scale-[0.98]"
+          <button
+            type="button"
+            :aria-pressed="themeStore.mode === 'light'"
+            class="theme-option border rounded-xl p-4 cursor-pointer flex items-center justify-between transition-all duration-200 select-none group relative z-20"
             :class="themeStore.mode === 'light'
               ? (themeStore.isDark ? 'bg-[#18181b] border-white shadow-sm ring-1 ring-white/20' : 'bg-white border-black shadow-sm ring-1 ring-black/10')
               : (themeStore.isDark ? 'bg-[#18181b] border-[#27272a] hover:border-zinc-500' : 'bg-zinc-50 border-zinc-200 hover:border-zinc-300')"
@@ -75,11 +81,13 @@
               <div class="text-xs font-bold" :class="themeStore.isDark ? 'text-white' : 'text-zinc-950'">明亮模式</div>
             </div>
             <IconCheck v-if="themeStore.mode === 'light'" :size="16" :class="themeStore.isDark ? 'text-white' : 'text-black'" />
-          </div>
+          </button>
 
           <!-- Auto Option -->
-          <div
-            class="border rounded-xl p-4 cursor-pointer flex items-center justify-between transition-all duration-200 select-none group relative z-20 active:scale-[0.98]"
+          <button
+            type="button"
+            :aria-pressed="themeStore.mode === 'auto'"
+            class="theme-option border rounded-xl p-4 cursor-pointer flex items-center justify-between transition-all duration-200 select-none group relative z-20"
             :class="themeStore.mode === 'auto'
               ? (themeStore.isDark ? 'bg-[#18181b] border-white shadow-sm ring-1 ring-white/20' : 'bg-white border-black shadow-sm ring-1 ring-black/10')
               : (themeStore.isDark ? 'bg-[#18181b] border-[#27272a] hover:border-zinc-500' : 'bg-zinc-50 border-zinc-200 hover:border-zinc-300')"
@@ -94,7 +102,7 @@
               <div class="text-xs font-bold" :class="themeStore.isDark ? 'text-white' : 'text-zinc-950'">跟随系统</div>
             </div>
             <IconCheck v-if="themeStore.mode === 'auto'" :size="16" :class="themeStore.isDark ? 'text-white' : 'text-black'" />
-          </div>
+          </button>
         </div>
       </div>
 
@@ -117,9 +125,9 @@
               <label class="block text-xs mb-1.5 font-medium" :class="themeStore.isDark ? 'text-zinc-300' : 'text-zinc-700'">
                 单项目最大扫描文件数上限
               </label>
-              <n-input-number v-model:value="settings.maxScanFiles" :min="1000" :max="500000" class="w-full" />
+              <n-input-number v-model:value="settings.maxScanFiles" :min="1000" :max="50000" :precision="0" class="w-full" />
               <p class="text-[11px] mt-2 leading-relaxed" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
-                超出该文件上限时将自动触发安全截断保护，防止对超大 Mono-repo 扫描时耗尽系统内存。
+                保存后用于下一次导入或重新分析，不影响正在运行的任务。安全上限为 50,000；超过上限会停止分析并保留旧结果，可调整上限或 .gitignore 后重试。
               </p>
             </div>
           </div>
@@ -140,7 +148,7 @@
               </div>
             </div>
 
-            <n-button size="tiny" type="error" secondary @click="handleClearLogs">
+            <n-button size="tiny" type="error" secondary :loading="clearing" :disabled="!logStatus?.available || clearing" @click="handleClearLogs">
               <template #icon>
                 <IconTrash :size="12" />
               </template>
@@ -153,18 +161,33 @@
               <label class="block text-xs mb-1.5 font-medium" :class="themeStore.isDark ? 'text-zinc-300' : 'text-zinc-700'">
                 日志保留天数 (轮转)
               </label>
-              <n-input-number v-model:value="settings.maxLogRetentionDays" :min="1" :max="90" class="w-full" />
+              <n-input-number v-model:value="settings.maxLogRetentionDays" :min="1" :max="90" :precision="0" class="w-full" />
             </div>
 
             <div>
               <label class="block text-xs mb-1.5 font-medium" :class="themeStore.isDark ? 'text-zinc-300' : 'text-zinc-700'">
                 最大配额 (MB)
               </label>
-              <n-input-number v-model:value="settings.maxLogRetentionMb" :min="50" :max="5000" class="w-full" />
+              <n-input-number v-model:value="settings.maxLogRetentionMb" :min="50" :max="5000" :precision="0" class="w-full" />
             </div>
           </div>
         </div>
       </div>
+
+      <section class="border rounded-xl p-4 space-y-2 text-xs" aria-label="日志存储状态"
+        :class="themeStore.isDark ? 'bg-[#121216] border-[#27272a] text-zinc-300' : 'bg-white border-zinc-200 text-zinc-700'">
+        <div class="flex items-center justify-between gap-3">
+          <span v-if="logStatus?.available">日志占用：{{ formatBytes(logStatus.totalBytes) }} · {{ logStatus.fileCount }} 个文件</span>
+          <span v-else>{{ logStatus ? '浏览器预览不提供桌面日志存储' : '正在读取日志状态…' }}</span>
+          <n-button size="tiny" :disabled="!logStatus?.available" @click="handleOpenLogs">打开历史日志目录</n-button>
+        </div>
+        <p v-if="logStatus?.directory" class="font-mono break-all">{{ logStatus.directory }}</p>
+        <p>保存后在下一轮检查应用日志策略：启动时、每 60 秒或每新增约 4 MB 检查一次；按文件删除，配额可能短暂超出。检查按队列顺序执行。</p>
+        <p>服务输出按项目、服务和 UTC 日期保存。标记为秘密的环境变量按原值脱敏；请勿在输出中主动暴露其他凭据。</p>
+        <p v-if="logStatus?.pendingBytes">待写入：{{ formatBytes(logStatus.pendingBytes) }}</p>
+        <p v-if="logStatus?.droppedEntries" class="text-amber-600">本次启动有 {{ logStatus.droppedEntries }} 条日志未保证完整保存。</p>
+        <p v-if="logStatusError || logStatus?.lastError" role="alert" class="text-red-500 break-all">{{ logStatusError || ('本次启动最近的存储错误：' + logStatus?.lastError) }}</p>
+      </section>
 
       <!-- Section 3: 安全与沙箱设计 with Vector Icons -->
       <div
@@ -217,7 +240,8 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, onMounted } from 'vue';
+import { reactive, ref, onMounted, onUnmounted } from 'vue';
+import type { LogStorageStatusDto } from '@codehelm/contracts';
 import { message, dialog } from '../utils/discrete.js';
 import { useThemeStore } from '../stores/themeStore.js';
 import {
@@ -240,39 +264,110 @@ const settings = reactive({
   maxLogRetentionMb: 500,
 });
 
+const loaded = ref(false);
+const saving = ref(false);
+const clearing = ref(false);
+const logStatus = ref<LogStorageStatusDto | null>(null);
+const logStatusError = ref('');
+let polling: ReturnType<typeof setInterval> | undefined;
+let refreshing = false;
+let disposed = false;
+
+function errorText(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function formatBytes(bytes: number): string {
+  return bytes < 1024 ? `${bytes} B` : bytes < 1048576
+    ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / 1048576).toFixed(1)} MB`;
+}
+
+async function refreshLogStatus() {
+  if (refreshing || disposed) return;
+  refreshing = true;
+  try {
+    logStatus.value = await window.codehelm.settings.getLogStatus();
+    logStatusError.value = '';
+  } catch (error) {
+    logStatusError.value = '无法读取日志存储状态：' + errorText(error);
+  } finally { refreshing = false; }
+}
+
 onMounted(async () => {
-  if (window.codehelm?.settings) {
-    try {
-      const data = await window.codehelm.settings.get();
-      settings.maxScanFiles = data.maxScanFiles;
-      settings.maxLogRetentionDays = data.maxLogRetentionDays;
-      settings.maxLogRetentionMb = data.maxLogRetentionMb;
-    } catch (err) {
-      console.error('Failed to load settings:', err);
-    }
+  try {
+    const data = await window.codehelm.settings.get();
+    settings.maxScanFiles = data.maxScanFiles;
+    settings.maxLogRetentionDays = data.maxLogRetentionDays;
+    settings.maxLogRetentionMb = data.maxLogRetentionMb;
+    loaded.value = true;
+  } catch (error) {
+    message.error('读取设置失败：' + errorText(error));
   }
+  await refreshLogStatus();
+  if (!disposed) polling = setInterval(() => { void refreshLogStatus(); }, 5000);
 });
 
+onUnmounted(() => { disposed = true; clearInterval(polling); });
+
 async function handleSave() {
-  if (window.codehelm?.settings) {
-    try {
-      await window.codehelm.settings.update(settings);
-      message.success('系统设置已成功保存');
-    } catch (err: any) {
-      message.error(err.message || '保存设置失败');
-    }
-  }
+  if (saving.value || !loaded.value) return;
+  saving.value = true;
+  try {
+    const updated = await window.codehelm.settings.update({ ...settings });
+    settings.maxScanFiles = updated.maxScanFiles;
+    settings.maxLogRetentionDays = updated.maxLogRetentionDays;
+    settings.maxLogRetentionMb = updated.maxLogRetentionMb;
+    message.success('设置已保存：扫描下次任务生效，日志策略下一轮检查生效');
+  } catch (error) {
+    message.error('保存设置失败：' + errorText(error));
+  } finally { saving.value = false; }
+}
+
+async function handleOpenLogs() {
+  try { await window.codehelm.settings.openLogDirectory(); }
+  catch (error) { message.error(errorText(error)); }
 }
 
 function handleClearLogs() {
+  if (clearing.value || !logStatus.value?.available) return;
   dialog.warning({
     title: '确认清空历史日志',
-    content: '确定要清空 CodeHelm 记录的所有服务运行日志历史文件吗？此操作不可逆。',
+    content: '仅删除 CodeHelm 日志目录中的服务历史日志，不删除项目文件。此操作不可逆；运行中的服务仍会继续产生新日志。',
     positiveText: '确认清空',
     negativeText: '取消',
-    onPositiveClick: () => {
-      message.success('历史日志已全部清理完成');
+    onPositiveClick: async () => {
+      if (clearing.value) return false;
+      clearing.value = true;
+      try {
+        const result = await window.codehelm.settings.clearLogs();
+        message.success(`已删除 ${result.deletedCount} 个日志文件，释放 ${formatBytes(result.freedBytes)}`);
+        await refreshLogStatus();
+        return true;
+      } catch (error) {
+        message.error('日志清理失败：' + errorText(error));
+        await refreshLogStatus();
+        return false;
+      } finally { clearing.value = false; }
     },
   });
 }
 </script>
+
+<style scoped>
+.theme-option {
+  text-align: left;
+}
+
+.theme-option:focus-visible {
+  outline: 2px solid var(--text-primary);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-option,
+  .theme-option :deep(*) {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+</style>

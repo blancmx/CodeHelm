@@ -35,7 +35,7 @@
         type="button"
         title="最小化"
         class="h-6.5 w-8 rounded-md flex items-center justify-center transition-all duration-150 focus:outline-none cursor-pointer active:scale-95"
-        :class="themeStore.isDark ? 'hover:bg-white/10 text-zinc-400 hover:text-white' : 'hover:bg-zinc-200 text-zinc-600 hover:text-zinc-950'"
+        :class="themeStore.isDark ? 'hover:bg-white/10 text-white' : 'hover:bg-zinc-200 text-black'"
         @click="handleMinimize"
       >
         <svg width="10" height="2" viewBox="0 0 10 2">
@@ -48,7 +48,7 @@
         type="button"
         :title="isMaximized ? '还原' : '最大化'"
         class="h-6.5 w-8 rounded-md flex items-center justify-center transition-all duration-150 focus:outline-none cursor-pointer active:scale-95"
-        :class="themeStore.isDark ? 'hover:bg-white/10 text-zinc-400 hover:text-white' : 'hover:bg-zinc-200 text-zinc-600 hover:text-zinc-950'"
+        :class="themeStore.isDark ? 'hover:bg-white/10 text-white' : 'hover:bg-zinc-200 text-black'"
         @click="handleToggleMaximize"
       >
         <!-- Restore Icon (when maximized) -->
@@ -83,7 +83,7 @@
         type="button"
         title="关闭"
         class="h-6.5 w-8 rounded-md flex items-center justify-center transition-all duration-150 focus:outline-none cursor-pointer hover:bg-[#e81123] hover:text-white active:bg-[#c4101f] active:scale-95"
-        :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-600'"
+        :class="themeStore.isDark ? 'text-white' : 'text-black'"
         @click="handleClose"
       >
         <svg

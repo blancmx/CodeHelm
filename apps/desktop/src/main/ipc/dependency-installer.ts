@@ -12,10 +12,26 @@ export interface DependencyInstallPlan {
   cwd: string;
   executable: string;
   args: string[];
+  // Availability checks are deferred because probing a Python module can execute project code.
+  pythonModuleCheck?: {
+    moduleName: string;
+  };
 }
 
 export interface DependencyInstallPlanOptions {
   isPythonModuleAvailable?: (executable: string, moduleName: string, cwd: string) => boolean;
+}
+
+export function checkPythonModuleAvailable(
+  executable: string,
+  moduleName: string,
+  cwd: string
+): boolean {
+  return spawnSync(executable, ['-c', `import ${moduleName}`], {
+    cwd,
+    windowsHide: true,
+    stdio: 'ignore',
+  }).status === 0;
 }
 
 const PYTHON_MODULE_PACKAGES: Record<string, string> = {
@@ -85,14 +101,7 @@ export function createDependencyInstallPlans(
 ): DependencyInstallPlan[] {
   const normalizedRoot = path.resolve(projectRoot);
   const plans = new Map<string, DependencyInstallPlan>();
-  const isPythonModuleAvailable = options.isPythonModuleAvailable
-    ?? ((executable: string, moduleName: string, cwd: string) => (
-      spawnSync(executable, ['-c', `import ${moduleName}`], {
-        cwd,
-        windowsHide: true,
-        stdio: 'ignore',
-      }).status === 0
-    ));
+  const isPythonModuleAvailable = options.isPythonModuleAvailable;
 
   for (const service of services.filter((entry) => entry.enabled)) {
     let moduleRoot: string;
@@ -135,14 +144,19 @@ export function createDependencyInstallPlans(
       const moduleFlag = service.args.findIndex((arg) => arg === '-m');
       const moduleName = moduleFlag >= 0 ? service.args[moduleFlag + 1]?.toLowerCase() : undefined;
       const packageName = moduleName ? PYTHON_MODULE_PACKAGES[moduleName] : undefined;
-      if (moduleName && packageName && !isPythonModuleAvailable(service.executable, moduleName, moduleRoot)) {
+      if (
+        moduleName
+        && packageName
+        && (!isPythonModuleAvailable || !isPythonModuleAvailable(service.executable, moduleName, moduleRoot))
+      ) {
         const key = `python-inferred:${service.executable.toLowerCase()}:${moduleName}:${moduleRoot.toLowerCase()}`;
         plans.set(key, {
           key,
-          label: `${path.relative(normalizedRoot, moduleRoot) || '.'} (${packageName}, inferred)`,
+          label: `${path.relative(normalizedRoot, moduleRoot) || '.'} (${packageName}, inferred if missing)`,
           cwd: moduleRoot,
           executable: service.executable,
           args: ['-m', 'pip', 'install', packageName],
+          pythonModuleCheck: options.isPythonModuleAvailable ? undefined : { moduleName },
         });
       }
     }

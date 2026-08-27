@@ -46,10 +46,18 @@ const harness = vi.hoisted(() => {
   };
   const startSession = vi.fn(async () => session);
   const showMessageBox = vi.fn(async () => ({ response: 0 }));
+  const isPythonModuleAvailable = vi.fn(() => true);
   const spawn = vi.fn(() => {
     throw new Error('spawn should not run before approval');
   });
-  const plans = [{
+  const plans: Array<{
+    key: string;
+    label: string;
+    cwd: string;
+    executable: string;
+    args: string[];
+    pythonModuleCheck?: { moduleName: string };
+  }> = [{
     key: 'node:npm:E:/projects/codehelm-test',
     label: '. (npm)',
     cwd: project.rootPath,
@@ -58,10 +66,11 @@ const harness = vi.hoisted(() => {
   }];
   const createPlans = vi.fn(() => plans);
   const handlers = new Map<string, (...args: any[]) => Promise<unknown>>();
+  const onLogs = vi.fn();
 
   class MockOrchestrator {
     onStatusChange = vi.fn();
-    onLogs = vi.fn();
+    onLogs = onLogs;
     startSession = startSession;
     stopSession = vi.fn();
     stopService = vi.fn();
@@ -90,10 +99,12 @@ const harness = vi.hoisted(() => {
     session,
     startSession,
     showMessageBox,
+    isPythonModuleAvailable,
     spawn,
     plans,
     createPlans,
     handlers,
+    onLogs,
     MockOrchestrator,
     MockProfileRepository,
     MockProjectRepository,
@@ -117,6 +128,7 @@ vi.mock('@codehelm/runner', () => ({ Orchestrator: harness.MockOrchestrator }));
 vi.mock('node:child_process', () => ({ spawn: harness.spawn }));
 vi.mock('../dependency-installer.js', () => ({
   createDependencyInstallPlans: harness.createPlans,
+  checkPythonModuleAvailable: harness.isPythonModuleAvailable,
 }));
 vi.mock('../runtime-profile-constraints.js', () => ({
   applyRuntimeProfileConstraints: (_rootPath: string, profile: typeof harness.profile) => ({
@@ -131,7 +143,8 @@ const db = {
   prepare: vi.fn(() => ({ run: vi.fn() })),
 };
 
-registerRunnerHandlers(db as never);
+const logSink = { accept: vi.fn() };
+registerRunnerHandlers(db as never, logSink as never);
 
 function handler(channel: string) {
   const selected = harness.handlers.get(channel);
@@ -140,6 +153,11 @@ function handler(channel: string) {
 }
 
 describe('runner IPC execution authorization', () => {
+  it('routes real orchestrator log batches to the persistent sink', () => {
+    const batch = { projectId: harness.profile.projectId, runSessionId: harness.session.id, entries: [] };
+    harness.onLogs.mock.calls[0][0](batch);
+    expect(logSink.accept).toHaveBeenCalledWith(batch);
+  });
   it('blocks both execution sinks without a main-process approval', async () => {
     const request = {
       profileId: harness.profile.id,
@@ -165,6 +183,47 @@ describe('runner IPC execution authorization', () => {
       mode: 'start',
     })).rejects.toThrow('Execution confirmation cancelled.');
     expect(harness.startSession).not.toHaveBeenCalled();
+  });
+
+  it('defers inferred Python checks until after the native approval', async () => {
+    harness.showMessageBox.mockClear();
+    harness.startSession.mockClear();
+    harness.isPythonModuleAvailable.mockClear();
+    harness.profile.services[0].executable = 'python';
+    harness.profile.services[0].args = ['-m', 'flask'];
+    harness.profile.services[0].moduleRelativePath = '.';
+    harness.profile.services[0].cwdRelative = '';
+    harness.createPlans.mockReturnValue([{
+      key: 'python-inferred:python:flask:e:/projects/codehelm-test',
+      label: '. (Flask, inferred if missing)',
+      cwd: 'E:/projects/codehelm-test',
+      executable: 'python',
+      args: ['-m', 'pip', 'install', 'Flask'],
+      pythonModuleCheck: { moduleName: 'flask' },
+    }]);
+
+    harness.showMessageBox.mockResolvedValueOnce({ response: 1 });
+    await expect(handler(IpcChannels.RUNNER_CONFIRM_EXECUTION)({}, {
+      profileId: harness.profile.id,
+      mode: 'install',
+    })).rejects.toThrow('Execution confirmation cancelled.');
+    expect(harness.isPythonModuleAvailable).not.toHaveBeenCalled();
+
+    const token = await handler(IpcChannels.RUNNER_CONFIRM_EXECUTION)({}, {
+      profileId: harness.profile.id,
+      mode: 'install',
+    });
+    expect(harness.isPythonModuleAvailable).not.toHaveBeenCalled();
+
+    await expect(handler(IpcChannels.RUNNER_INSTALL_AND_START)({}, {
+      profileId: harness.profile.id,
+      approvalToken: token,
+    })).resolves.toMatchObject({ id: harness.session.id });
+    expect(harness.isPythonModuleAvailable).toHaveBeenCalledWith(
+      'python',
+      'flask',
+      'E:/projects/codehelm-test'
+    );
   });
 
   it('consumes a confirmed token once and rejects a changed configuration', async () => {

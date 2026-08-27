@@ -11,7 +11,7 @@ export default defineConfig({
     UnoCSS(),
     electron([
       {
-        entry: 'src/main/index.ts',
+        entry: { index: 'src/main/index.ts', 'analysis-worker': 'src/main/analysis-worker.ts', 'workspace-worker': 'src/main/workspace-worker.ts' },
         onstart(options) {
           options.startup();
         },
@@ -20,6 +20,7 @@ export default defineConfig({
             outDir: 'dist-electron/main',
             rollupOptions: {
               external: ['better-sqlite3'],
+              output: { entryFileNames: '[name].js', chunkFileNames: '[name]-[hash].js' },
             },
           },
         },

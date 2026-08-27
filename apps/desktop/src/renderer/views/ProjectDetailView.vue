@@ -83,6 +83,10 @@
           {{ isAnalyzing ? '分析中...' : '重新分析' }}
         </n-button>
 
+        <n-button v-if="isAnalyzing" size="small" :disabled="!canCancelAnalysis" @click="analysis.cancel">
+          {{ analysisTask?.status === 'cancelling' ? '正在取消…' : '取消分析' }}
+        </n-button>
+
         <template v-if="isAnyServiceRunning">
           <!-- Compact Quick Access: Dropdown if multiple endpoints, single button if one -->
           <n-dropdown
@@ -177,7 +181,7 @@
           </span>
         </div>
         <span class="font-mono font-bold" :class="themeStore.isDark ? 'text-zinc-300' : 'text-zinc-700'">
-          {{ analysisPercentage }}%
+          已发现 {{ analysisTask?.scannedFiles ?? 0 }} 个文件 · {{ analysisPercentage === 0 ? '扫描中' : `${analysisPercentage}%` }}
         </span>
       </div>
       <n-progress
@@ -187,6 +191,13 @@
         processing
       />
     </div>
+
+    <div v-if="analysisTask?.status === 'failed'" role="alert" class="my-3 p-3 rounded-lg border border-rose-500/40 text-rose-500 text-sm flex-shrink-0">
+      {{ analysisTask.errorMessage || analysisTask.stage }}
+    </div>
+    <p v-else-if="analysisTask?.status === 'cancelled'" role="status" class="my-2 text-sm text-zinc-500 flex-shrink-0">
+      已取消分析，保留上一次成功结果。
+    </p>
 
     <!-- Main Tabs -->
     <div class="flex-1 overflow-hidden pt-3 flex flex-col">
@@ -1104,6 +1115,7 @@ import { setPageTitle } from '../utils/title.js';
 import { useProjectStore } from '../stores/projectStore.js';
 import { useRunnerStore } from '../stores/runnerStore.js';
 import { useThemeStore } from '../stores/themeStore.js';
+import { useAnalysisTask } from '../composables/useAnalysisTask.js';
 import EditServiceModal from '../components/EditServiceModal.vue';
 import FirstRunConfirmModal from '../components/FirstRunConfirmModal.vue';
 import ProjectFileTree from '../components/ProjectFileTree.vue';
@@ -1159,11 +1171,17 @@ const readmeSummary = ref<ReadmeSummaryDto | null>(null);
 const profiles = ref<RunProfileDto[]>([]);
 const editingProfile = ref<RunProfileDto | null>(null);
 
-const isAnalyzing = ref(false);
+const analysis = useAnalysisTask(window.codehelm.analysis, () => props.id, (state) => {
+  if (state.status === 'completed') {
+    message.success('静态技术画像分析完成');
+    void loadData().catch((error) => message.error(error.message || '读取分析结果失败'));
+  } else if (state.status === 'failed') message.error(state.errorMessage || '分析失败');
+  else message.info('已取消分析，原分析结果保留');
+}, (error) => message.error(error instanceof Error ? error.message : '分析任务操作失败'));
+const { task: analysisTask, busy: isAnalyzing, canCancel: canCancelAnalysis } = analysis;
 const isLaunching = ref(false);
-const analysisStage = ref('正在分析...');
-const analysisPercentage = ref(0);
-let unsubscribeProgress: (() => void) | null = null;
+const analysisStage = computed(() => analysisTask.value?.stage ?? '正在启动扫描 Worker…');
+const analysisPercentage = computed(() => analysisTask.value?.percentage ?? 0);
 
 const editModalVisible = ref(false);
 const selectedServiceToEdit = ref<ServiceConfigDto | null>(null);
@@ -1187,31 +1205,21 @@ function getServiceLogCount(serviceName: string) {
 }
 
 onMounted(async () => {
-  if (window.codehelm?.analysis?.onProgress) {
-    unsubscribeProgress = window.codehelm.analysis.onProgress((data) => {
-      isAnalyzing.value = data.percentage < 100;
-      analysisStage.value = data.stage;
-      analysisPercentage.value = data.percentage;
-
-      if (data.percentage >= 100) {
-        loadData();
-      }
-    });
-  }
-
+  analysis.subscribe();
+  await analysis.restore();
   await loadData();
   await refreshLegacyAnalysis();
 });
 
 onUnmounted(() => {
-  if (unsubscribeProgress) {
-    unsubscribeProgress();
-  }
+  analysis.dispose();
 });
 
 watch(
   () => props.id,
   async () => {
+    analysis.reset();
+    await analysis.restore();
     activeMainTab.value = typeof route?.query?.tab === 'string' ? route.query.tab : 'overview';
     await loadData();
     await refreshLegacyAnalysis();
@@ -1494,19 +1502,7 @@ function handleClearLogs() {
 }
 
 async function handleStartAnalysis() {
-  if (!window.codehelm || isAnalyzing.value) return;
-  try {
-    isAnalyzing.value = true;
-    analysisStage.value = '启动静态扫描引擎...';
-    analysisPercentage.value = 10;
-    await window.codehelm.analysis.start(props.id);
-    message.success('静态技术画像分析完成');
-    await loadData();
-  } catch (err: any) {
-    message.error(err.message || '分析失败');
-  } finally {
-    isAnalyzing.value = false;
-  }
+  await analysis.start();
 }
 
 function handleLaunchClick(mode: RunnerExecutionMode = 'start') {

@@ -358,6 +358,26 @@ const currentThemeOverrides = computed(() => {
 </script>
 
 <style>
+/* Commit the palette atomically; the small feedback ring animates separately. */
+html.theme-changing,
+html.theme-changing *,
+html.theme-changing *::before,
+html.theme-changing *::after {
+  transition: none !important;
+}
+
+.theme-mode-feedback {
+  position: fixed;
+  width: 96px;
+  height: 96px;
+  border: 2px solid var(--text-primary);
+  border-radius: 50%;
+  z-index: 2147483647;
+  pointer-events: none;
+  contain: strict;
+  will-change: transform, opacity;
+}
+
 :root {
   --bg-app: #fafafa;
   --bg-sidebar: #f4f4f5;

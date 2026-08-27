@@ -121,14 +121,25 @@ export async function upsertAutoDetectedProfile(
   snapshot: AnalysisSnapshot,
   portAllocator?: DetectedServicePortAllocator
 ): Promise<void> {
+  const save = await prepareAutoDetectedProfile(profileRepo, projectId, snapshot, portAllocator);
+  save();
+}
+
+/** Prepare async port checks first; callers can commit profile + snapshot in one transaction. */
+export async function prepareAutoDetectedProfile(
+  profileRepo: ProfileRepository,
+  projectId: string,
+  snapshot: AnalysisSnapshot,
+  portAllocator?: DetectedServicePortAllocator
+): Promise<() => void> {
   const profiles = profileRepo.findByProjectId(projectId);
   const autoProfile = profiles.find((profile) => profile.name === AUTO_PROFILE_NAME);
 
   // Never create a second default beside user-created profiles.
-  if (!autoProfile && profiles.length > 0) return;
+  if (!autoProfile && profiles.length > 0) return () => {};
 
   let detectedServices = buildDetectedServices(snapshot);
-  if (detectedServices.length === 0) return;
+  if (detectedServices.length === 0) return () => {};
   if (portAllocator) {
     detectedServices = await portAllocator.allocate(
       projectId,
@@ -151,5 +162,5 @@ export async function upsertAutoDetectedProfile(
     userConfirmedAt: autoProfile?.userConfirmedAt,
   }).profile;
 
-  profileRepo.save(protectedProfile);
+  return () => { profileRepo.save(protectedProfile); };
 }

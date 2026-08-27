@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
 import { createDatabase } from '@codehelm/database';
 import { IpcChannels } from '@codehelm/contracts';
-import { registerAllIpcHandlers, stopAllRunnerSessions } from './ipc/index.js';
+import { registerAllIpcHandlers, stopAllRunnerSessions, closeLogStorage, closeAnalysisTasks } from './ipc/index.js';
 import {
   createTrustedDevRenderer,
   createTrustedFileRenderer,
@@ -283,5 +283,13 @@ app.on('before-quit', (event) => {
     .catch((error) => {
       console.error('[Main] Failed to stop runner sessions during quit:', error);
     })
-    .finally(() => app.exit(0));
+    .finally(async () => {
+      try {
+        await closeAnalysisTasks();
+        await closeLogStorage();
+        db?.close();
+      } catch (error) {
+        console.error('[Main] Failed to close storage during quit:', error);
+      } finally { app.exit(0); }
+    });
 });

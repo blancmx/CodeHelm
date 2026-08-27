@@ -7,9 +7,12 @@ import type {
   SelectedDirectoryDto,
   FileTreeNodeDto,
   ReadmeSummaryDto,
+  WorkspaceScanInput,
+  ProjectTaskDto,
+  ProjectTaskProgressDto,
 } from './dto/projects.js';
 import type {
-  AnalysisProgressDto,
+  AnalysisTaskDto,
   AnalysisSnapshotDto,
 } from './dto/analysis.js';
 import type {
@@ -22,12 +25,17 @@ import type {
   RunnerExecutionMode,
   ServiceStatusEventDto,
 } from './dto/runner.js';
-import type { AppSettingsDto } from './dto/settings.js';
+import type { AppSettingsDto, LogStorageStatusDto, LogCleanupResultDto } from './dto/settings.js';
 
 export type Unsubscribe = () => void;
 
 export interface CodeHelmApi {
   projects: {
+    startScan(input: WorkspaceScanInput): Promise<{ taskId: string }>;
+    startImport(input: BatchImportInput): Promise<{ taskId: string }>;
+    getTask(taskId: string): Promise<ProjectTaskDto | null>;
+    cancelTask(taskId: string): Promise<{ cancelled: boolean }>;
+    onTaskProgress(listener: (event: ProjectTaskProgressDto) => void): Unsubscribe;
     selectDirectory(): Promise<SelectedDirectoryDto | null>;
     import(input: ImportProjectInput): Promise<ProjectDto>;
     batchImport(input: BatchImportInput): Promise<ProjectDto[]>;
@@ -41,9 +49,10 @@ export interface CodeHelmApi {
   };
   analysis: {
     start(projectId: string): Promise<{ taskId: string }>;
-    cancel(taskId: string): Promise<void>;
+    cancel(taskId: string): Promise<{ cancelled: boolean }>;
+    getTask(projectId: string): Promise<AnalysisTaskDto | null>;
     getLatest(projectId: string): Promise<AnalysisSnapshotDto | null>;
-    onProgress(listener: (event: AnalysisProgressDto) => void): Unsubscribe;
+    onProgress(listener: (event: AnalysisTaskDto) => void): Unsubscribe;
   };
   profiles: {
     save(input: SaveRunProfileInput): Promise<RunProfileDto>;
@@ -64,6 +73,9 @@ export interface CodeHelmApi {
   settings: {
     get(): Promise<AppSettingsDto>;
     update(patch: Partial<AppSettingsDto>): Promise<AppSettingsDto>;
+    getLogStatus(): Promise<LogStorageStatusDto>;
+    clearLogs(): Promise<LogCleanupResultDto>;
+    openLogDirectory(): Promise<void>;
   };
   window: {
     minimize(): Promise<void>;

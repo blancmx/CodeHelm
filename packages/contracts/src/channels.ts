@@ -4,6 +4,11 @@ export const IpcChannels = {
   PROJECTS_IMPORT: 'codehelm:projects:import',
   PROJECTS_BATCH_IMPORT: 'codehelm:projects:batch-import',
   PROJECTS_SCAN_WORKSPACE: 'codehelm:projects:scan-workspace',
+  PROJECTS_START_SCAN: 'codehelm:projects:start-scan',
+  PROJECTS_START_IMPORT: 'codehelm:projects:start-import',
+  PROJECTS_GET_TASK: 'codehelm:projects:get-task',
+  PROJECTS_CANCEL_TASK: 'codehelm:projects:cancel-task',
+  PROJECTS_ON_TASK_PROGRESS: 'codehelm:projects:on-task-progress',
   PROJECTS_LIST: 'codehelm:projects:list',
   PROJECTS_GET: 'codehelm:projects:get',
   PROJECTS_REMOVE: 'codehelm:projects:remove',
@@ -15,6 +20,7 @@ export const IpcChannels = {
   ANALYSIS_START: 'codehelm:analysis:start',
   ANALYSIS_CANCEL: 'codehelm:analysis:cancel',
   ANALYSIS_GET_LATEST: 'codehelm:analysis:get-latest',
+  ANALYSIS_GET_TASK: 'codehelm:analysis:get-task',
   ANALYSIS_ON_PROGRESS: 'codehelm:analysis:on-progress',
 
   // Run Profiles
@@ -36,6 +42,9 @@ export const IpcChannels = {
   // Settings
   SETTINGS_GET: 'codehelm:settings:get',
   SETTINGS_UPDATE: 'codehelm:settings:update',
+  SETTINGS_LOG_STATUS: 'codehelm:settings:log-status',
+  SETTINGS_CLEAR_LOGS: 'codehelm:settings:clear-logs',
+  SETTINGS_OPEN_LOG_DIRECTORY: 'codehelm:settings:open-log-directory',
 
   // Window Controls
   WINDOW_MINIMIZE: 'codehelm:window:minimize',

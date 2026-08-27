@@ -1,9 +1,13 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ServiceConfig } from '@codehelm/domain';
 import { createDependencyInstallPlans } from '../dependency-installer.js';
+
+const spawnSync = vi.hoisted(() => vi.fn(() => ({ status: 0 })));
+
+vi.mock('node:child_process', () => ({ spawnSync }));
 
 const tempDirs: string[] = [];
 
@@ -104,6 +108,22 @@ describe('createDependencyInstallPlans', () => {
     expect(createDependencyInstallPlans(root, [pythonModule('flask')], {
       isPythonModuleAvailable: () => true,
     })).toEqual([]);
+  });
+
+  it('does not execute an inferred Python import while planning an install', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'codehelm-python-preview-'));
+    tempDirs.push(root);
+    fs.writeFileSync(path.join(root, 'flask.py'), 'raise RuntimeError("must not be imported")');
+    spawnSync.mockClear();
+
+    const plans = createDependencyInstallPlans(root, [pythonModule('flask')]);
+
+    expect(spawnSync).not.toHaveBeenCalled();
+    expect(plans).toEqual([
+      expect.objectContaining({
+        pythonModuleCheck: { moduleName: 'flask' },
+      }),
+    ]);
   });
 
   it('skips a module cwd that crosses a directory junction', () => {

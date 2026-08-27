@@ -1,7 +1,16 @@
 import { describe, it, expect } from 'vitest';
-import { ImportProjectInputSchema, SaveRunProfileInputSchema } from '../index.js';
+import { ImportProjectInputSchema, SaveRunProfileInputSchema, AppSettingsPatchSchema } from '../index.js';
 
 describe('Contracts Zod Schema Validation', () => {
+  it.each([
+    { maxScanFiles: 50001 }, { maxScanFiles: 999 }, { maxScanFiles: 1000.5 },
+    { maxScanFiles: null }, { maxLogRetentionDays: 0 }, { maxLogRetentionDays: 91 },
+    { maxLogRetentionMb: 49 }, { maxLogRetentionMb: 5001 }, { maxLogRetentionMb: NaN },
+    { maxLogRetentionDays: Infinity }, { unexpected: true },
+  ])('rejects unsupported settings: %j', (patch) => {
+    expect(AppSettingsPatchSchema.safeParse(patch).success).toBe(false);
+  });
+
   it('should validate valid ImportProjectInput', () => {
     const valid = {
       rootPath: 'E:/my-project',

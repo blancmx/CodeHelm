@@ -4,12 +4,14 @@ import type { ProcessFingerprint, ServiceConfig, ServiceSession } from '@codehel
 import { generateId, safeResolvePath } from '@codehelm/shared';
 import { killProcessTree } from './tree-killer.js';
 import { ProcessVerifier } from './process-verifier.js';
+import { SecretRedactor } from '../logs/secret-redactor.js';
 
 interface ActiveProcess {
   session: ServiceSession;
   config: ServiceConfig;
   projectRoot: string;
   child?: ChildProcess;
+  outputClosed?: Promise<void>;
   onLog: (sessionId: string, stream: 'stdout' | 'stderr', text: string) => void;
   onExit: (sessionId: string, exitCode: number | null, signal: string | null) => void;
 }
@@ -26,6 +28,11 @@ export class ProcessManager {
   ): Promise<ServiceSession> {
     const serviceSessionId = generateId();
     const startTime = Date.now();
+    const secrets = service.env.filter((v) => v.isSecret).map((v) => v.value);
+    const redactError = (text: string) => {
+      const redactor = new SecretRedactor(secrets);
+      return redactor.write(Buffer.from(text)) + redactor.end();
+    };
 
     // Resolve working directory safely within projectRoot
     const cwd = service.cwdRelative
@@ -69,6 +76,7 @@ export class ProcessManager {
       });
 
       active.child = child;
+      active.outputClosed = new Promise((resolve) => child.once('close', () => resolve()));
       session.pid = child.pid;
 
       if (child.pid) {
@@ -85,22 +93,20 @@ export class ProcessManager {
       }
 
       // Hook output streams
-      child.stdout?.on('data', (chunk: Buffer) => {
-        const text = chunk.toString('utf-8');
-        onLog(serviceSessionId, 'stdout', text);
-      });
-
-      child.stderr?.on('data', (chunk: Buffer) => {
-        const text = chunk.toString('utf-8');
-        onLog(serviceSessionId, 'stderr', text);
-      });
+      for (const stream of ['stdout', 'stderr'] as const) {
+        const redactor = new SecretRedactor(secrets);
+        const emit = (text: string) => { if (text) onLog(serviceSessionId, stream, text); };
+        child[stream]?.on('data', (chunk: Buffer) => emit(redactor.write(chunk)));
+        child[stream]?.once('end', () => emit(redactor.end()));
+        child.once('close', () => emit(redactor.end()));
+      }
 
       // Hook lifecycle events
       child.on('error', (err: Error) => {
         session.status = 'FAILED';
-        session.errorMessage = err.message;
+        session.errorMessage = redactError(err.message);
         session.stoppedAt = new Date().toISOString();
-        onLog(serviceSessionId, 'stderr', `[Process Error] ${err.message}\n`);
+        onLog(serviceSessionId, 'stderr', `[Process Error] ${session.errorMessage}\n`);
         onExit(serviceSessionId, null, null);
       });
 
@@ -115,9 +121,9 @@ export class ProcessManager {
       return session;
     } catch (err: any) {
       session.status = 'FAILED';
-      session.errorMessage = err.message;
+      session.errorMessage = redactError(err.message);
       session.stoppedAt = new Date().toISOString();
-      onLog(serviceSessionId, 'stderr', `[Spawn Exception] ${err.message}\n`);
+      onLog(serviceSessionId, 'stderr', `[Spawn Exception] ${session.errorMessage}\n`);
       return session;
     }
   }
@@ -168,6 +174,14 @@ export class ProcessManager {
       child.kill();
     }
 
+    if (active.outputClosed) {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      await Promise.race([
+        active.outputClosed,
+        new Promise<void>((resolve) => { timer = setTimeout(resolve, 1000); }),
+      ]);
+      clearTimeout(timer);
+    }
     active.session.status = 'STOPPED';
     active.session.stoppedAt = new Date().toISOString();
     this.processes.delete(serviceSessionId);

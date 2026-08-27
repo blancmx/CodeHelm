@@ -5,6 +5,15 @@ import { toIpcPayload } from './ipc-payload.js';
 
 const api: CodeHelmApi = {
   projects: {
+    startScan: (input) => ipcRenderer.invoke(IpcChannels.PROJECTS_START_SCAN, toIpcPayload(input)),
+    startImport: (input) => ipcRenderer.invoke(IpcChannels.PROJECTS_START_IMPORT, toIpcPayload(input)),
+    getTask: (taskId) => ipcRenderer.invoke(IpcChannels.PROJECTS_GET_TASK, taskId),
+    cancelTask: (taskId) => ipcRenderer.invoke(IpcChannels.PROJECTS_CANCEL_TASK, taskId),
+    onTaskProgress: (listener) => {
+      const subscription = (_event: Electron.IpcRendererEvent, data: Parameters<typeof listener>[0]) => listener(data);
+      ipcRenderer.on(IpcChannels.PROJECTS_ON_TASK_PROGRESS, subscription);
+      return () => ipcRenderer.removeListener(IpcChannels.PROJECTS_ON_TASK_PROGRESS, subscription);
+    },
     selectDirectory: () => ipcRenderer.invoke(IpcChannels.PROJECTS_SELECT_DIRECTORY),
     import: (input) => ipcRenderer.invoke(IpcChannels.PROJECTS_IMPORT, toIpcPayload(input)),
     batchImport: (input) => ipcRenderer.invoke(IpcChannels.PROJECTS_BATCH_IMPORT, toIpcPayload(input)),
@@ -22,6 +31,7 @@ const api: CodeHelmApi = {
   analysis: {
     start: (projectId) => ipcRenderer.invoke(IpcChannels.ANALYSIS_START, projectId),
     cancel: (taskId) => ipcRenderer.invoke(IpcChannels.ANALYSIS_CANCEL, taskId),
+    getTask: (projectId) => ipcRenderer.invoke(IpcChannels.ANALYSIS_GET_TASK, projectId),
     getLatest: (projectId) => ipcRenderer.invoke(IpcChannels.ANALYSIS_GET_LATEST, projectId),
     onProgress: (listener) => {
       const channel = IpcChannels.ANALYSIS_ON_PROGRESS;
@@ -75,6 +85,9 @@ const api: CodeHelmApi = {
   settings: {
     get: () => ipcRenderer.invoke(IpcChannels.SETTINGS_GET),
     update: (patch) => ipcRenderer.invoke(IpcChannels.SETTINGS_UPDATE, toIpcPayload(patch)),
+    getLogStatus: () => ipcRenderer.invoke(IpcChannels.SETTINGS_LOG_STATUS),
+    clearLogs: () => ipcRenderer.invoke(IpcChannels.SETTINGS_CLEAR_LOGS),
+    openLogDirectory: () => ipcRenderer.invoke(IpcChannels.SETTINGS_OPEN_LOG_DIRECTORY),
   },
   window: {
     minimize: () => ipcRenderer.invoke(IpcChannels.WINDOW_MINIMIZE),
