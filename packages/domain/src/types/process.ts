@@ -34,9 +34,13 @@ export interface ServiceSession {
   errorMessage?: string;
   startedAt?: string;
   stoppedAt?: string;
+  recovery?: {
+    checkedAt: string;
+    outcome: 'not-running' | 'identity-match' | 'pid-reused' | 'unverified';
+  };
 }
 
-export type RunSessionStatus = 'STARTING' | 'RUNNING' | 'STOPPING' | 'STOPPED' | 'PARTIAL_FAILED' | 'FAILED';
+export type RunSessionStatus = 'STARTING' | 'RUNNING' | 'STOPPING' | 'STOPPED' | 'PARTIAL_FAILED' | 'FAILED' | 'INTERRUPTED';
 
 export interface RunSession {
   id: string;

@@ -14,7 +14,7 @@
             class="text-xs border px-2.5 py-0.5 rounded-full font-mono font-medium"
             :class="themeStore.isDark ? 'bg-[#18181b] text-zinc-300 border-[#27272a]' : 'bg-zinc-100 text-zinc-800 border-zinc-200'"
           >
-            {{ projectStore.projects.length }} 个工程
+            {{ projectStore.hasLoadedProjects ? `${projectStore.projects.length} 个工程` : '项目数待读取' }}
           </span>
         </div>
         <p class="text-xs mt-1" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
@@ -51,6 +51,7 @@
           type="primary"
           size="small"
           class="font-semibold shadow-sm group"
+          :disabled="!!projectStore.listError"
           @click="projectStore.importModalVisible = true"
         >
           <template #icon>
@@ -73,10 +74,10 @@
             已纳管工程总数
           </div>
           <div class="text-2xl font-bold mt-1 font-mono tracking-tight" :class="themeStore.isDark ? 'text-white' : 'text-zinc-950'">
-            {{ projectStore.projects.length }}
+            {{ projectStore.hasLoadedProjects ? projectStore.projects.length : '—' }}
           </div>
           <div class="text-[10px] mt-1 flex items-center gap-1.5" :class="themeStore.isDark ? 'text-zinc-500' : 'text-zinc-400'">
-            <span>覆盖 {{ totalModulesCount }} 个子模块</span>
+            <span>{{ projectStore.hasLoadedProjects ? `覆盖 ${totalModulesCount} 个子模块` : '等待项目数据' }}</span>
           </div>
         </div>
         <div
@@ -96,11 +97,11 @@
       >
         <div>
           <div class="text-[11px] font-medium flex items-center gap-1.5" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
-            <span>活跃运行中服务</span>
-            <span v-if="runnerStore.runningCount > 0" class="w-1.5 h-1.5 rounded-full bg-white pulsing-dot-active" />
+            <span>本次受管 · 运行中 / 启动中</span>
+            <span v-if="(runtimeReady && runnerStore.runningCount > 0)" class="w-1.5 h-1.5 rounded-full bg-emerald-400 pulsing-dot-active" />
           </div>
-          <div class="text-2xl font-bold mt-1 font-mono tracking-tight" :class="runnerStore.runningCount > 0 ? (themeStore.isDark ? 'text-white' : 'text-zinc-950') : (themeStore.isDark ? 'text-zinc-500' : 'text-zinc-400')">
-            {{ runnerStore.runningCount }}
+          <div class="text-2xl font-bold mt-1 font-mono tracking-tight" :class="(runtimeReady && runnerStore.runningCount > 0) ? (themeStore.isDark ? 'text-white' : 'text-zinc-950') : (themeStore.isDark ? 'text-zinc-500' : 'text-zinc-400')">
+            {{ runtimeReady ? runnerStore.runningCount : '—' }}
           </div>
           <div class="text-[10px] mt-1 flex items-center gap-1" :class="themeStore.isDark ? 'text-zinc-400 group-hover:text-white' : 'text-zinc-500 group-hover:text-zinc-900'">
             <span>查看控制中心日志流</span>
@@ -109,7 +110,7 @@
         </div>
         <div
           class="w-10 h-10 rounded-xl flex items-center justify-center border transition-colors"
-          :class="runnerStore.runningCount > 0
+          :class="(runtimeReady && runnerStore.runningCount > 0)
             ? (themeStore.isDark ? 'bg-white text-black border-white font-bold' : 'bg-black text-white border-black font-bold')
             : (themeStore.isDark ? 'bg-[#18181b] border-[#27272a] text-zinc-300' : 'bg-zinc-100 border-zinc-200 text-zinc-700')"
         >
@@ -127,10 +128,10 @@
             技术生态与语言画像
           </div>
           <div class="text-2xl font-bold mt-1 font-mono tracking-tight" :class="themeStore.isDark ? 'text-white' : 'text-zinc-950'">
-            {{ uniqueTechnologies.length }} <span class="text-xs font-normal font-sans" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">类技术</span>
+            {{ projectStore.hasLoadedProjects ? uniqueTechnologies.length : '—' }} <span class="text-xs font-normal font-sans" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">类技术</span>
           </div>
           <div class="text-[10px] mt-1 truncate max-w-200px font-mono" :class="themeStore.isDark ? 'text-zinc-500' : 'text-zinc-400'">
-            {{ topTechnologiesText }}
+            {{ projectStore.hasLoadedProjects ? topTechnologiesText : '等待项目数据' }}
           </div>
         </div>
         <div
@@ -143,7 +144,7 @@
     </div>
 
     <!-- Quick Filter Tabs, Sorting & View Mode Switcher -->
-    <div class="flex items-center justify-between pt-3 pb-2 flex-shrink-0 gap-3">
+    <div v-if="projectStore.hasLoadedProjects" class="flex items-center justify-between pt-3 pb-2 flex-shrink-0 gap-3">
       <!-- Left: Dynamic Ecosystem Tabs & Independent Running Toggle -->
       <div class="flex items-center gap-2.5 overflow-x-auto py-0.5 min-w-0">
         <!-- Dynamic Ecosystem Filter Tabs with Silky Magnetic Sliding Pill -->
@@ -199,15 +200,15 @@
                   ? 'bg-[#121216] text-zinc-400 hover:text-zinc-200 border-[#27272a] hover:border-zinc-500'
                   : 'bg-white text-zinc-600 hover:text-zinc-900 border-zinc-200 hover:border-zinc-300 shadow-2xs')
           ]"
-          :title="onlyRunning ? '点击展示所有状态项目' : '点击仅筛选当前处于运行中的项目'"
+          :title="onlyRunning ? '点击展示所有状态项目' : '筛选至少有一个运行中或启动中服务的项目'"
           @click="onlyRunning = !onlyRunning"
         >
           <span
             class="w-1.5 h-1.5 rounded-full flex-shrink-0 transition-colors"
             :class="runningProjectsCount > 0 ? (onlyRunning ? 'bg-emerald-400 pulsing-dot-active' : 'bg-emerald-400') : 'bg-zinc-400'"
           />
-          <span>仅看运行中</span>
-          <span class="text-[10px] opacity-80 font-mono">({{ runningProjectsCount }})</span>
+          <span>运行中 / 启动中</span>
+          <span class="text-[10px] opacity-80 font-mono">({{ runtimeReady ? runningProjectsCount : '—' }})</span>
         </button>
       </div>
 
@@ -297,12 +298,39 @@
       </div>
     </div>
 
+    <section
+      v-if="projectStore.listError"
+      role="alert"
+      class="mt-4 border rounded-xl p-4 flex-shrink-0"
+      :class="themeStore.isDark ? 'border-amber-800 bg-amber-950/30 text-amber-200' : 'border-amber-300 bg-amber-50 text-amber-950'"
+    >
+      <h3 class="text-sm font-semibold">项目列表读取失败</h3>
+      <p class="text-xs mt-2 leading-relaxed">{{ projectStore.listError }}</p>
+      <p v-if="projectStore.hasLoadedProjects" class="text-xs mt-2">下方保留上次成功读取的结果，不代表当前数据库状态。</p>
+      <n-button size="small" class="mt-3" :disabled="isRefreshing || projectStore.loading" @click="handleManualRefresh">
+        重试读取
+      </n-button>
+    </section>
+
+    <section v-if="runnerStore.stateError" role="alert" class="mt-3 border rounded-xl p-3 flex-shrink-0"
+      :class="themeStore.isDark ? 'border-amber-800 text-amber-200' : 'border-amber-300 text-amber-950'">
+      <p class="text-xs">运行状态读取失败：{{ runnerStore.stateError }}。请使用右上角刷新重试；未知状态不计入运行筛选。</p>
+    </section>
+
     <!-- Main Content Area with Crisp Ghost-Free Transition -->
     <div class="flex-1 overflow-y-auto pt-2 flex flex-col [scrollbar-gutter:stable]">
       <transition name="tab-crossfade" mode="out-in">
-        <!-- Empty State -->
         <div
-          v-if="filteredProjects.length === 0 && !searchQuery.trim() && activeFilter === 'ALL' && !onlyRunning"
+          v-if="!projectStore.hasLoadedProjects"
+          key="unavailable-state"
+          role="status"
+          class="flex-1 flex items-center justify-center text-sm text-zinc-500 py-8"
+        >
+          {{ projectStore.loading ? '正在读取项目列表…' : projectStore.listError ? '无法确认项目数量，请先处理上方错误。' : '等待项目数据' }}
+        </div>
+        <!-- Empty State: only after a successful database read -->
+        <div
+          v-else-if="filteredProjects.length === 0 && !searchQuery.trim() && activeFilter === 'ALL' && !onlyRunning"
           key="empty-state"
           class="flex-1 flex flex-col items-center justify-center text-center max-w-lg mx-auto py-8 my-auto"
         >
@@ -433,22 +461,22 @@
                 </div>
               </div>
 
-              <!-- Status Badge (Monochrome) -->
+              <!-- Status Badge -->
               <span
-                v-if="project.lastRunStatus"
-                class="px-2 py-0.5 rounded-full text-[10px] font-mono font-medium flex items-center gap-1.5 flex-shrink-0 border"
-                :class="statusBadgeClass(project.lastRunStatus)"
+                class="px-1.5 py-0.5 rounded-full text-[10px] font-mono font-medium inline-flex items-center gap-1 flex-shrink-0 border leading-none"
+                :class="statusBadgeClass(project.runtime.status)"
+                :title="runtimeStatusTitle(project)"
               >
                 <span
-                  v-if="project.lastRunStatus === 'RUNNING'"
-                  class="w-1.5 h-1.5 rounded-full pulsing-dot-active"
-                  :class="themeStore.isDark ? 'bg-white' : 'bg-black'"
+                  v-if="project.runtime.status === 'RUNNING'"
+                  class="w-1.5 h-1.5 rounded-full bg-emerald-400 pulsing-dot-active flex-shrink-0 -translate-y-[0.5px]"
                 />
-                <span>{{ project.lastRunStatus }}</span>
+                <span class="leading-none">{{ runtimeStatusLabel(project.runtime.status, project.id) }}</span>
               </span>
             </div>
 
             <!-- Language & Tag Pills (Monochrome) -->
+            <UnresolvedNotice compact :project-id="project.id" :count="runnerStore.getUnresolvedCount(project.id)" />
             <div class="flex flex-wrap gap-1.5 mt-3.5">
               <span
                 v-for="lang in (project.primaryLanguages || [])"
@@ -513,21 +541,21 @@
       <div
         v-else-if="viewMode === 'list'"
         :key="'list-' + activeFilter + '-' + (onlyRunning ? '1' : '0')"
-        class="border rounded-xl overflow-hidden pb-6 mb-4"
+        class="border rounded-xl overflow-x-auto pb-6 mb-4"
         :class="themeStore.isDark ? 'bg-[#121216] border-[#27272a]' : 'bg-white border-zinc-200 shadow-sm'"
       >
-        <table class="w-full text-left text-xs border-collapse table-fixed">
+        <table class="w-full min-w-[1000px] text-left text-xs border-collapse table-fixed">
           <thead>
             <tr
               class="border-b text-[11px] font-medium"
               :class="themeStore.isDark ? 'bg-[#18181b] border-[#27272a] text-zinc-400' : 'bg-zinc-50 border-zinc-200 text-zinc-600'"
             >
-              <th class="py-3 px-4 w-[24%]">工程名称</th>
-              <th class="py-3 px-4 w-[26%]">本地路径</th>
-              <th class="py-3 px-4 w-[18%]">技术生态</th>
-              <th class="py-3 px-4 w-[14%]">架构规模</th>
-              <th class="py-3 px-4 w-[10%]">运行状态</th>
-              <th class="py-3 px-4 w-[8%] text-right">操作</th>
+              <th class="py-3 px-4 w-[22%]">工程名称</th>
+              <th class="py-3 px-4 w-[22%]">本地路径</th>
+              <th class="py-3 px-4 w-[13%]">技术生态</th>
+              <th class="py-3 px-4 w-[13%]">架构规模</th>
+              <th class="py-3 px-4 w-[18%]">运行状态</th>
+              <th class="py-3 px-4 w-[12%] text-right">操作</th>
             </tr>
           </thead>
           <tbody
@@ -591,20 +619,17 @@
               <!-- Status -->
               <td class="py-3.5 px-4">
                 <span
-                  v-if="project.lastRunStatus"
-                  class="px-2 py-0.5 rounded-full text-[10px] font-mono font-medium inline-flex items-center gap-1.5 border"
-                  :class="statusBadgeClass(project.lastRunStatus)"
+                  class="px-1.5 py-0.5 rounded-full text-[10px] font-mono font-medium inline-flex items-center gap-1 border leading-none"
+                  :class="statusBadgeClass(project.runtime.status)"
+                  :title="runtimeStatusTitle(project)"
                 >
                   <span
-                    v-if="project.lastRunStatus === 'RUNNING'"
-                    class="w-1.5 h-1.5 rounded-full pulsing-dot-active"
-                    :class="themeStore.isDark ? 'bg-white' : 'bg-black'"
+                    v-if="project.runtime.status === 'RUNNING'"
+                    class="w-1.5 h-1.5 rounded-full bg-emerald-400 pulsing-dot-active flex-shrink-0 -translate-y-[0.5px]"
                   />
-                  <span>{{ project.lastRunStatus }}</span>
+                  <span class="leading-none">{{ runtimeStatusLabel(project.runtime.status, project.id) }}</span>
                 </span>
-                <span v-else class="text-[11px]" :class="themeStore.isDark ? 'text-zinc-600' : 'text-zinc-400'">
-                  未启动
-                </span>
+                <UnresolvedNotice compact :project-id="project.id" :count="runnerStore.getUnresolvedCount(project.id)" />
               </td>
 
               <!-- Actions -->
@@ -637,6 +662,7 @@
 </template>
 
 <script setup lang="ts">
+import UnresolvedNotice from '../components/UnresolvedNotice.vue';
 import { ref, computed, nextTick, watch, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { dialog, message } from '../utils/discrete.js';
@@ -670,7 +696,13 @@ async function handleManualRefresh() {
   isRefreshing.value = true;
   const startTime = Date.now();
   try {
-    await projectStore.fetchProjects();
+    const [projectsRefreshed, runtimeRefreshed] = await Promise.all([
+      projectStore.fetchProjects(), runnerStore.fetchState(),
+    ]);
+    if (!projectsRefreshed || !runtimeRefreshed) {
+      message.error(projectStore.listError || runnerStore.stateError || '状态已更新或刷新被替代，请重试');
+      return;
+    }
     const elapsed = Date.now() - startTime;
     if (elapsed < 650) {
       await new Promise((r) => setTimeout(r, 650 - elapsed));
@@ -761,6 +793,7 @@ function handleSelectFilter(val: string) {
 }
 
 onMounted(() => {
+  void runnerStore.fetchState();
   updateIndicator();
   // Ensure indicator updates once child refs are mounted
   setTimeout(updateIndicator, 40);
@@ -819,11 +852,21 @@ const topTechnologiesText = computed(() => {
   return uniqueTechnologies.value.slice(0, 4).join(' • ');
 });
 
-const runningProjectsCount = computed(() => {
-  return (projectStore.projects || []).filter(
-    (p: ProjectSummaryDto) => p.lastRunStatus === 'RUNNING' || p.lastRunStatus === 'STARTING'
-  ).length;
-});
+const runtimeReady = computed(() => runnerStore.stateLoaded && !runnerStore.stateError);
+const projectsWithRuntime = computed(() => projectStore.projects.map(project => ({
+  ...project, runtime: runnerStore.getProjectState(project.id),
+})));
+const runningProjectsCount = computed(() => projectsWithRuntime.value.filter(p => p.runtime.runningCount > 0).length);
+
+function runtimeStatusLabel(status: string, projectId: string) {
+  if (status === 'UNKNOWN') return runnerStore.stateError ? '状态未知' : '待读取';
+  return status === 'STOPPED' && runnerStore.getUnresolvedCount(projectId) > 0 ? '本次未运行' : status;
+}
+
+function runtimeStatusTitle(project: ProjectSummaryDto) {
+  const current = runtimeReady.value ? '本次受管状态；未运行不代表历史遗留进程已退出。' : '运行状态尚未可靠读取。';
+  return current + (project.lastRunStatus ? ` 上次运行记录：${project.lastRunStatus}（仅作历史参考）` : '');
+}
 
 interface EcosystemCategory {
   key: string;
@@ -930,14 +973,14 @@ watch([() => activeFilter.value, () => filterOptions.value], () => {
 }, { deep: true });
 
 const filteredProjects = computed(() => {
-  const list = projectStore.projects || [];
+  const list = projectsWithRuntime.value;
 
-  return list.filter((p: ProjectSummaryDto) => {
+  return list.filter((p) => {
     if (!p) return false;
 
     // 1. Independent Running status toggle
     if (onlyRunning.value) {
-      if (p.lastRunStatus !== 'RUNNING' && p.lastRunStatus !== 'STARTING') return false;
+      if (p.runtime.runningCount === 0) return false;
     }
 
     // 2. Dynamic Ecosystem category
@@ -979,7 +1022,8 @@ const sortedProjects = computed(() => {
       if (s === 'FAILED') return 3;
       return 4;
     };
-    return list.sort((a, b) => statusWeight(a.lastRunStatus) - statusWeight(b.lastRunStatus));
+    return list.sort((a, b) => Number(b.runtime.runningCount > 0) - Number(a.runtime.runningCount > 0)
+      || statusWeight(a.runtime.status) - statusWeight(b.runtime.status));
   }
   return list;
 });
@@ -1015,6 +1059,8 @@ function statusBadgeClass(status?: string) {
         ? 'bg-zinc-800 text-zinc-200 border-zinc-700'
         : 'bg-zinc-200 text-zinc-800 border-zinc-300';
     case 'FAILED':
+    case 'DEGRADED':
+    case 'ORPHANED':
       return themeStore.isDark
         ? 'bg-rose-950/40 text-rose-300 border-rose-800'
         : 'bg-rose-50 text-rose-700 border-rose-200';

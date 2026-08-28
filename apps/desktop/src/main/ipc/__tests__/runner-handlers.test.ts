@@ -45,7 +45,11 @@ const harness = vi.hoisted(() => {
     services: [],
   };
   const startSession = vi.fn(async () => session);
-  const showMessageBox = vi.fn(async () => ({ response: 0 }));
+  const restartService = vi.fn();
+  const sender = { mainFrame: {} };
+  const owner = { isDestroyed: () => false, webContents: sender };
+  const event = { sender, senderFrame: sender.mainFrame };
+  const showConfirmation = vi.fn(async () => true);
   const isPythonModuleAvailable = vi.fn(() => true);
   const spawn = vi.fn(() => {
     throw new Error('spawn should not run before approval');
@@ -69,12 +73,16 @@ const harness = vi.hoisted(() => {
   const onLogs = vi.fn();
 
   class MockOrchestrator {
+    setSessionPersistence = vi.fn();
+    getActiveSessions = vi.fn(() => []);
+    getPersistenceError = vi.fn();
+    assertCanStart = vi.fn();
     onStatusChange = vi.fn();
     onLogs = onLogs;
     startSession = startSession;
     stopSession = vi.fn();
     stopService = vi.fn();
-    restartService = vi.fn();
+    restartService = restartService;
   }
 
   class MockProfileRepository {
@@ -93,12 +101,24 @@ const harness = vi.hoisted(() => {
       return project;
     }
   }
+  const hasUnresolvedProfile = vi.fn(() => false);
+  const listUnresolved = vi.fn((): unknown[] => []);
+  class MockSessionRepository {
+    listUnfinished() { return []; }
+    listRecent() { return []; }
+    listUnresolved = listUnresolved;
+    save = vi.fn();
+    hasUnresolvedProfile = hasUnresolvedProfile;
+  }
 
   return {
     profile,
+    event,
+    owner,
     session,
     startSession,
-    showMessageBox,
+    restartService,
+    showConfirmation,
     isPythonModuleAvailable,
     spawn,
     plans,
@@ -108,6 +128,9 @@ const harness = vi.hoisted(() => {
     MockOrchestrator,
     MockProfileRepository,
     MockProjectRepository,
+    MockSessionRepository,
+    hasUnresolvedProfile,
+    listUnresolved,
   };
 });
 
@@ -117,15 +140,18 @@ vi.mock('electron', () => ({
       harness.handlers.set(channel, handler);
     },
   },
-  BrowserWindow: { getAllWindows: () => [] },
-  dialog: { showMessageBox: harness.showMessageBox },
+  BrowserWindow: { getAllWindows: () => [], fromWebContents: (sender: unknown) => sender === harness.event.sender ? harness.owner : null },
 }));
+vi.mock('../../execution-confirmation-window.js', () => ({ showExecutionConfirmation: harness.showConfirmation }));
 vi.mock('@codehelm/database', () => ({
   ProfileRepository: harness.MockProfileRepository,
   ProjectRepository: harness.MockProjectRepository,
+  SessionRepository: harness.MockSessionRepository,
 }));
 vi.mock('@codehelm/runner', () => ({ Orchestrator: harness.MockOrchestrator }));
-vi.mock('node:child_process', () => ({ spawn: harness.spawn }));
+vi.mock('node:child_process', async (importOriginal) => ({
+  ...await importOriginal<typeof import('node:child_process')>(), spawn: harness.spawn,
+}));
 vi.mock('../dependency-installer.js', () => ({
   createDependencyInstallPlans: harness.createPlans,
   checkPythonModuleAvailable: harness.isPythonModuleAvailable,
@@ -144,7 +170,7 @@ const db = {
 };
 
 const logSink = { accept: vi.fn() };
-registerRunnerHandlers(db as never, logSink as never);
+await registerRunnerHandlers(db as never, logSink as never);
 
 function handler(channel: string) {
   const selected = harness.handlers.get(channel);
@@ -153,6 +179,44 @@ function handler(channel: string) {
 }
 
 describe('runner IPC execution authorization', () => {
+  it('rejects confirmation requests from unowned windows or child frames', async () => {
+    const request = { profileId: harness.profile.id, mode: 'start' };
+    await expect(handler(IpcChannels.RUNNER_CONFIRM_EXECUTION)({ sender: {}, senderFrame: {} }, request)).rejects.toThrow('主窗口');
+    await expect(handler(IpcChannels.RUNNER_CONFIRM_EXECUTION)({ ...harness.event, senderFrame: {} }, request)).rejects.toThrow('主窗口');
+  });
+
+  it('does not authorize a profile that changes while its confirmation is open', async () => {
+    const before = [...harness.profile.services[0].args];
+    harness.showConfirmation.mockImplementationOnce(async () => {
+      harness.profile.services[0].args = ['run', 'changed-during-review'];
+      return true;
+    });
+    try {
+      await expect(handler(IpcChannels.RUNNER_CONFIRM_EXECUTION)(harness.event, {
+        profileId: harness.profile.id, mode: 'start', theme: 'light',
+      })).rejects.toThrow('执行内容已变化');
+    } finally { harness.profile.services[0].args = before; }
+  });
+
+  it.each(['DEGRADED', 'FAILED', 'STOPPED'])('rejects a %s restart instead of returning success', async status => {
+    harness.restartService.mockResolvedValueOnce({ status, errorMessage: 'restart not ready' });
+    await expect(handler(IpcChannels.RUNNER_RESTART_SERVICE)({}, 'old-child')).rejects.toThrow('restart not ready');
+  });
+
+  it('exposes a detached live/history snapshot and blocks execution when a historical process is unresolved', async () => {
+    expect(handler(IpcChannels.RUNNER_GET_STATE)({})).toMatchObject({ activeSessions: [], history: [], unresolvedSessions: [] });
+    harness.hasUnresolvedProfile.mockReturnValue(true);
+    const old = { ...harness.session, status: 'INTERRUPTED', services: [{
+      id: 'old-child', runSessionId: harness.session.id, serviceConfigId: 'service-1',
+      serviceName: 'Old', serviceType: 'tool', status: 'ORPHANED', pid: 123,
+    }] };
+    harness.listUnresolved.mockReturnValue([old]);
+    try {
+      expect(handler(IpcChannels.RUNNER_GET_STATE)({})).toMatchObject({ activeSessions: [], history: [], unresolvedSessions: [old] });
+      await expect(handler(IpcChannels.RUNNER_START_SESSION)({}, { profileId: harness.profile.id, approvalToken: 'token' })).rejects.toThrow('未确认归属');
+      await expect(handler(IpcChannels.RUNNER_INSTALL_AND_START)({}, { profileId: harness.profile.id, approvalToken: 'token' })).rejects.toThrow('未确认归属');
+    } finally { harness.hasUnresolvedProfile.mockReturnValue(false); harness.listUnresolved.mockReturnValue([]); }
+  });
   it('routes real orchestrator log batches to the persistent sink', () => {
     const batch = { projectId: harness.profile.projectId, runSessionId: harness.session.id, entries: [] };
     harness.onLogs.mock.calls[0][0](batch);
@@ -175,18 +239,18 @@ describe('runner IPC execution authorization', () => {
   });
 
   it('does not mint an approval when the main-process confirmation is cancelled', async () => {
-    harness.showMessageBox.mockClear();
+    harness.showConfirmation.mockClear();
     harness.startSession.mockClear();
-    harness.showMessageBox.mockResolvedValueOnce({ response: 1 });
-    await expect(handler(IpcChannels.RUNNER_CONFIRM_EXECUTION)({}, {
+    harness.showConfirmation.mockResolvedValueOnce(false);
+    await expect(handler(IpcChannels.RUNNER_CONFIRM_EXECUTION)(harness.event, {
       profileId: harness.profile.id,
       mode: 'start',
     })).rejects.toThrow('Execution confirmation cancelled.');
     expect(harness.startSession).not.toHaveBeenCalled();
   });
 
-  it('defers inferred Python checks until after the native approval', async () => {
-    harness.showMessageBox.mockClear();
+  it('defers inferred Python checks until after the isolated confirmation', async () => {
+    harness.showConfirmation.mockClear();
     harness.startSession.mockClear();
     harness.isPythonModuleAvailable.mockClear();
     harness.profile.services[0].executable = 'python';
@@ -202,14 +266,14 @@ describe('runner IPC execution authorization', () => {
       pythonModuleCheck: { moduleName: 'flask' },
     }]);
 
-    harness.showMessageBox.mockResolvedValueOnce({ response: 1 });
-    await expect(handler(IpcChannels.RUNNER_CONFIRM_EXECUTION)({}, {
+    harness.showConfirmation.mockResolvedValueOnce(false);
+    await expect(handler(IpcChannels.RUNNER_CONFIRM_EXECUTION)(harness.event, {
       profileId: harness.profile.id,
       mode: 'install',
     })).rejects.toThrow('Execution confirmation cancelled.');
     expect(harness.isPythonModuleAvailable).not.toHaveBeenCalled();
 
-    const token = await handler(IpcChannels.RUNNER_CONFIRM_EXECUTION)({}, {
+    const token = await handler(IpcChannels.RUNNER_CONFIRM_EXECUTION)(harness.event, {
       profileId: harness.profile.id,
       mode: 'install',
     });
@@ -227,14 +291,14 @@ describe('runner IPC execution authorization', () => {
   });
 
   it('consumes a confirmed token once and rejects a changed configuration', async () => {
-    harness.showMessageBox.mockClear();
+    harness.showConfirmation.mockClear();
     harness.startSession.mockClear();
     const confirm = handler(IpcChannels.RUNNER_CONFIRM_EXECUTION);
     const start = handler(IpcChannels.RUNNER_START_SESSION);
     const reuse = handler(IpcChannels.RUNNER_REUSE_EXECUTION_APPROVAL);
     const confirmationRequest = { profileId: harness.profile.id, mode: 'start' };
-    const token = await confirm({}, confirmationRequest);
-    expect(harness.showMessageBox).toHaveBeenCalledTimes(1);
+    const token = await confirm(harness.event, confirmationRequest);
+    expect(harness.showConfirmation).toHaveBeenCalledTimes(1);
 
     await expect(start({}, { profileId: harness.profile.id, approvalToken: token }))
       .resolves.toMatchObject({ id: harness.session.id });
@@ -249,13 +313,13 @@ describe('runner IPC execution authorization', () => {
   });
 
   it('requires a separate approval for the dependency-install execution mode', async () => {
-    harness.showMessageBox.mockClear();
+    harness.showConfirmation.mockClear();
     harness.startSession.mockClear();
     harness.profile.services[0].executable = 'npm';
     harness.createPlans.mockReturnValue([]);
     const confirm = handler(IpcChannels.RUNNER_CONFIRM_EXECUTION);
     const install = handler(IpcChannels.RUNNER_INSTALL_AND_START);
-    const token = await confirm({}, { profileId: harness.profile.id, mode: 'install' });
+    const token = await confirm(harness.event, { profileId: harness.profile.id, mode: 'install' });
 
     await expect(install({}, { profileId: harness.profile.id, approvalToken: token }))
       .resolves.toMatchObject({ id: harness.session.id });

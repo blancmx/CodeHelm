@@ -83,11 +83,15 @@ export class ProjectRepository {
     const stmt = this.db.prepare(`
       SELECT 
         p.*,
-        (SELECT COUNT(*) FROM modules m JOIN analysis_snapshots a ON m.snapshot_id = a.id WHERE a.project_id = p.id) as module_count,
+        (SELECT COUNT(*) FROM modules m WHERE m.snapshot_id = latest.id) as module_count,
         (SELECT COUNT(*) FROM service_configs s JOIN run_profiles rp ON s.run_profile_id = rp.id WHERE rp.project_id = p.id) as service_count,
-        (SELECT primary_language FROM analysis_snapshots WHERE project_id = p.id ORDER BY started_at DESC LIMIT 1) as primary_language,
+        latest.primary_language,
         (SELECT status FROM run_sessions WHERE project_id = p.id ORDER BY started_at DESC LIMIT 1) as last_run_status
       FROM projects p
+      LEFT JOIN analysis_snapshots latest ON latest.id = (
+        SELECT id FROM analysis_snapshots WHERE project_id = p.id
+        ORDER BY started_at DESC, rowid DESC LIMIT 1
+      )
       ORDER BY p.updated_at DESC
     `);
 

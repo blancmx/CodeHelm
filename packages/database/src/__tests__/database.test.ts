@@ -59,6 +59,49 @@ describe('Database Repositories with in-memory SQLite', () => {
     }).toThrow();
   });
 
+  it('summarizes only the latest snapshot while retaining historical modules', () => {
+    const project = projectRepo.create({ name: 'Repeated analysis', rootPath: 'E:/projects/repeated' });
+    const empty = projectRepo.create({ name: 'Unanalyzed', rootPath: 'E:/projects/empty' });
+    const save = (id: string, startedAt: string, count: number, primaryLanguage: string) => analysisRepo.save({
+      id, projectId: project.id, analyzerVersion: 'test', status: 'completed', primaryLanguage,
+      languages: [], startedAt,
+      modules: Array.from({ length: count }, (_, index) => ({
+        id: `${id}-${index}`, snapshotId: id, name: `module-${index}`, relativePath: `module-${index}`,
+        moduleType: 'backend' as const, technologies: [],
+      })),
+    });
+    save('older', '2026-08-28T00:00:00.000Z', 3, 'Python');
+    save('latest', '2026-08-28T00:01:00.000Z', 2, 'TypeScript');
+    // A late insertion with an older scan timestamp must not become latest.
+    save('backfill', '2026-08-27T00:00:00.000Z', 4, 'Java');
+    expect(projectRepo.list().find((item) => item.id === project.id)).toMatchObject({
+      moduleCount: analysisRepo.findLatestByProjectId(project.id)!.modules.length,
+      primaryLanguages: ['TypeScript'],
+    });
+    expect(analysisRepo.findById('older')!.modules).toHaveLength(3);
+    expect(projectRepo.list().find((item) => item.id === empty.id)).toMatchObject({ moduleCount: 0, primaryLanguages: [] });
+
+    save('latest-empty', '2026-08-28T00:02:00.000Z', 0, 'Unknown');
+    expect(projectRepo.list().find((item) => item.id === project.id)?.moduleCount).toBe(0);
+    expect(analysisRepo.findById('latest')!.modules).toHaveLength(2);
+  });
+
+  it('uses the same insertion tie-breaker for summary and detail snapshots', () => {
+    const project = projectRepo.create({ name: 'Same millisecond', rootPath: 'E:/projects/tie' });
+    for (const [id, primaryLanguage, count] of [['z-first', 'Python', 2], ['a-second', 'Go', 1]] as const) {
+      analysisRepo.save({
+        id, projectId: project.id, analyzerVersion: 'test', status: 'completed', primaryLanguage,
+        languages: [], startedAt: '2026-08-28T00:00:00.000Z',
+        modules: Array.from({ length: count }, (_, index) => ({
+          id: `${id}-${index}`, snapshotId: id, name: id, relativePath: '.',
+          moduleType: 'backend' as const, technologies: [],
+        })),
+      });
+    }
+    expect(analysisRepo.findLatestByProjectId(project.id)?.id).toBe('a-second');
+    expect(projectRepo.list()[0]).toMatchObject({ moduleCount: 1, primaryLanguages: ['Go'] });
+  });
+
   it('should save and retrieve run profile with services', () => {
     const project = projectRepo.create({
       name: 'P1',

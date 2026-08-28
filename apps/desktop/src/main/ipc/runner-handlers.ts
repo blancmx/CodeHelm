@@ -1,4 +1,5 @@
-import { dialog, ipcMain, BrowserWindow } from 'electron';
+import { ipcMain, BrowserWindow } from 'electron';
+import { showExecutionConfirmation } from '../execution-confirmation-window.js';
 import type { Database as DatabaseInstance } from 'better-sqlite3';
 import {
   IpcChannels,
@@ -6,10 +7,11 @@ import {
   RunnerExecutionConfirmationRequestSchema,
   RunnerExecutionRequestSchema,
   ServiceSessionDtoSchema,
+  RunnerStateDtoSchema,
 } from '@codehelm/contracts';
 import type { RunnerExecutionMode } from '@codehelm/contracts';
 import { DEFAULT_MAX_LOG_ENTRY_BYTES, truncateUtf8 } from '@codehelm/domain';
-import { ProfileRepository, ProjectRepository } from '@codehelm/database';
+import { ProfileRepository, ProjectRepository, SessionRepository } from '@codehelm/database';
 import { killProcessTree, Orchestrator } from '@codehelm/runner';
 import { spawn } from 'node:child_process';
 import type { ChildProcess } from 'node:child_process';
@@ -27,6 +29,7 @@ import {
 import { applyRuntimeProfileConstraints } from './runtime-profile-constraints.js';
 import { decryptProfileSecrets, protectProfileSecrets } from './profile-secrets.js';
 import type { LogStorage } from './log-storage.js';
+import { recoverInterruptedSessions } from './session-recovery.js';
 
 const orchestrator = new Orchestrator();
 const activeInstallerProcesses = new Set<ChildProcess>();
@@ -74,11 +77,27 @@ function requireStartedSession(session: Awaited<ReturnType<Orchestrator['startSe
   );
 }
 
-export function registerRunnerHandlers(db: DatabaseInstance, logs?: LogStorage) {
+export async function registerRunnerHandlers(db: DatabaseInstance, logs?: LogStorage) {
   const profileRepo = new ProfileRepository(db);
   const projectRepo = new ProjectRepository(db);
+  const sessionRepo = new SessionRepository(db);
+  const recovered = await recoverInterruptedSessions(sessionRepo);
+  console.log('[Runner] Reconciled historical sessions:', recovered);
+  orchestrator.setSessionPersistence(session => sessionRepo.save(session));
   const executionApprovals = new ExecutionApprovalGuard();
   const activeExecutions = new ExecutionSlotGuard();
+
+  ipcMain.handle(IpcChannels.RUNNER_GET_STATE, () => {
+    const activeSessions = orchestrator.getActiveSessions();
+    const activeIds = new Set(activeSessions.map(s => s.id));
+    return RunnerStateDtoSchema.parse({
+      activeSessions: activeSessions.map(s => ({ ...s, services: s.services.filter(service =>
+        ['STARTING','RUNNING','STOPPING','DEGRADED','ORPHANED'].includes(service.status)) })),
+      history: sessionRepo.listRecent(100).filter(s => !activeIds.has(s.id)).slice(0, 50),
+      unresolvedSessions: sessionRepo.listUnresolved(),
+      persistenceError: orchestrator.getPersistenceError(),
+    });
+  });
 
   // Hook background status & log broadcasters
   orchestrator.onStatusChange((session, projectId, runSessionId) => {
@@ -253,6 +272,7 @@ export function registerRunnerHandlers(db: DatabaseInstance, logs?: LogStorage) 
   }
 
   function requireExecutionSlot(profileId: string): void {
+    requireNoActiveExecution(profileId);
     activeExecutions.acquire(profileId);
   }
 
@@ -261,76 +281,33 @@ export function registerRunnerHandlers(db: DatabaseInstance, logs?: LogStorage) 
   }
 
   function requireNoActiveExecution(profileId: string): void {
+    orchestrator.assertCanStart();
+    if (sessionRepo.hasUnresolvedProfile(profileId)) {
+      throw new Error('此方案存在重启后未确认归属的进程，请先人工核验并关闭遗留进程，再重开 CodeHelm；不会自动接管或重复启动。');
+    }
     activeExecutions.assertAvailable(profileId);
   }
 
-  async function requestInteractiveExecutionConfirmation(
-    profile: ReturnType<typeof reconcileProfile>['profile'],
-    project: ReturnType<typeof reconcileProfile>['project'],
-    mode: RunnerExecutionMode,
-    plans: DependencyInstallPlan[],
-    approvalContext: ReturnType<typeof getExecutionContext>['approvalContext']
-  ): Promise<string> {
-    const serviceDetails = profile.services
-      .filter((service) => service.enabled)
-      .map((service) => {
-        const command = [service.executable, ...service.args].join(' ');
-        const envNames = service.env
-          .map((entry) => entry.key)
-          .filter(Boolean)
-          .join(', ');
-        return [
-          `- ${service.name}: ${command}`,
-          `  cwd: ${service.cwdRelative || '.'}`,
-          `  env names: ${envNames || '(none)'}`,
-        ].join('\n');
-      });
-    const installDetails = plans.map((plan) =>
-      `- ${plan.executable} ${plan.args.join(' ')} (cwd: ${plan.cwd})`
-    );
-    const detail = [
-      `Project root: ${project.rootPath}`,
-      `Execution mode: ${mode === 'install' ? 'install dependencies and start' : 'start'}`,
-      'Services:',
-      ...(serviceDetails.length > 0 ? serviceDetails : ['- (none)']),
-      ...(mode === 'install'
-        ? ['Dependency install plans:', ...(installDetails.length > 0 ? installDetails : ['- (none)'])]
-        : []),
-    ].join('\n');
-    const options = {
-      type: 'warning' as const,
-      title: mode === 'install' ? 'Confirm dependency installation and start' : 'Confirm service start',
-      message: 'CodeHelm is about to execute the current project run profile.',
-      detail,
-      buttons: ['Confirm execution', 'Cancel'],
-      defaultId: 1,
-      cancelId: 1,
-      noLink: true,
-    };
-    const owner = BrowserWindow.getAllWindows().find((window) => !window.isDestroyed());
-    const result = owner
-      ? await dialog.showMessageBox(owner, options)
-      : await dialog.showMessageBox(options);
-    if (result.response !== 0) {
-      throw new Error('Execution confirmation cancelled.');
+  ipcMain.handle(IpcChannels.RUNNER_CONFIRM_EXECUTION, async (event, rawRequest) => {
+    const request = RunnerExecutionConfirmationRequestSchema.parse(rawRequest);
+    const owner = BrowserWindow.fromWebContents(event.sender);
+    if (!owner || owner.isDestroyed() || event.senderFrame !== event.sender.mainFrame) {
+      throw new Error('执行确认必须来自应用主窗口。');
+    }
+    requireNoActiveExecution(request.profileId);
+    const { profile, project, plans, approvalContext } = getExecutionContext(request.profileId, request.mode);
+    const approved = await showExecutionConfirmation(owner, {
+      profile, projectRoot: project.rootPath, plans, mode: request.mode, theme: request.theme,
+    });
+    if (!approved) throw new Error('Execution confirmation cancelled.');
+    requireNoActiveExecution(request.profileId);
+    // Review and execution must describe the same main-process snapshot.
+    const current = getExecutionContext(request.profileId, request.mode).approvalContext;
+    if (current.configurationFingerprint !== approvalContext.configurationFingerprint
+      || current.executionFingerprint !== approvalContext.executionFingerprint) {
+      throw new Error('Execution confirmation required: 执行内容已变化，请重新核对后启动。');
     }
     return executionApprovals.confirm(approvalContext);
-  }
-
-  ipcMain.handle(IpcChannels.RUNNER_CONFIRM_EXECUTION, async (_event, rawRequest) => {
-    const request = RunnerExecutionConfirmationRequestSchema.parse(rawRequest);
-    requireNoActiveExecution(request.profileId);
-    const { profile, project, plans, approvalContext } = getExecutionContext(
-      request.profileId,
-      request.mode
-    );
-    return requestInteractiveExecutionConfirmation(
-      profile,
-      project,
-      request.mode,
-      plans,
-      approvalContext
-    );
   });
 
   ipcMain.handle(IpcChannels.RUNNER_REUSE_EXECUTION_APPROVAL, async (_event, rawRequest) => {
@@ -436,6 +413,9 @@ export function registerRunnerHandlers(db: DatabaseInstance, logs?: LogStorage) 
 
   ipcMain.handle(IpcChannels.RUNNER_RESTART_SERVICE, async (_event, serviceSessionId: string) => {
     const newSession = await orchestrator.restartService(serviceSessionId);
+    if (newSession.status !== 'RUNNING') {
+      throw new Error(newSession.errorMessage || `服务重启未完成：${newSession.status}`);
+    }
     return ServiceSessionDtoSchema.parse(newSession);
   });
 }

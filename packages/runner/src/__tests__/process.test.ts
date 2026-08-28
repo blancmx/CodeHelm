@@ -26,6 +26,26 @@ describe('streaming secret redaction', () => {
 });
 
 describe('ProcessManager & HealthChecker', () => {
+  it('cancels TCP polling and an in-flight HTTP readiness request', async () => {
+    const http = await import('node:http');
+    let observed!: () => void;
+    const received = new Promise<void>(resolve => { observed = resolve; });
+    const server = http.createServer(() => observed()); // Never respond: abort must close the request.
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+    const port = (server.address() as net.AddressInfo).port;
+    const controller = new AbortController();
+    try {
+      const waiting = HealthChecker.waitForHttp(`http://127.0.0.1:${port}`, 200, 30000, 300, controller.signal);
+      await received;
+      controller.abort();
+      expect(await waiting).toBe(false);
+      expect(await HealthChecker.waitForPortOpen(port, 30000, 200, undefined, controller.signal)).toBe(false);
+    } finally {
+      server.closeAllConnections();
+      await new Promise<void>(resolve => server.close(() => resolve()));
+    }
+  }, 5000);
+
   const pm = new ProcessManager();
 
   afterEach(async () => {

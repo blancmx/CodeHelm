@@ -47,7 +47,9 @@ describe('workspace discovery and import task integration', () => {
     await jobs.close(); await analysis.close(); db.close();
     expect(workers.every((worker) => worker.threadId === -1)).toBe(true);
     if (path.dirname(root) !== path.resolve(os.tmpdir()) || !path.basename(root).startsWith('codehelm-project-tasks-')) throw new Error('Unsafe fixture cleanup');
-    await fs.rm(root, { recursive: true, force: true });
+    // Windows may briefly retain directory entries after SQLite/Worker handles
+    // close. Retry only cleanup; exhausted retries still fail the test.
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
   });
 
   async function project(name: string) {

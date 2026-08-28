@@ -57,6 +57,37 @@ describe('WorkspaceScanner import preview', () => {
     expect(web?.tags).toEqual(expect.arrayContaining(['Vue 3', 'Vite', 'TypeScript']));
   });
 
+  it('does not promote grouping directories from descendant Python files, even at depth zero', async () => {
+    const leaf = path.join(tempDir, 'group', 'flask-app');
+    await fs.mkdir(leaf, { recursive: true });
+    await fs.writeFile(path.join(leaf, 'app.py'), 'from flask import Flask\napp = Flask(__name__)\n');
+    expect(await new WorkspaceScanner().scan(tempDir, { maxDepth: 0 })).toEqual([]);
+    expect(await new WorkspaceScanner().scan(tempDir, { maxDepth: 1 })).toEqual([]);
+    const projects = await new WorkspaceScanner().scan(tempDir, { maxDepth: 2 });
+    expect(projects.map((project) => project.relativePath)).toEqual([path.join('group', 'flask-app')]);
+    expect(projects[0].recommendedRunCommand).toBe('flask --app app:app run --port 5000');
+  });
+
+  it('keeps a root standalone script without borrowing a child project framework', async () => {
+    await fs.writeFile(path.join(tempDir, 'tool.py'), 'print("static fixture, never execute")\n');
+    await fs.mkdir(path.join(tempDir, 'child'));
+    await fs.writeFile(path.join(tempDir, 'child', 'app.py'), 'from flask import Flask\napp = Flask(__name__)\n');
+    const [project] = await new WorkspaceScanner().scan(tempDir, { maxDepth: 0 });
+    expect(project.framework).toBe('Python Application');
+    expect(project.recommendedRunCommand).toBe('python tool.py');
+  });
+
+  it('does not borrow source evidence across a nested project manifest boundary', async () => {
+    await fs.writeFile(path.join(tempDir, 'pyproject.toml'), '[project]\nname = "root-cli"\n');
+    await fs.writeFile(path.join(tempDir, 'main.py'), 'print("root")\n');
+    await fs.mkdir(path.join(tempDir, 'child'));
+    await fs.writeFile(path.join(tempDir, 'child', 'requirements.txt'), 'flask\n');
+    await fs.writeFile(path.join(tempDir, 'child', 'app.py'), 'from flask import Flask\napp = Flask(__name__)\n');
+    const [project] = await new WorkspaceScanner().scan(tempDir, { maxDepth: 0 });
+    expect(project.framework).toBe('Python Application');
+    expect(project.recommendedRunCommand).toBe('python main.py');
+  });
+
   it('does not inspect a project reached through a directory junction', async () => {
     const outsideProject = path.join(tempDir, 'outside-project');
     await fs.mkdir(outsideProject);

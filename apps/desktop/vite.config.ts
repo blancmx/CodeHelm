@@ -36,6 +36,18 @@ export default defineConfig({
           },
         },
       },
+      {
+        entry: 'src/preload/execution-confirmation.ts',
+        onstart(options) { options.reload(); },
+        vite: {
+          build: {
+            outDir: 'dist-electron/review-preload',
+            rollupOptions: {
+              output: { format: 'cjs', entryFileNames: 'execution-confirmation.cjs', inlineDynamicImports: true },
+            },
+          },
+        },
+      },
     ]),
   ],
   resolve: {

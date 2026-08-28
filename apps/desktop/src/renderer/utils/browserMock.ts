@@ -1263,6 +1263,9 @@ export function setupBrowserMock() {
     },
 
     runner: {
+      async getState() {
+        throw new Error('浏览器演示不提供真实进程状态或持久化运行历史，请在桌面端查看。');
+      },
       async confirmExecution(_profileId: string, _mode: RunnerExecutionMode): Promise<string> {
         mockExecutionApprovals.add(executionApprovalKey(_profileId, _mode));
         return 'browser-mock-execution-approval';

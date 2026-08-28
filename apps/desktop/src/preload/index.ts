@@ -46,10 +46,11 @@ const api: CodeHelmApi = {
     get: (id) => ipcRenderer.invoke(IpcChannels.PROFILES_GET, id),
   },
   runner: {
-    confirmExecution: (profileId, mode) =>
+    getState: () => ipcRenderer.invoke(IpcChannels.RUNNER_GET_STATE),
+    confirmExecution: (profileId, mode, theme) =>
       ipcRenderer.invoke(
         IpcChannels.RUNNER_CONFIRM_EXECUTION,
-        toIpcPayload({ profileId, mode })
+        toIpcPayload({ profileId, mode, theme })
       ),
     reuseExecutionApproval: (profileId, mode) =>
       ipcRenderer.invoke(

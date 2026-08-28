@@ -12,6 +12,11 @@ files:
   - "node_modules/better-sqlite3/**/*"
   - "package.json"
 
+# Windows Shell must be able to read the relaunch icon outside app.asar.
+extraResources:
+  - from: resources/icon.ico
+    to: icon.ico
+
 asar: true
 asarUnpack:
   - "**/*.node"
@@ -22,7 +27,8 @@ win:
     - target: dir
       arch:
         - x64
-  signAndEditExecutable: false
+  # Keep product metadata/icon editing enabled, without requiring a signing certificate.
+  signExecutable: false
 
 nsis:
   oneClick: false

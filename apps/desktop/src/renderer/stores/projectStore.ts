@@ -11,6 +11,9 @@ export const useProjectStore = defineStore('project', () => {
   const projects = ref<ProjectSummaryDto[]>([]);
   const currentProject = ref<ProjectDto | null>(null);
   const loading = ref(false);
+  const listError = ref<string | null>(null);
+  const hasLoadedProjects = ref(false);
+  let listRequest = 0;
   const importModalVisible = ref(false);
   const searchModalVisible = ref(false);
 
@@ -22,16 +25,28 @@ export const useProjectStore = defineStore('project', () => {
     searchModalVisible.value = false;
   }
 
-  async function fetchProjects() {
+  async function fetchProjects(): Promise<boolean> {
+    const request = ++listRequest;
     loading.value = true;
     try {
-      if (window.codehelm?.projects) {
-        projects.value = await window.codehelm.projects.list();
-      }
+      if (!window.codehelm?.projects) throw new Error('项目数据接口不可用，请确认桌面端已正常启动');
+      const result = await window.codehelm.projects.list();
+      if (request !== listRequest) return false;
+      projects.value = result;
+      hasLoadedProjects.value = true;
+      listError.value = null;
+      return true;
     } catch (err) {
       console.error('Failed to fetch projects:', err);
+      if (request === listRequest) {
+        const detail = err instanceof Error ? err.message : String(err);
+        listError.value = /SQLITE_CORRUPT|database disk image is malformed/i.test(detail)
+          ? '数据库完整性异常，项目记录暂时无法读取。请保留数据库和日志，不要清库或重复导入。'
+          : `项目列表读取失败：${detail}`;
+      }
+      return false;
     } finally {
-      loading.value = false;
+      if (request === listRequest) loading.value = false;
     }
   }
 
@@ -114,6 +129,8 @@ export const useProjectStore = defineStore('project', () => {
     projects,
     currentProject,
     loading,
+    listError,
+    hasLoadedProjects,
     importModalVisible,
     searchModalVisible,
     openSearchModal,

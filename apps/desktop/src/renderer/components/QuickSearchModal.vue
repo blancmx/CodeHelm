@@ -1,19 +1,18 @@
 <template>
   <teleport to="body">
-    <transition name="search-modal-overlay">
+    <transition name="search-modal">
       <div
         v-if="isVisible"
-        class="fixed inset-0 z-[9999] flex items-start justify-center pt-[12vh] bg-black/60 backdrop-blur-xs select-none"
+        class="search-modal-backdrop fixed inset-0 z-[9999] flex items-start justify-center pt-[12vh] bg-black/60 backdrop-blur-xs select-none"
         @mousedown.self="handleClose"
       >
-        <transition name="search-modal-card" appear>
-          <div
-            class="w-[640px] max-w-[92vw] rounded-2xl border shadow-2xl overflow-hidden flex flex-col transition-colors duration-200"
-            :class="themeStore.isDark
-              ? 'bg-[#121216] border-[#27272a] shadow-black/90 text-white'
-              : 'bg-white border-zinc-200 shadow-zinc-400/30 text-zinc-950'"
-            @keydown="handleKeyDown"
-          >
+        <div
+          class="search-modal-card w-[640px] max-w-[92vw] rounded-2xl border shadow-2xl overflow-hidden flex flex-col transition-colors duration-200"
+          :class="themeStore.isDark
+            ? 'bg-[#121216] border-[#27272a] shadow-black/90 text-white'
+            : 'bg-white border-zinc-200 shadow-zinc-400/30 text-zinc-950'"
+          @keydown="handleKeyDown"
+        >
             <!-- Top Search Input Bar -->
             <div
               class="h-14 px-4 flex items-center gap-3 border-b transition-colors"
@@ -133,8 +132,7 @@
               </div>
             </div>
           </div>
-        </transition>
-      </div>
+        </div>
     </transition>
   </teleport>
 </template>
@@ -250,24 +248,39 @@ function scrollToSelected() {
 </script>
 
 <style scoped>
-.search-modal-overlay-enter-active,
-.search-modal-overlay-leave-active {
-  transition: opacity 160ms cubic-bezier(0.16, 1, 0.3, 1);
+/* Overlay Backdrop Transitions */
+.search-modal-enter-active {
+  transition: opacity 220ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.search-modal-overlay-enter-from,
-.search-modal-overlay-leave-to {
+.search-modal-leave-active {
+  transition: opacity 180ms cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+}
+
+.search-modal-enter-from,
+.search-modal-leave-to {
   opacity: 0;
 }
 
-.search-modal-card-enter-active,
-.search-modal-card-leave-active {
-  transition: opacity 180ms cubic-bezier(0.16, 1, 0.3, 1), transform 180ms cubic-bezier(0.16, 1, 0.3, 1);
+/* Modal Card Smooth Slide & Scale Transitions (Entrance & Exit) */
+.search-modal-enter-active .search-modal-card {
+  transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1), opacity 200ms cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform, opacity;
 }
 
-.search-modal-card-enter-from,
-.search-modal-card-leave-to {
+.search-modal-leave-active .search-modal-card {
+  transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1), opacity 160ms cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform, opacity;
+}
+
+.search-modal-enter-from .search-modal-card {
   opacity: 0;
-  transform: scale(0.96) translateY(-10px);
+  transform: translateY(-16px) scale(0.96);
+}
+
+.search-modal-leave-to .search-modal-card {
+  opacity: 0;
+  transform: translateY(-14px) scale(0.96);
 }
 </style>

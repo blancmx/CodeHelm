@@ -15,8 +15,8 @@
             class="text-xs border px-2.5 py-0.5 rounded-full font-sans font-semibold flex items-center gap-1.5"
             :class="themeStore.isDark ? 'bg-white text-black border-white' : 'bg-black text-white border-black'"
           >
-            <span class="w-1.5 h-1.5 rounded-full pulsing-dot-active" :class="themeStore.isDark ? 'bg-black' : 'bg-white'" />
-            <span>{{ runningProjectGroups.length }} 个运行中项目 · {{ totalActiveServicesCount }} 个服务</span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 pulsing-dot-active" />
+            <span>{{ runningProjectGroups.length }} 个受管理项目 · {{ totalActiveServicesCount }} 条服务状态</span>
           </span>
         </div>
         <p class="text-xs mt-1" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
@@ -53,7 +53,7 @@
           <IconZap :size="28" />
         </div>
         <h3 class="text-base font-bold" :class="themeStore.isDark ? 'text-white' : 'text-zinc-950'">
-          当前无运行中的工程项目
+          {{ runnerStore.stateError ? '当前运行状态读取失败' : !runnerStore.stateLoaded ? '正在读取运行状态' : '当前无受本次应用管理的运行项目' }}
         </h3>
         <p class="text-xs mt-2 leading-relaxed" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
           当您在项目详情页中一键启动服务方案后，这里将按项目分层集中呈现所有正在运行的工程实例、所属服务进程、PID 指纹与快捷访问入口。
@@ -86,7 +86,7 @@
           >
             <!-- Left: Project Info -->
             <div class="flex items-center gap-3 min-w-0">
-              <span class="w-2.5 h-2.5 rounded-full pulsing-dot-active flex-shrink-0" :class="themeStore.isDark ? 'bg-white' : 'bg-black'" />
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 pulsing-dot-active flex-shrink-0" />
               <div>
                 <div class="flex items-center gap-2">
                   <h3
@@ -100,7 +100,7 @@
                     class="text-[10px] font-medium px-2 py-0.2 rounded-full border"
                     :class="themeStore.isDark ? 'bg-[#18181b] text-zinc-400 border-[#27272a]' : 'bg-zinc-100 text-zinc-600 border-zinc-200'"
                   >
-                    {{ proj.services.length }} 个服务运行中
+                    {{ proj.services.length }} 条服务状态
                   </span>
                 </div>
                 <div class="flex items-center gap-2 mt-1 text-xs text-zinc-400 font-mono">
@@ -148,17 +148,21 @@
                 <!-- Service Title & Status Badge -->
                 <div class="flex items-center justify-between mb-2.5">
                   <div class="flex items-center gap-2 min-w-0">
-                    <span class="w-2 h-2 rounded-full pulsing-dot-active flex-shrink-0" :class="themeStore.isDark ? 'bg-white' : 'bg-black'" />
+                    <span class="w-2 h-2 rounded-full pulsing-dot-active flex-shrink-0" :class="svc.status === 'RUNNING' ? 'bg-emerald-400' : (themeStore.isDark ? 'bg-white' : 'bg-black')" />
                     <span class="font-bold text-sm truncate" :class="themeStore.isDark ? 'text-white' : 'text-zinc-950'">
                       {{ svc.name }}
                     </span>
                   </div>
 
                   <span
-                    class="border px-2 py-0.2 rounded-md text-[10px] font-mono font-bold flex-shrink-0"
+                    class="border px-1.5 py-0.2 rounded-md text-[10px] font-mono font-bold inline-flex items-center gap-1 flex-shrink-0 leading-none"
                     :class="themeStore.isDark ? 'bg-white text-black border-white' : 'bg-black text-white border-black'"
                   >
-                    {{ svc.status }}
+                    <span
+                      v-if="svc.status === 'RUNNING'"
+                      class="w-1.5 h-1.5 rounded-full bg-emerald-400 pulsing-dot-active flex-shrink-0 -translate-y-[0.5px]"
+                    />
+                    <span class="leading-none">{{ svc.status }}</span>
                   </span>
                 </div>
 
@@ -172,7 +176,7 @@
                     <span class="font-bold" :class="themeStore.isDark ? 'text-zinc-200' : 'text-zinc-800'">{{ svc.pid }}</span>
                   </div>
                   <div v-if="svc.port" class="flex items-center justify-between text-xs">
-                    <span class="text-zinc-500">监听端口:</span>
+                    <span class="text-zinc-500">运行端口:</span>
                     <span class="font-bold text-emerald-400">:{{ svc.port }}</span>
                   </div>
                 </div>
@@ -232,17 +236,21 @@
           </div>
         </div>
       </div>
+      <RunHistory :project-id="typeof route.query.project === 'string' ? route.query.project : undefined" :focus-requested="route.hash === '#run-history'" />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, watch } from 'vue';
+import { computed, onMounted, onUnmounted, watch } from 'vue';
+import { useRoute } from 'vue-router';
+import RunHistory from '../components/RunHistory.vue';
 import { message, dialog } from '../utils/discrete.js';
 import { useRunnerStore } from '../stores/runnerStore.js';
 import { useProjectStore } from '../stores/projectStore.js';
 import { useThemeStore } from '../stores/themeStore.js';
 import { setPageTitle } from '../utils/title.js';
+import { getServiceEndpoint } from '../utils/service-endpoints.js';
 import {
   IconZap,
   IconSquare,
@@ -252,14 +260,19 @@ import {
 } from '../components/icons/index.js';
 
 const runnerStore = useRunnerStore();
+const route = useRoute();
 const projectStore = useProjectStore();
 const themeStore = useThemeStore();
 
 onMounted(async () => {
+  runnerStore.setupListeners();
+  await runnerStore.fetchState();
   if (projectStore.projects.length === 0) {
     await projectStore.fetchProjects();
   }
 });
+const refreshTimer = setInterval(() => { void runnerStore.fetchState(); }, 4000);
+onUnmounted(() => clearInterval(refreshTimer));
 
 interface RunningServiceItem {
   configId: string;
@@ -270,7 +283,6 @@ interface RunningServiceItem {
   port?: number;
   url?: string;
   browserLabel?: string;
-  isBackend?: boolean;
 }
 
 interface RunningProjectGroup {
@@ -286,14 +298,13 @@ const runningProjectGroups = computed<RunningProjectGroup[]>(() => {
   const groupsMap = new Map<string, RunningProjectGroup>();
 
   runnerStore.serviceStatuses.forEach((val, key) => {
-    if (val.status === 'RUNNING' || val.status === 'STARTING') {
-      const isBackend =
-        (val.serviceName || key).toLowerCase().includes('backend') ||
-        (val.serviceName || key).toLowerCase().includes('fastapi') ||
-        (val.serviceName || key).toLowerCase().includes('api') ||
-        (val.serviceName || key).toLowerCase().includes('server');
-
-      const port = val.port;
+    if (['RUNNING', 'STARTING', 'DEGRADED', 'STOPPING', 'ORPHANED'].includes(val.status)) {
+      const sessionService = runnerStore.activeSessions
+        .find(session => session.id === val.runSessionId)?.services
+        .find(service => service.id === val.sessionServiceId);
+      const endpoint = getServiceEndpoint({
+        id: key, name: val.serviceName || key, type: sessionService?.serviceType,
+      }, val);
       const serviceItem: RunningServiceItem = {
         configId: key,
         sessionServiceId: val.sessionServiceId || key,
@@ -301,9 +312,8 @@ const runningProjectGroups = computed<RunningProjectGroup[]>(() => {
         status: val.status,
         pid: val.pid,
         port: val.port,
-        url: port ? (isBackend ? `http://localhost:${port}/docs` : `http://localhost:${port}`) : undefined,
-        browserLabel: isBackend ? `打开 API 文档 (:${port}/docs)` : `打开前端界面 (:${port})`,
-        isBackend,
+        url: endpoint?.canOpen ? endpoint.url : undefined,
+        browserLabel: endpoint ? `${endpoint.actionLabel} (:${endpoint.port})` : undefined,
       };
 
       // Determine the project for this service strictly by its own projectId
@@ -366,17 +376,12 @@ async function handleStopSingleService(sessionServiceId: string) {
 }
 
 async function handleStopProject(proj: RunningProjectGroup) {
-  if (proj.runSessionId) {
-    try {
-      await runnerStore.stopSession(proj.runSessionId);
-      message.success(`已停止项目 ${proj.projectName} 的所有服务`);
-    } catch (err: any) {
-      message.error(err.message || '停止项目失败');
-    }
-  } else if (runnerStore.currentSession?.id) {
-    await runnerStore.stopSession(runnerStore.currentSession.id);
+  try {
+    const sessions = runnerStore.activeSessions.filter(s => s.projectId === proj.projectId);
+    const results = await Promise.allSettled(sessions.map(s => runnerStore.stopSession(s.id)));
+    if (results.some(result => result.status === 'rejected')) throw new Error('部分会话未确认停止，请刷新查看。');
     message.success(`已停止项目 ${proj.projectName} 的所有服务`);
-  }
+  } catch (err: any) { message.error(err.message || '停止项目失败'); }
 }
 
 function handleStopAll() {
@@ -386,10 +391,9 @@ function handleStopAll() {
     positiveText: '确认停止',
     negativeText: '取消',
     onPositiveClick: async () => {
-      if (runnerStore.currentSession?.id) {
-        await runnerStore.stopSession(runnerStore.currentSession.id);
-        message.success('所有服务已停止');
-      }
+      const results = await Promise.allSettled(runnerStore.activeSessions.map(s => runnerStore.stopSession(s.id)));
+      if (results.some(result => result.status === 'rejected')) message.error('部分会话未确认停止，请查看记录。');
+      else message.success('所有受本次应用管理的服务已停止');
     },
   });
 }
@@ -406,4 +410,3 @@ watch(
   { immediate: true }
 );
 </script>
-

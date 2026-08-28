@@ -289,7 +289,7 @@
                   class="text-xl font-bold mt-2 flex items-center gap-2"
                   :class="isAnyServiceRunning ? (themeStore.isDark ? 'text-white' : 'text-zinc-950') : (themeStore.isDark ? 'text-zinc-400' : 'text-zinc-400')"
                 >
-                  <span v-if="isAnyServiceRunning" class="w-2.5 h-2.5 rounded-full pulsing-dot-active" :class="themeStore.isDark ? 'bg-white' : 'bg-black'" />
+                  <span v-if="isAnyServiceRunning" class="w-2.5 h-2.5 rounded-full bg-emerald-400 pulsing-dot-active" />
                   <span>{{ isAnyServiceRunning ? 'RUNNING' : 'IDLE' }}</span>
                 </div>
                 <div class="text-xs mt-1" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
@@ -332,7 +332,7 @@
                   :class="themeStore.isDark ? 'bg-[#18181b] border-[#27272a]' : 'bg-zinc-50 border-zinc-200'"
                 >
                   <div class="flex items-center gap-2.5 min-w-0">
-                    <span class="w-2 h-2 rounded-full" :class="getServiceStatus(service.id).status === 'RUNNING' ? (themeStore.isDark ? 'bg-white' : 'bg-black') : 'bg-zinc-400'" />
+                    <span class="w-2 h-2 rounded-full" :class="getServiceStatus(service.id).status === 'RUNNING' ? 'bg-emerald-400 pulsing-dot-active' : 'bg-zinc-400'" />
                     <div class="min-w-0">
                       <div class="text-xs font-bold truncate" :class="themeStore.isDark ? 'text-white' : 'text-zinc-950'">{{ service.name }}</div>
                       <div class="text-[11px] font-mono truncate" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">$ {{ service.executable }} {{ service.args.join(' ') }}</div>
@@ -489,7 +489,7 @@
               >
                 <div class="flex items-center justify-between pb-3 mb-3 border-b" :class="themeStore.isDark ? 'border-[#27272a]' : 'border-zinc-100'">
                   <div class="flex items-center gap-2">
-                    <span class="w-2 h-2 rounded-full pulsing-dot-active" :class="themeStore.isDark ? 'bg-white' : 'bg-black'" />
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 pulsing-dot-active" />
                     <h4 class="text-xs font-bold" :class="themeStore.isDark ? 'text-white' : 'text-zinc-950'">
                       项目服务已就绪与可访问端点
                     </h4>
@@ -608,10 +608,14 @@
                           </span>
                           <!-- Status badge -->
                           <span
-                            class="px-2 py-0.2 rounded text-[10px] font-mono font-semibold"
+                            class="px-1.5 py-0.2 rounded text-[10px] font-mono font-semibold inline-flex items-center gap-1 leading-none"
                             :class="statusBadgeClass(getServiceStatus(service.id).status)"
                           >
-                            {{ getServiceStatus(service.id).status }}
+                            <span
+                              v-if="getServiceStatus(service.id).status === 'RUNNING'"
+                              class="w-1.5 h-1.5 rounded-full bg-emerald-400 pulsing-dot-active flex-shrink-0 -translate-y-[0.5px]"
+                            />
+                            <span class="leading-none">{{ getServiceStatus(service.id).status }}</span>
                           </span>
                           <span v-if="getServiceStatus(service.id).pid" class="text-[11px] font-mono" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
                             PID: {{ getServiceStatus(service.id).pid }}
@@ -1097,12 +1101,18 @@
       @save="handleSaveServiceModal"
     />
 
-    <FirstRunConfirmModal
-      v-model:show="confirmModalVisible"
-      :profile="activeProfile"
-      :install-dependencies="pendingLaunchMode === 'install'"
-      @update-port="handleFirstRunPortOverride"
-      @confirm="handleConfirmLaunch"
+    <AnalysisProgressModal
+      v-model:show="analysisModalVisible"
+      :project-name="projectStore.currentProject?.name"
+      :root-path="projectStore.currentProject?.rootPath"
+      :stage="analysisTask?.stage"
+      :scanned-files="analysisTask?.scannedFiles"
+      :percentage="analysisTask?.percentage"
+      :current-file="analysisTask?.currentFile"
+      :busy="isAnalyzing"
+      :can-cancel="canCancelAnalysis"
+      :is-cancelling="analysisTask?.status === 'cancelling'"
+      @cancel="analysis.cancel()"
     />
   </div>
 </template>
@@ -1116,8 +1126,9 @@ import { useProjectStore } from '../stores/projectStore.js';
 import { useRunnerStore } from '../stores/runnerStore.js';
 import { useThemeStore } from '../stores/themeStore.js';
 import { useAnalysisTask } from '../composables/useAnalysisTask.js';
+import { displayIpcError } from '../utils/ipc-error.js';
 import EditServiceModal from '../components/EditServiceModal.vue';
-import FirstRunConfirmModal from '../components/FirstRunConfirmModal.vue';
+import AnalysisProgressModal from '../components/AnalysisProgressModal.vue';
 import ProjectFileTree from '../components/ProjectFileTree.vue';
 import {
   IconArrowLeft,
@@ -1142,7 +1153,6 @@ import type {
   ReadmeSummaryDto,
   RunProfileDto,
   RunnerExecutionMode,
-  SaveRunProfileInput,
   ServiceConfigDto,
 } from '@codehelm/contracts';
 
@@ -1185,8 +1195,7 @@ const analysisPercentage = computed(() => analysisTask.value?.percentage ?? 0);
 
 const editModalVisible = ref(false);
 const selectedServiceToEdit = ref<ServiceConfigDto | null>(null);
-const confirmModalVisible = ref(false);
-const pendingLaunchMode = ref<RunnerExecutionMode>('start');
+const analysisModalVisible = ref(false);
 
 const logSearch = ref('');
 const selectedServiceLogFilter = ref('ALL');
@@ -1502,92 +1511,26 @@ function handleClearLogs() {
 }
 
 async function handleStartAnalysis() {
+  analysisModalVisible.value = true;
   await analysis.start();
 }
 
-function handleLaunchClick(mode: RunnerExecutionMode = 'start') {
-  if (!activeProfile.value || isLaunching.value) return;
-  pendingLaunchMode.value = mode;
-  void launchWithExistingApproval(mode);
-}
-
-function isExecutionConfirmationRequired(error: unknown): boolean {
-  return error instanceof Error
-    && error.message.includes('Execution confirmation required');
-}
-
-async function launchWithExistingApproval(mode: RunnerExecutionMode) {
+async function handleLaunchClick(mode: RunnerExecutionMode = 'start') {
   if (!activeProfile.value?.id || isLaunching.value) return;
-  const profileId = activeProfile.value.id;
   try {
     isLaunching.value = true;
-    let approvalToken: string;
-    try {
-      approvalToken = await runnerStore.reuseExecutionApproval(profileId, mode);
-    } catch {
-      // The main process deliberately rejects stale or unknown approvals.
-      // Re-open the review instead of falling back to an unguarded runner call.
-      confirmModalVisible.value = true;
-      return;
-    }
-
-    message.loading(
-      mode === 'install' ? '正在检查/安装前置依赖并拉起服务方案...' : '正在按 DAG 拓扑并发拉起服务...'
-    );
-    if (mode === 'install') {
-      await runnerStore.installAndStartProfile(profileId, approvalToken);
-    } else {
-      await runnerStore.startProfile(profileId, approvalToken);
-    }
-    // Runtime reconciliation may persist a project-constrained port (for
-    // example a backend CORS origin). Reload so cards and launch links show
-    // the same port as the running process.
+    const saved = await window.codehelm.profiles.save(JSON.parse(JSON.stringify(activeProfile.value)));
+    editingProfile.value = saved;
+    await runnerStore.launchProfile(saved.id, mode, themeStore.isDark ? 'dark' : 'light');
     await loadData();
     message.success(mode === 'install' ? '依赖准备完毕，服务方案已成功启动！' : '服务方案已启动');
   } catch (err: any) {
-    if (isExecutionConfirmationRequired(err)) {
-      confirmModalVisible.value = true;
+    if (err?.message?.includes('Execution confirmation cancelled')) {
+      message.info('已取消启动');
+    } else if (err?.message?.includes('Execution confirmation required')) {
+      message.warning('执行内容已变化，请再次点击启动并核对最新方案。');
     } else {
-      message.error(err.message || (mode === 'install' ? '安装依赖或启动失败' : '启动失败'));
-    }
-  } finally {
-    isLaunching.value = false;
-  }
-}
-
-async function handleConfirmLaunch() {
-  if (!activeProfile.value?.id || isLaunching.value) return;
-  let launchStage = '保存启动配置';
-  const mode = pendingLaunchMode.value;
-  try {
-    isLaunching.value = true;
-    confirmModalVisible.value = false;
-    activeProfile.value.userConfirmedAt ??= new Date().toISOString();
-    // Vue refs/proxies cannot cross Electron's structured-clone IPC boundary.
-    // Detach a stable JSON-shaped snapshot before invoking the preload API.
-    const profilePayload = JSON.parse(
-      JSON.stringify(activeProfile.value)
-    ) as SaveRunProfileInput;
-    const savedProfile = await window.codehelm.profiles.save(profilePayload);
-    editingProfile.value = savedProfile;
-    launchStage = '获取主进程执行授权';
-    const approvalToken = await runnerStore.confirmExecution(savedProfile.id, mode);
-    launchStage = '启动服务';
-    message.loading(
-      mode === 'install' ? '正在检查/安装前置依赖并拉起服务方案...' : '正在按 DAG 拓扑并发拉起服务...'
-    );
-    if (mode === 'install') {
-      await runnerStore.installAndStartProfile(savedProfile.id, approvalToken);
-    } else {
-      await runnerStore.startProfile(savedProfile.id, approvalToken);
-    }
-    await loadData();
-    message.success(mode === 'install' ? '依赖准备完毕，服务方案已成功启动！' : '服务方案已启动');
-  } catch (err: any) {
-    if (isExecutionConfirmationRequired(err)) {
-      confirmModalVisible.value = true;
-    } else {
-      message.error(`${launchStage}失败：${err?.message || '未知错误'}`);
+      message.error(displayIpcError(err, '启动失败'));
     }
   } finally {
     isLaunching.value = false;
@@ -1649,10 +1592,7 @@ function handleServicePortOverride(service: ServiceConfigDto, value: number | nu
   }
 }
 
-function handleFirstRunPortOverride(serviceId: string, value: number | null) {
-  const service = activeProfile.value?.services.find((item) => item.id === serviceId);
-  if (service) handleServicePortOverride(service, value);
-}
+
 
 function handleDeleteService(serviceId: string) {
   if (!editingProfile.value) return;
@@ -1705,7 +1645,7 @@ function failurePolicyLabel(p: string) {
 function statusDotClass(status: ProcessStatus) {
   switch (status) {
     case 'RUNNING':
-      return (themeStore.isDark ? 'bg-white' : 'bg-black') + ' pulsing-dot-active';
+      return 'bg-emerald-400 pulsing-dot-active';
     case 'STARTING':
       return 'bg-zinc-400';
     case 'FAILED':

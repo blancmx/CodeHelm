@@ -37,6 +37,10 @@ export const ServiceSessionDtoSchema = z.object({
   errorMessage: z.string().optional(),
   startedAt: z.string().optional(),
   stoppedAt: z.string().optional(),
+  recovery: z.object({
+    checkedAt: z.string(),
+    outcome: z.enum(['not-running', 'identity-match', 'pid-reused', 'unverified']),
+  }).optional(),
 });
 export type ServiceSessionDto = z.infer<typeof ServiceSessionDtoSchema>;
 
@@ -44,12 +48,20 @@ export const RunSessionDtoSchema = z.object({
   id: z.string().uuid(),
   projectId: z.string().uuid(),
   runProfileId: z.string().uuid(),
-  status: z.enum(['STARTING', 'RUNNING', 'STOPPING', 'STOPPED', 'PARTIAL_FAILED', 'FAILED']),
+  status: z.enum(['STARTING', 'RUNNING', 'STOPPING', 'STOPPED', 'PARTIAL_FAILED', 'FAILED', 'INTERRUPTED']),
   services: z.array(ServiceSessionDtoSchema),
   startedAt: z.string(),
   stoppedAt: z.string().optional(),
 });
 export type RunSessionDto = z.infer<typeof RunSessionDtoSchema>;
+
+export const RunnerStateDtoSchema = z.object({
+  activeSessions: z.array(RunSessionDtoSchema),
+  history: z.array(RunSessionDtoSchema),
+  unresolvedSessions: z.array(RunSessionDtoSchema),
+  persistenceError: z.string().optional(),
+});
+export type RunnerStateDto = z.infer<typeof RunnerStateDtoSchema>;
 
 export const RunnerExecutionModeSchema = z.enum(['start', 'install']);
 export type RunnerExecutionMode = z.infer<typeof RunnerExecutionModeSchema>;
@@ -57,6 +69,7 @@ export type RunnerExecutionMode = z.infer<typeof RunnerExecutionModeSchema>;
 export const RunnerExecutionConfirmationRequestSchema = z.object({
   profileId: z.string().uuid(),
   mode: RunnerExecutionModeSchema,
+  theme: z.enum(['dark', 'light']).optional(),
 });
 export type RunnerExecutionConfirmationRequest = z.infer<
   typeof RunnerExecutionConfirmationRequestSchema

@@ -28,7 +28,7 @@ export async function closeLogStorage(): Promise<void> {
 
 export { stopAllRunnerSessions } from './runner-handlers.js';
 
-export function registerAllIpcHandlers(db: DatabaseInstance) {
+export async function registerAllIpcHandlers(db: DatabaseInstance) {
   analysisTasks = getAnalysisTasks(db);
   projectTasks = getProjectTasks(db, analysisTasks);
   logs = new LogStorage(resolveLogDirectory({
@@ -39,7 +39,7 @@ export function registerAllIpcHandlers(db: DatabaseInstance) {
   registerProjectHandlers(db);
   registerProfileHandlers(db);
   registerAnalysisHandlers(db);
-  registerRunnerHandlers(db, logs);
+  await registerRunnerHandlers(db, logs);
   registerSettingsHandlers(db, logs);
   logs.start();
 }

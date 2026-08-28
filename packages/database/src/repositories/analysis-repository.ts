@@ -121,7 +121,8 @@ export class AnalysisRepository {
   }
 
   findLatestByProjectId(projectId: string): AnalysisSnapshot | null {
-    const stmt = this.db.prepare('SELECT id FROM analysis_snapshots WHERE project_id = ? ORDER BY started_at DESC LIMIT 1');
+    // Match the project summary, including scans saved within the same millisecond.
+    const stmt = this.db.prepare('SELECT id FROM analysis_snapshots WHERE project_id = ? ORDER BY started_at DESC, rowid DESC LIMIT 1');
     const row = stmt.get(projectId) as { id: string } | undefined;
     return row ? this.findById(row.id) : null;
   }

@@ -14,6 +14,8 @@ interface ActiveProcess {
   outputClosed?: Promise<void>;
   onLog: (sessionId: string, stream: 'stdout' | 'stderr', text: string) => void;
   onExit: (sessionId: string, exitCode: number | null, signal: string | null) => void;
+  onPrepared?: (session: ServiceSession) => void;
+  onChange?: (session: ServiceSession) => void;
 }
 
 export class ProcessManager {
@@ -24,7 +26,9 @@ export class ProcessManager {
     projectRoot: string,
     runSessionId: string,
     onLog: (sessionId: string, stream: 'stdout' | 'stderr', text: string) => void,
-    onExit: (sessionId: string, exitCode: number | null, signal: string | null) => void
+    onExit: (sessionId: string, exitCode: number | null, signal: string | null) => void,
+    onPrepared?: (session: ServiceSession) => void,
+    onChange?: (session: ServiceSession) => void,
   ): Promise<ServiceSession> {
     const serviceSessionId = generateId();
     const startTime = Date.now();
@@ -64,7 +68,10 @@ export class ProcessManager {
       projectRoot,
       onLog,
       onExit,
+      onPrepared,
+      onChange,
     };
+    onPrepared?.(session); // A failed durable intent must prevent the spawn.
     this.processes.set(serviceSessionId, active);
 
     try {
@@ -78,6 +85,7 @@ export class ProcessManager {
       active.child = child;
       active.outputClosed = new Promise((resolve) => child.once('close', () => resolve()));
       session.pid = child.pid;
+      onChange?.(session); // Record PID before the potentially slow OS identity lookup.
 
       if (child.pid) {
         const observedStartTime = ProcessVerifier.getProcessStartTime(child.pid);
@@ -90,6 +98,7 @@ export class ProcessManager {
           argsSummary: service.args.join(' '),
         };
         session.fingerprint = fingerprint;
+        onChange?.(session);
       }
 
       // Hook output streams
@@ -133,6 +142,7 @@ export class ProcessManager {
     if (!active) return;
 
     active.session.status = 'STOPPING';
+    active.onChange?.(active.session);
 
     const pid = active.session.pid;
     const child = active.child;
@@ -182,24 +192,34 @@ export class ProcessManager {
       ]);
       clearTimeout(timer);
     }
+    if (pid && child && child.exitCode === null && child.signalCode === null && ProcessVerifier.isPidAlive(pid)) {
+      active.session.status = 'ORPHANED';
+      active.session.errorMessage = '无法确认服务已停止，请人工核验；未将未知进程标记为已停止。';
+      active.onChange?.(active.session);
+      throw new Error(active.session.errorMessage);
+    }
     active.session.status = 'STOPPED';
     active.session.stoppedAt = new Date().toISOString();
+    active.onChange?.(active.session);
     this.processes.delete(serviceSessionId);
   }
 
-  async restartService(serviceSessionId: string): Promise<ServiceSession> {
+  async restartService(serviceSessionId: string, beforeRestart?: () => void): Promise<ServiceSession> {
     const active = this.processes.get(serviceSessionId);
     if (!active) {
       throw new Error(`Active service session not found: ${serviceSessionId}`);
     }
 
     await this.stopService(serviceSessionId);
+    beforeRestart?.();
     return this.startService(
       active.config,
       active.projectRoot,
       active.session.runSessionId,
       active.onLog,
-      active.onExit
+      active.onExit,
+      active.onPrepared,
+      active.onChange,
     );
   }
 
@@ -213,6 +233,11 @@ export class ProcessManager {
 
   getSession(serviceSessionId: string): ServiceSession | undefined {
     return this.processes.get(serviceSessionId)?.session;
+  }
+
+  getServiceConfig(serviceSessionId: string): ServiceConfig | undefined {
+    const config = this.processes.get(serviceSessionId)?.config;
+    return config ? structuredClone(config) : undefined;
   }
 
   getActiveCount(): number {

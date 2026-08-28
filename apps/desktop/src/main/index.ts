@@ -1,10 +1,12 @@
-import { app, BrowserWindow, shell, Menu, ipcMain } from 'electron';
+import { app, BrowserWindow, shell, Menu, ipcMain, dialog } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
-import { createDatabase } from '@codehelm/database';
+import { openProtectedDatabase } from '@codehelm/database';
+import type { Database as DatabaseInstance } from 'better-sqlite3';
 import { IpcChannels } from '@codehelm/contracts';
 import { registerAllIpcHandlers, stopAllRunnerSessions, closeLogStorage, closeAnalysisTasks } from './ipc/index.js';
+import { APP_NAME, WINDOWS_APP_ID, createWindowsAppDetails } from './windows-app-details.js';
 import {
   createTrustedDevRenderer,
   createTrustedFileRenderer,
@@ -27,19 +29,19 @@ const legacyUserDataPath = app.getPath('userData');
 const stableUserDataPath = path.join(app.getPath('appData'), 'CodeHelm');
 const stableSessionDataPath = path.join(stableUserDataPath, 'SessionData');
 fs.mkdirSync(stableSessionDataPath, { recursive: true });
-app.setName('CodeHelm');
+app.setName(APP_NAME);
 app.setPath('userData', stableUserDataPath);
 app.setPath('sessionData', stableSessionDataPath);
 
 // Application state
 let mainWindow: BrowserWindow | null = null;
-let db: any = null;
+let db: DatabaseInstance | null = null;
 let trustedRenderer: TrustedRenderer | null = null;
 let isQuitting = false;
 
 // Set Windows taskbar AppUserModelId for stable icon grouping
 if (process.platform === 'win32') {
-  app.setAppUserModelId('com.codehelm.desktop');
+  app.setAppUserModelId(WINDOWS_APP_ID);
 }
 
 function getAppIconPath(): string {
@@ -124,14 +126,14 @@ async function createWindow() {
   console.log('[Main] VITE_DEV_SERVER_URL:', devServerUrl);
 
   mainWindow = new BrowserWindow({
-    title: 'CodeHelm',
+    title: APP_NAME,
     width: 1280,
     height: 850,
     minWidth: 960,
     minHeight: 600,
     frame: false,
     titleBarStyle: 'hidden',
-    show: true,
+    show: false, // Apply taskbar identity before Windows first displays the button.
     backgroundColor: '#09090b',
     ...(iconPath ? { icon: iconPath } : {}),
     webPreferences: {
@@ -142,6 +144,15 @@ async function createWindow() {
     },
   });
   trustedRenderer = null;
+
+  if (process.platform === 'win32') {
+    mainWindow.setAppDetails(createWindowsAppDetails({
+      executablePath: process.execPath,
+      appPath: app.getAppPath(),
+      isPackaged: app.isPackaged,
+      iconPath,
+    }));
+  }
 
   if (iconPath) {
     mainWindow.setIcon(iconPath);
@@ -234,33 +245,40 @@ async function loadLocalRenderer(window: BrowserWindow): Promise<void> {
   await window.loadFile(targetPath);
 }
 
-function migrateLegacyDatabase(): void {
-  if (path.resolve(legacyUserDataPath) === path.resolve(stableUserDataPath)) return;
-  const legacyDatabase = path.join(legacyUserDataPath, 'codehelm.sqlite');
-  const stableDatabase = path.join(stableUserDataPath, 'codehelm.sqlite');
-  if (!fs.existsSync(legacyDatabase) || fs.existsSync(stableDatabase)) return;
-
-  fs.copyFileSync(legacyDatabase, stableDatabase, fs.constants.COPYFILE_EXCL);
-  console.log('[Main] Migrated legacy database to:', stableDatabase);
-}
-
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   if (!gotTheLock) return;
   console.log('[Main] Electron app is ready.');
 
+  const dbPath = path.join(app.getPath('userData'), 'codehelm.sqlite');
+  const backupDirectory = path.join(app.getPath('userData'), 'backups');
   try {
-    migrateLegacyDatabase();
-    const dbPath = path.join(app.getPath('userData'), 'codehelm.sqlite');
     console.log('[Main] Initializing database at:', dbPath);
-    db = createDatabase(dbPath);
-    registerAllIpcHandlers(db);
+    const opened = await openProtectedDatabase({
+      databasePath: dbPath, backupDirectory,
+      legacyDatabasePath: path.join(legacyUserDataPath, 'codehelm.sqlite'),
+    });
+    db = opened.db;
+    if (isQuitting) { db.close(); db = null; return; }
+    console.log('[Main] Verified startup backup:', opened.backup.manifestPath);
+    if (opened.importedLegacy) console.log('[Main] Imported verified legacy snapshot into:', dbPath);
+    await registerAllIpcHandlers(db);
     registerWindowIpcHandlers();
     console.log('[Main] IPC handlers registered successfully.');
   } catch (dbErr) {
     console.error('[Main] Failed to initialize database or IPC handlers:', dbErr);
+    db?.close();
+    db = null;
+    // Fail closed before opening a renderer; missing IPC must never look like an empty project library.
+    await dialog.showMessageBox({
+      type: 'error', title: 'CodeHelm 数据库保护', message: '无法安全打开项目数据库',
+      detail: `${dbErr instanceof Error ? dbErr.message : '数据库初始化失败。'}\n\n数据库：${dbPath}\n备份目录：${backupDirectory}\n\n请保留上述文件。退出后检查磁盘空间和权限，或联系维护者核验备份；不要删除数据库或覆盖原文件。`,
+      buttons: ['退出应用'], defaultId: 0, cancelId: 0, noLink: true,
+    });
+    app.quit();
+    return;
   }
 
-  createWindow();
+  await createWindow();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

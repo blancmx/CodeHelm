@@ -161,11 +161,11 @@
               <span class="truncate text-xs font-medium transition-transform duration-200 group-hover:translate-x-0.5">运行中心</span>
               <div
                 v-if="runnerStore.runningCount > 0"
-                class="flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[9px] font-mono font-medium flex-shrink-0 ml-1.5"
+                class="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[9px] font-mono font-medium flex-shrink-0 ml-1.5 leading-none"
                 :class="themeStore.isDark ? 'bg-white/15 text-white border border-white/30' : ($route.name === 'runner' ? 'bg-zinc-800 text-white border border-zinc-700' : 'bg-black text-white border border-black')"
               >
-                <span class="w-1.5 h-1.5 rounded-full bg-white pulsing-dot-active" />
-                <span>{{ runnerStore.runningCount }}</span>
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 pulsing-dot-active flex-shrink-0 -translate-y-[0.5px]" />
+                <span class="leading-none">{{ runnerStore.runningCount }}</span>
               </div>
             </div>
 
@@ -238,7 +238,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, onMounted, onUnmounted, watch } from 'vue';
 import { useProjectStore } from '../stores/projectStore.js';
 import { useRunnerStore } from '../stores/runnerStore.js';
 import { useThemeStore } from '../stores/themeStore.js';
@@ -264,6 +264,13 @@ const isRunnerHovered = ref(false);
 const isSearchHovered = ref(false);
 const searchModalVisible = ref(false);
 
+watch(
+  () => projectStore.searchModalVisible,
+  (val) => {
+    searchModalVisible.value = val;
+  }
+);
+
 function handleSidebarBlankClick() {
   if (sidebarStore.isCollapsed) {
     sidebarStore.expandSidebar();
@@ -271,13 +278,20 @@ function handleSidebarBlankClick() {
 }
 
 function handleQuickSearch() {
+  projectStore.openSearchModal();
   searchModalVisible.value = true;
 }
 
 function handleGlobalKeydown(e: KeyboardEvent) {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
     e.preventDefault();
-    searchModalVisible.value = !searchModalVisible.value;
+    if (searchModalVisible.value || projectStore.searchModalVisible) {
+      searchModalVisible.value = false;
+      projectStore.closeSearchModal();
+    } else {
+      searchModalVisible.value = true;
+      projectStore.openSearchModal();
+    }
   }
 }
 

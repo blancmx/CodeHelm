@@ -99,6 +99,7 @@ CREATE TABLE IF NOT EXISTS service_sessions (
   status TEXT NOT NULL,
   pid INTEGER,
   fingerprint_json TEXT,
+  recovery_json TEXT,
   port INTEGER,
   exit_code INTEGER,
   exit_signal TEXT,

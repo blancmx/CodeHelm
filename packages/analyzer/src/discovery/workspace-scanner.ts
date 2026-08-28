@@ -41,6 +41,11 @@ const IGNORED_DIRS = new Set([
   'tmp',
 ]);
 
+const PROJECT_MANIFESTS = [
+  'package.json', 'requirements.txt', 'pyproject.toml', 'Pipfile',
+  'Cargo.toml', 'go.mod', 'pom.xml', 'build.gradle', 'build.gradle.kts',
+];
+
 function isRegularFile(filePath: string): boolean {
   try {
     return fsSync.lstatSync(filePath).isFile();
@@ -314,22 +319,30 @@ export class WorkspaceScanner {
       };
     }
 
-    let pythonFiles: string[] = [];
+    // Descendant source can refine an established Python project, but cannot
+    // establish the enclosing workspace/grouping directory as a project.
+    const hasPythonManifest = hasRequirementsTxt || hasPyproject || hasPipfile;
+    const pythonFiles: string[] = [];
     try {
       const collectPythonFiles = (currentPath: string, relativeBase: string, depth: number) => {
-        if (depth > 2 || pythonFiles.length >= MAX_WORKSPACE_PYTHON_FILES) return;
+        if (depth > (hasPythonManifest ? 2 : 0) || pythonFiles.length >= MAX_WORKSPACE_PYTHON_FILES) return;
         const directory = fsSync.opendirSync(currentPath);
         try {
           let entry: fsSync.Dirent | null;
+          let inspectedEntries = 0;
           while (
             pythonFiles.length < MAX_WORKSPACE_PYTHON_FILES
+            && inspectedEntries < MAX_WORKSPACE_SCAN_ENTRIES_PER_DIRECTORY
             && (entry = directory.readSync()) !== null
           ) {
+            inspectedEntries += 1;
             if (entry.name.startsWith('.') || IGNORED_DIRS.has(entry.name)) continue;
             const relativeEntry = relativeBase ? path.join(relativeBase, entry.name) : entry.name;
             if (entry.isFile() && entry.name.endsWith('.py')) pythonFiles.push(relativeEntry);
             else if (entry.isDirectory()) {
-              collectPythonFiles(path.join(currentPath, entry.name), relativeEntry, depth + 1);
+              const childPath = path.join(currentPath, entry.name);
+              if (PROJECT_MANIFESTS.some((manifest) => isRegularFile(path.join(childPath, manifest)))) continue;
+              collectPythonFiles(childPath, relativeEntry, depth + 1);
             }
           }
         } finally {
@@ -341,7 +354,7 @@ export class WorkspaceScanner {
     const hasAnyPy = pythonFiles.length > 0;
 
     // --- Case 2: Python Vibe / AI / Game / CLI Project ---
-    if (hasRequirementsTxt || hasPyproject || hasPipfile || hasMainPy || hasAnyPy) {
+    if (hasPythonManifest || hasMainPy || hasAnyPy) {
       let framework = 'Python App';
       let port: number | undefined = undefined;
       const tags: string[] = ['Python'];
