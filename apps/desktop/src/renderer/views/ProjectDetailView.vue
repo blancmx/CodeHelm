@@ -439,10 +439,11 @@
                         </span>
                       </div>
                       <span
-                        class="px-2 py-0.5 rounded text-[10px] font-medium font-mono border"
-                        :class="themeStore.isDark ? 'bg-[#18181b] text-zinc-300 border-[#27272a]' : 'bg-zinc-100 text-zinc-800 border-zinc-200'"
+                        class="px-2 py-0.5 rounded-md text-[11px] font-medium border inline-flex items-center gap-1 leading-none select-none font-sans"
+                        :class="themeStore.isDark ? 'bg-[#18181b] text-zinc-300 border-[#27272a]' : 'bg-zinc-100 text-zinc-700 border-zinc-200'"
                       >
-                        {{ Math.round(tech.confidence * 100) }}% 置信度
+                        <span class="font-semibold">{{ Math.round(tech.confidence * 100) }}%</span>
+                        <span class="text-[10px] opacity-75">置信度</span>
                       </span>
                     </div>
 
@@ -494,8 +495,8 @@
                       项目服务已就绪与可访问端点
                     </h4>
                   </div>
-                  <span class="text-[11px] font-mono text-emerald-500 font-semibold flex items-center gap-1">
-                    <span>✓</span>
+                  <span class="text-xs font-sans font-medium text-emerald-600 dark:text-emerald-400 inline-flex items-center gap-1.5 select-none">
+                    <IconCheck :size="13" :stroke-width="2.5" class="text-emerald-500 dark:text-emerald-400 flex-shrink-0 -translate-y-[0.5px]" />
                     <span>全部端口与 HTTP 健康检查已通过</span>
                   </span>
                 </div>
@@ -538,19 +539,6 @@
                   </table>
                 </div>
 
-                <!-- Credential & Notice Tip -->
-                <div
-                  class="mt-3.5 pt-2.5 border-t text-[11px] flex items-center justify-between"
-                  :class="themeStore.isDark ? 'border-[#27272a] text-zinc-400' : 'border-zinc-100 text-zinc-600'"
-                >
-                  <div class="flex items-center gap-2">
-                    <span class="font-bold" :class="themeStore.isDark ? 'text-zinc-300' : 'text-zinc-700'">💡 默认登录凭据：</span>
-                    <span class="font-mono bg-zinc-500/10 px-1.5 py-0.5 rounded">admin / 123456</span>
-                  </div>
-                  <span class="text-[10px]" :class="themeStore.isDark ? 'text-zinc-500' : 'text-zinc-400'">
-                    如果 5173 端口冲突，前端服务将自动顺延使用 5174/5175
-                  </span>
-                </div>
               </div>
 
               <!-- Main Services Card -->
@@ -608,7 +596,7 @@
                           </span>
                           <!-- Status badge -->
                           <span
-                            class="px-1.5 py-0.2 rounded text-[10px] font-mono font-semibold inline-flex items-center gap-1 leading-none"
+                            class="px-2 py-0.5 rounded-md text-[10px] font-sans font-bold tracking-wider uppercase inline-flex items-center gap-1.5 leading-none select-none shadow-2xs"
                             :class="statusBadgeClass(getServiceStatus(service.id).status)"
                           >
                             <span
@@ -851,10 +839,10 @@
                     :class="selectedServiceLogFilter === 'ALL'
                       ? 'bg-white text-black font-semibold shadow-xs'
                       : 'text-zinc-400 hover:text-zinc-200'"
-                    @click="selectedServiceLogFilter === 'ALL'"
+                    @click="selectedServiceLogFilter = 'ALL'"
                   >
                     <span>全部服务</span>
-                    <span class="font-mono text-[10px] opacity-80">({{ runnerStore.logs.length }})</span>
+                    <span class="font-mono text-[10px] opacity-80">({{ currentProjectLogs.length }})</span>
                   </button>
 
                   <button
@@ -1147,6 +1135,7 @@ import {
   IconZap,
   IconSearch,
   IconDownload,
+  IconCheck,
 } from '../components/icons/index.js';
 import type {
   AnalysisSnapshotDto,
@@ -1207,12 +1196,44 @@ const showLineNumbers = ref(true);
 const autoScroll = ref(true);
 const logContainerRef = ref<HTMLDivElement | null>(null);
 
+const currentProjectLogs = computed(() => {
+  const curProjId = props.id || projectStore.currentProject?.id;
+  if (!curProjId) return runnerStore.logs;
+
+  const currentProjectServiceNames = new Set(
+    activeProfile.value?.services?.map((s) => s.name) || []
+  );
+  for (const session of runnerStore.activeSessions) {
+    if (session.projectId === curProjId) {
+      for (const s of session.services) {
+        if (s.serviceName) currentProjectServiceNames.add(s.serviceName);
+      }
+    }
+  }
+  for (const s of runnerStore.serviceStatuses.values()) {
+    if (s.projectId === curProjId && s.serviceName) {
+      currentProjectServiceNames.add(s.serviceName);
+    }
+  }
+
+  return runnerStore.logs.filter((log) => {
+    if (log.serviceSessionId) {
+      for (const s of runnerStore.serviceStatuses.values()) {
+        if (s.sessionServiceId === log.serviceSessionId) {
+          return s.projectId === curProjId;
+        }
+      }
+    }
+    return currentProjectServiceNames.has(log.serviceName);
+  });
+});
+
 const stderrLogsCount = computed(() => {
-  return runnerStore.logs.filter((l) => l.stream === 'stderr').length;
+  return currentProjectLogs.value.filter((l) => l.stream === 'stderr').length;
 });
 
 function getServiceLogCount(serviceName: string) {
-  return runnerStore.logs.filter((l) => l.serviceName === serviceName).length;
+  return currentProjectLogs.value.filter((l) => l.serviceName === serviceName).length;
 }
 
 onMounted(async () => {
@@ -1437,7 +1458,7 @@ function getServiceStatus(serviceId: string) {
 }
 
 const filteredLogs = computed(() => {
-  let list = runnerStore.logs;
+  let list = currentProjectLogs.value;
 
   if (selectedServiceLogFilter.value !== 'ALL') {
     list = list.filter((l) => l.serviceName === selectedServiceLogFilter.value);
@@ -1452,7 +1473,8 @@ const filteredLogs = computed(() => {
     list = list.filter((l) => l.message.toLowerCase().includes(q) || l.serviceName.toLowerCase().includes(q));
   }
 
-  return list;
+  // 最新时间在最上面 (Latest first)
+  return list.slice().reverse();
 });
 
 watch(
@@ -1461,7 +1483,7 @@ watch(
     if (autoScroll.value && logContainerRef.value) {
       nextTick(() => {
         if (logContainerRef.value) {
-          logContainerRef.value.scrollTop = logContainerRef.value.scrollHeight;
+          logContainerRef.value.scrollTop = 0;
         }
       });
     }
@@ -1702,21 +1724,25 @@ function statusBadgeClass(status: ProcessStatus) {
 function serviceStatusLabel(status: ProcessStatus | string) {
   switch (status) {
     case 'RUNNING':
-      return '运行中';
+      return 'RUNNING';
     case 'STARTING':
-      return '启动中';
+      return 'STARTING';
     case 'STOPPING':
-      return '停止中';
+      return 'STOPPING';
     case 'STOPPED':
-      return '已停止';
+      return 'STOPPED';
     case 'FAILED':
-      return '失败';
+      return 'FAILED';
     case 'DEGRADED':
-      return '异常';
+      return 'DEGRADED';
     case 'IDLE':
-      return '空闲';
+      return 'IDLE';
+    case 'VERIFYING':
+      return 'VERIFYING';
+    case 'ORPHANED':
+      return 'ORPHANED';
     default:
-      return status;
+      return String(status).toUpperCase();
   }
 }
 </script>

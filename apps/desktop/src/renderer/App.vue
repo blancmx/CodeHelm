@@ -363,6 +363,19 @@ const currentThemeOverrides = computed(() => {
   z-index: 10000;
 }
 
+/* Ensure toast messages and notifications stay clear below the custom window header (32px) */
+.n-message-container.n-message-container--top,
+.n-message-container {
+  top: 48px !important;
+  z-index: 20000 !important;
+}
+
+.n-notification-container.n-notification-container--top-right,
+.n-notification-container {
+  top: 48px !important;
+  z-index: 20000 !important;
+}
+
 /* Commit the palette atomically; the small feedback ring animates separately. */
 html.theme-changing,
 html.theme-changing *,

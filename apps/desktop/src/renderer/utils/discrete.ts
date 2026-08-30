@@ -76,5 +76,19 @@ export const { message, dialog, notification, loadingBar } = createDiscreteApi(
       theme: darkTheme,
       themeOverrides: monochromeThemeOverrides,
     },
+    messageProviderProps: {
+      placement: 'top',
+      keepAliveOnHover: true,
+      containerStyle: {
+        top: '48px',
+      },
+    },
+    notificationProviderProps: {
+      placement: 'top-right',
+      keepAliveOnHover: true,
+      containerStyle: {
+        top: '48px',
+      },
+    },
   }
 );

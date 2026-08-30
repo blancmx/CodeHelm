@@ -22,7 +22,9 @@ asarUnpack:
   - "**/*.node"
 
 win:
-  icon: resources/icon.ico
+  # `buildResources` already points at `resources`; keep this relative to that directory
+  # so electron-builder embeds the branded icon into CodeHelm.exe instead of Electron's default.
+  icon: icon.ico
   target:
     - target: dir
       arch:

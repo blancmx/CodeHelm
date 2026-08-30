@@ -463,7 +463,7 @@
 
               <!-- Status Badge -->
               <span
-                class="px-1.5 py-0.5 rounded-full text-[10px] font-mono font-medium inline-flex items-center gap-1 flex-shrink-0 border leading-none"
+                class="px-1.5 py-0.5 rounded-full text-[10px] font-sans font-medium inline-flex items-center gap-1 flex-shrink-0 border leading-none"
                 :class="statusBadgeClass(project.runtime.status)"
                 :title="runtimeStatusTitle(project)"
               >

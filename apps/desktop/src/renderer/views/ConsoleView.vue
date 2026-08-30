@@ -552,11 +552,11 @@ const stderrLogsCount = computed(() => {
 });
 
 const filteredStderrCount = computed(() => {
-  return filteredLogs.value.filter((l) => l.stream === 'stderr').length;
+  return filteredLogs.value.filter((l: LogEntryDto) => l.stream === 'stderr').length;
 });
 
-const filteredLogs = computed(() => {
-  return runnerStore.logs.filter((log) => {
+const filteredLogs = computed((): LogEntryDto[] => {
+  const result = runnerStore.logs.filter((log: LogEntryDto) => {
     // Project filter
     if (selectedProjectFilter.value !== 'ALL') {
       const pId = getEntryProjectId(log);
@@ -583,16 +583,19 @@ const filteredLogs = computed(() => {
 
     return true;
   });
+
+  // 最新时间在最上面 (Latest first)
+  return result.slice().reverse();
 });
 
-// Auto-scroll watcher
+// Auto-scroll watcher (keep at top for latest logs)
 watch(
   () => filteredLogs.value.length,
   () => {
     if (autoScroll.value) {
       nextTick(() => {
         if (logContainerRef.value) {
-          logContainerRef.value.scrollTop = logContainerRef.value.scrollHeight;
+          logContainerRef.value.scrollTop = 0;
         }
       });
     }
@@ -610,7 +613,7 @@ function copyAllLogs() {
     return;
   }
   const text = filteredLogs.value
-    .map((e) => {
+    .map((e: LogEntryDto) => {
       const ts = e.timestamp ? `[${new Date(e.timestamp).toLocaleTimeString()}] ` : '';
       const stream = e.stream === 'stderr' ? '[ERR] ' : '';
       return `${ts}[${e.serviceName}] ${stream}${e.message}`;
@@ -626,7 +629,7 @@ function exportLogsToFile() {
     return;
   }
   const text = filteredLogs.value
-    .map((e) => {
+    .map((e: LogEntryDto) => {
       const ts = e.timestamp ? `[${new Date(e.timestamp).toISOString()}] ` : '';
       const stream = e.stream === 'stderr' ? '[ERR] ' : '[OUT] ';
       return `${ts}[${e.serviceName}] ${stream}${e.message}`;
@@ -669,7 +672,7 @@ onMounted(async () => {
     projectStore.fetchProjects(),
   ]);
   if (autoScroll.value && logContainerRef.value) {
-    logContainerRef.value.scrollTop = logContainerRef.value.scrollHeight;
+    logContainerRef.value.scrollTop = 0;
   }
 });
 </script>
