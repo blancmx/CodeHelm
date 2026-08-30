@@ -47,7 +47,6 @@ const sessions = computed(() => runner.displayHistory.filter(session => !props.p
 watch(() => [props.projectId, props.focusRequested, runner.stateLoaded], async () => {
   if (!props.focusRequested || !runner.stateLoaded) return;
   await nextTick();
-  section.value?.scrollIntoView({ block: 'start' });
   section.value?.focus({ preventScroll: true });
 }, { immediate: true });
 const statusLabels: Record<string, string> = { STOPPED: '已结束', FAILED: '失败', INTERRUPTED: '中断 · 已核验', PARTIAL_FAILED: '部分失败' };

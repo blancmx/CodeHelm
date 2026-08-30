@@ -150,12 +150,12 @@
         <!-- Dynamic Ecosystem Filter Tabs with Silky Magnetic Sliding Pill -->
         <div
           ref="tabContainerRef"
-          class="relative flex items-center p-0.5 rounded-xl border flex-shrink-0 select-none overflow-hidden"
+          class="relative flex items-center p-1 rounded-full border flex-shrink-0 select-none overflow-hidden"
           :class="themeStore.isDark ? 'bg-[#121216] border-[#27272a]' : 'bg-zinc-100/90 border-zinc-200'"
         >
           <!-- Sliding Active Pill Indicator -->
           <div
-            class="absolute rounded-[9px] transition-all duration-280 ease-[cubic-bezier(0.16,1,0.3,1)] shadow-xs pointer-events-none z-0"
+            class="absolute top-0 left-0 rounded-full transition-all duration-280 ease-[cubic-bezier(0.16,1,0.3,1)] shadow-xs pointer-events-none z-0"
             :style="indicatorStyle"
             :class="themeStore.isDark ? 'bg-white shadow-sm' : 'bg-black shadow-sm'"
           />
@@ -165,7 +165,7 @@
             :key="filter.value"
             :ref="(el) => setTabRef(filter.value, el)"
             type="button"
-            class="h-7 px-3 rounded-[9px] text-xs font-medium transition-colors duration-200 cursor-pointer flex items-center justify-center flex-shrink-0 select-none relative z-10 border border-transparent"
+            class="h-7.5 px-3.5 rounded-full text-xs font-medium transition-colors duration-200 cursor-pointer flex items-center justify-center flex-shrink-0 select-none relative z-10 border border-transparent"
             :class="activeFilter === filter.value
               ? (themeStore.isDark ? '!text-black font-bold' : '!text-white font-bold')
               : (themeStore.isDark ? 'text-zinc-400 hover:text-zinc-100' : 'text-zinc-600 hover:text-zinc-950')"
@@ -190,7 +190,7 @@
         <!-- Independent Running Status Filter Toggle Pill with smooth transition -->
         <button
           type="button"
-          class="h-8 px-3 rounded-xl text-xs font-medium transition-all duration-200 cursor-pointer flex items-center gap-1.5 flex-shrink-0 select-none border"
+          class="h-8 px-3.5 rounded-full text-xs font-medium transition-all duration-200 cursor-pointer flex items-center gap-1.5 flex-shrink-0 select-none border"
           :class="[
             onlyRunning
               ? (themeStore.isDark
@@ -204,7 +204,7 @@
           @click="onlyRunning = !onlyRunning"
         >
           <span
-            class="w-1.5 h-1.5 rounded-full flex-shrink-0 transition-colors"
+            class="w-1.5 h-1.5 rounded-full flex-shrink-0 transition-colors -translate-y-[0.5px]"
             :class="runningProjectsCount > 0 ? (onlyRunning ? 'bg-emerald-400 pulsing-dot-active' : 'bg-emerald-400') : 'bg-zinc-400'"
           />
           <span>运行中 / 启动中</span>
@@ -318,7 +318,7 @@
     </section>
 
     <!-- Main Content Area with Crisp Ghost-Free Transition -->
-    <div class="flex-1 overflow-y-auto pt-2 flex flex-col [scrollbar-gutter:stable]">
+    <div ref="projectListRef" class="flex-1 min-h-0 overflow-y-auto pt-2 flex flex-col [scrollbar-gutter:stable]">
       <transition name="tab-crossfade" mode="out-in">
         <div
           v-if="!projectStore.hasLoadedProjects"
@@ -425,7 +425,7 @@
         class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-6"
       >
         <div
-          v-for="project in sortedProjects"
+          v-for="project in pagedProjects"
           :key="project.id"
           class="border rounded-xl p-5 transition-all duration-150 cursor-pointer flex flex-col justify-between group"
           :class="themeStore.isDark
@@ -563,7 +563,7 @@
             :class="themeStore.isDark ? 'divide-[#1f1f23]' : 'divide-zinc-100'"
           >
             <tr
-              v-for="project in sortedProjects"
+              v-for="project in pagedProjects"
               :key="project.id"
               class="transition-colors cursor-pointer"
               :class="themeStore.isDark ? 'hover:bg-[#18181c]' : 'hover:bg-zinc-50'"
@@ -658,6 +658,16 @@
       </div>
     </transition>
   </div>
+  <nav v-if="projectStore.hasLoadedProjects && pageBounds.pageCount > 1" aria-label="项目分页"
+    class="flex items-center justify-between gap-3 pt-3 flex-shrink-0 text-xs"
+    :class="themeStore.isDark ? 'text-zinc-300' : 'text-zinc-700'">
+    <span role="status">第 {{ pageBounds.start + 1 }}–{{ pageBounds.end }} 项，共 {{ sortedProjects.length }} 项</span>
+    <div class="flex items-center gap-3">
+      <n-button size="small" :disabled="pageBounds.page === 1" @click="currentPage--">上一页</n-button>
+      <span class="font-mono">{{ pageBounds.page }} / {{ pageBounds.pageCount }}</span>
+      <n-button size="small" :disabled="pageBounds.page === pageBounds.pageCount" @click="currentPage++">下一页</n-button>
+    </div>
+  </nav>
 </div>
 </template>
 
@@ -683,6 +693,7 @@ import {
   IconChevronDown,
 } from '../components/icons/index.js';
 import type { ProjectSummaryDto } from '@codehelm/contracts';
+import { getPageBounds } from '../utils/pagination.js';
 
 const projectStore = useProjectStore();
 const runnerStore = useRunnerStore();
@@ -749,10 +760,11 @@ function setTabRef(key: string, el: any) {
   }
 }
 
-const indicatorStyle = ref<{ transform: string; width: string; height: string; opacity: number }>({
+const indicatorStyle = ref<{ transform: string; width: string; height: string; top: string; opacity: number }>({
   transform: 'translateX(0px)',
   width: '0px',
-  height: '28px',
+  height: '0px',
+  top: '0px',
   opacity: 0,
 });
 
@@ -764,23 +776,23 @@ function updateIndicator() {
       indicatorStyle.value = {
         transform: 'translateX(0px)',
         width: '0px',
-        height: '28px',
+        height: '0px',
+        top: '0px',
         opacity: 0,
       };
       return;
     }
 
-    const containerRect = container.getBoundingClientRect();
-    const activeRect = activeEl.getBoundingClientRect();
-
-    const left = activeRect.left - containerRect.left;
-    const width = activeRect.width;
-    const height = activeRect.height;
+    const left = activeEl.offsetLeft;
+    const top = activeEl.offsetTop;
+    const width = activeEl.offsetWidth;
+    const height = activeEl.offsetHeight;
 
     indicatorStyle.value = {
       transform: `translateX(${left}px)`,
       width: `${width}px`,
       height: `${height}px`,
+      top: `${top}px`,
       opacity: 1,
     };
   });
@@ -1026,6 +1038,20 @@ const sortedProjects = computed(() => {
       || statusWeight(a.runtime.status) - statusWeight(b.runtime.status));
   }
   return list;
+});
+
+const projectListRef = ref<HTMLElement | null>(null);
+const currentPage = ref(1);
+const pageBounds = computed(() => getPageBounds(sortedProjects.value.length, currentPage.value, 24));
+const pagedProjects = computed(() => sortedProjects.value.slice(pageBounds.value.start, pageBounds.value.end));
+
+watch([activeFilter, onlyRunning, searchQuery, sortBy], () => {
+  currentPage.value = 1;
+  nextTick(() => { if (projectListRef.value) projectListRef.value.scrollTop = 0; });
+});
+watch(() => pageBounds.value.page, (page) => {
+  currentPage.value = page;
+  nextTick(() => { if (projectListRef.value) projectListRef.value.scrollTop = 0; });
 });
 
 function navigateToProject(id: string) {

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { AnalysisTaskDto, CodeHelmApi } from '@codehelm/contracts';
 import { useAnalysisTask } from '../useAnalysisTask.js';
+import { getAnalysisPresentation } from '../../utils/analysis-presentation.js';
 
 function fixture() {
   let listener: (state: AnalysisTaskDto) => void = () => {};
@@ -25,6 +26,16 @@ function fixture() {
 }
 
 describe('analysis renderer lifecycle', () => {
+  it.each([
+    ['completed', '分析完成', 'success'],
+    ['cancelled', '已取消', 'warning'],
+    ['failed', '分析失败', 'error'],
+    ['cancelling', '正在停止', 'warning'],
+    ['saving', '正在保存', 'default'],
+    ['running', '扫描分析中', 'default'],
+  ] as const)('presents %s without inferring success merely from not busy', (status, label, tone) => {
+    expect(getAnalysisPresentation(status)).toEqual({ label, tone });
+  });
   it('stays busy after start returns, filters other projects, and reloads only on terminal success', async () => {
     const f = fixture();
     await f.model.start();

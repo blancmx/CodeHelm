@@ -335,6 +335,9 @@ function handleClearLogs() {
     content: '仅删除 CodeHelm 日志目录中的服务历史日志，不删除项目文件。此操作不可逆；运行中的服务仍会继续产生新日志。',
     positiveText: '确认清空',
     negativeText: '取消',
+    positiveButtonProps: {
+      type: 'error',
+    },
     onPositiveClick: async () => {
       if (clearing.value) return false;
       clearing.value = true;

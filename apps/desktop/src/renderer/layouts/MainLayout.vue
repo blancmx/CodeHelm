@@ -81,12 +81,12 @@
           <!-- Overview Tab -->
           <router-link
             to="/"
-            class="h-9 w-full rounded-lg flex items-center transition-all duration-150 group relative"
+            class="h-9 w-full rounded-lg flex items-center group relative select-none transition-colors duration-150"
             :class="[
               sidebarStore.isCollapsed ? 'overflow-visible' : 'overflow-hidden',
               $route.name === 'overview'
-                ? (themeStore.isDark ? 'bg-white/10 text-white border border-white/20 shadow-xs font-semibold' : 'bg-black text-white border border-black font-semibold shadow-xs')
-                : (themeStore.isDark ? 'text-zinc-400 hover:bg-[#18181b] hover:text-zinc-100 border border-transparent' : 'text-zinc-600 hover:bg-zinc-200/70 hover:text-zinc-950 border border-transparent')
+                ? (themeStore.isDark ? 'bg-white/10 text-white font-semibold' : 'bg-black text-white font-semibold shadow-xs')
+                : (themeStore.isDark ? 'text-zinc-400 hover:bg-[#18181b] hover:text-zinc-100' : 'text-zinc-600 hover:bg-zinc-200/70 hover:text-zinc-950')
             ]"
             :title="sidebarStore.isCollapsed ? `项目总览 (${projectStore.projects.length})` : ''"
             @mouseenter="isOverviewHovered = true"
@@ -103,10 +103,10 @@
 
             <!-- Expanded Mode Text & Badge (Smooth clipping to the right of fixed icon) -->
             <div
-              class="flex items-center justify-between min-w-0 flex-1 overflow-hidden transition-all duration-300 ease-in-out whitespace-nowrap pr-2"
+              class="flex items-center justify-between min-w-0 flex-1 overflow-hidden whitespace-nowrap pr-2"
               :class="sidebarStore.isCollapsed ? 'max-w-0 opacity-0 -translate-x-2 pointer-events-none' : 'max-w-[145px] opacity-100 translate-x-0'"
             >
-              <span class="truncate text-xs font-medium transition-transform duration-200 group-hover:translate-x-0.5">项目总览</span>
+              <span class="truncate text-xs font-medium transition-transform duration-150 group-hover:translate-x-0.5">项目总览</span>
               <span
                 v-if="projectStore.projects.length"
                 class="text-[9px] px-1.5 py-0.2 rounded font-mono font-medium flex-shrink-0 ml-1.5"
@@ -119,7 +119,7 @@
             <!-- Collapsed Float Badge: Positioned at outside square top-right corner, 100% round and unclipped -->
             <span
               v-if="projectStore.projects.length"
-              class="absolute -top-1 -right-1 min-w-[16px] h-[16px] px-1 rounded-full text-[9px] font-mono font-bold flex items-center justify-center border shadow-xs transition-all duration-200 z-20 select-none leading-none"
+              class="absolute -top-1 -right-1 min-w-[16px] h-[16px] px-1 rounded-full text-[9px] font-mono font-bold flex items-center justify-center border shadow-xs z-20 select-none leading-none"
               :class="[
                 sidebarStore.isCollapsed ? 'opacity-100 scale-100' : 'opacity-0 scale-50 pointer-events-none',
                 themeStore.isDark ? 'bg-[#27272a] text-white border-[#3f3f46]' : 'bg-zinc-200 text-zinc-900 border-zinc-300'
@@ -132,12 +132,12 @@
           <!-- Runner Center Tab -->
           <router-link
             to="/runner"
-            class="h-9 w-full rounded-lg flex items-center transition-all duration-150 group relative"
+            class="h-9 w-full rounded-lg flex items-center group relative select-none transition-colors duration-150"
             :class="[
               sidebarStore.isCollapsed ? 'overflow-visible' : 'overflow-hidden',
               $route.name === 'runner'
-                ? (themeStore.isDark ? 'bg-white/10 text-white border border-white/20 shadow-xs font-semibold' : 'bg-black text-white border border-black font-semibold shadow-xs')
-                : (themeStore.isDark ? 'text-zinc-400 hover:bg-[#18181b] hover:text-zinc-100 border border-transparent' : 'text-zinc-600 hover:bg-zinc-200/70 hover:text-zinc-950 border border-transparent')
+                ? (themeStore.isDark ? 'bg-white/10 text-white font-semibold' : 'bg-black text-white font-semibold shadow-xs')
+                : (themeStore.isDark ? 'text-zinc-400 hover:bg-[#18181b] hover:text-zinc-100' : 'text-zinc-600 hover:bg-zinc-200/70 hover:text-zinc-950')
             ]"
             :title="sidebarStore.isCollapsed ? `运行中心 (${runnerStore.runningCount > 0 ? runnerStore.runningCount + ' 个活跃进程' : '空闲'})` : ''"
             @mouseenter="isRunnerHovered = true"
@@ -155,10 +155,10 @@
 
             <!-- Expanded Mode Text & Active Badge -->
             <div
-              class="flex items-center justify-between min-w-0 flex-1 overflow-hidden transition-all duration-300 ease-in-out whitespace-nowrap pr-2"
+              class="flex items-center justify-between min-w-0 flex-1 overflow-hidden whitespace-nowrap pr-2"
               :class="sidebarStore.isCollapsed ? 'max-w-0 opacity-0 -translate-x-2 pointer-events-none' : 'max-w-[145px] opacity-100 translate-x-0'"
             >
-              <span class="truncate text-xs font-medium transition-transform duration-200 group-hover:translate-x-0.5">运行中心</span>
+              <span class="truncate text-xs font-medium transition-transform duration-150 group-hover:translate-x-0.5">运行中心</span>
               <div
                 v-if="runnerStore.runningCount > 0"
                 class="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[9px] font-mono font-medium flex-shrink-0 ml-1.5 leading-none"
@@ -172,7 +172,7 @@
             <!-- Collapsed Float Badge: Positioned at outside square top-right corner, 100% round and unclipped -->
             <span
               v-if="runnerStore.runningCount > 0"
-              class="absolute -top-1 -right-1 min-w-[16px] h-[16px] px-1 rounded-full text-[9px] font-mono font-bold flex items-center justify-center border shadow-xs transition-all duration-200 z-20 select-none leading-none"
+              class="absolute -top-1 -right-1 min-w-[16px] h-[16px] px-1 rounded-full text-[9px] font-mono font-bold flex items-center justify-center border shadow-xs z-20 select-none leading-none"
               :class="[
                 sidebarStore.isCollapsed ? 'opacity-100 scale-100' : 'opacity-0 scale-50 pointer-events-none',
                 themeStore.isDark ? 'bg-white text-black border-zinc-200' : 'bg-black text-white border-zinc-800'
@@ -181,22 +181,78 @@
               {{ runnerStore.runningCount }}
             </span>
           </router-link>
+
+          <!-- Live Console Tab -->
+          <router-link
+            to="/console"
+            class="h-9 w-full rounded-lg flex items-center group relative select-none transition-colors duration-150"
+            :class="[
+              sidebarStore.isCollapsed ? 'overflow-visible' : 'overflow-hidden',
+              $route.name === 'console'
+                ? (themeStore.isDark ? 'bg-white/10 text-white font-semibold' : 'bg-black text-white font-semibold shadow-xs')
+                : (themeStore.isDark ? 'text-zinc-400 hover:bg-[#18181b] hover:text-zinc-100' : 'text-zinc-600 hover:bg-zinc-200/70 hover:text-zinc-950')
+            ]"
+            :title="sidebarStore.isCollapsed ? `实时控制台 (${runnerStore.logs.length} 条日志)` : ''"
+            @mouseenter="isConsoleHovered = true"
+            @mouseleave="isConsoleHovered = false"
+          >
+            <!-- Fixed Icon Box -->
+            <div class="w-10 h-9 flex items-center justify-center flex-shrink-0 relative">
+              <IconTerminalAnimated
+                :size="16"
+                :hovered="isConsoleHovered"
+                :active="$route.name === 'console'"
+              />
+            </div>
+
+            <!-- Expanded Mode Text & Active Badge -->
+            <div
+              class="flex items-center justify-between min-w-0 flex-1 overflow-hidden whitespace-nowrap pr-2"
+              :class="sidebarStore.isCollapsed ? 'max-w-0 opacity-0 -translate-x-2 pointer-events-none' : 'max-w-[145px] opacity-100 translate-x-0'"
+            >
+              <span class="truncate text-xs font-medium transition-transform duration-150 group-hover:translate-x-0.5">实时控制台</span>
+              <div
+                v-if="runnerStore.logs.length > 0"
+                class="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[9px] font-mono font-medium flex-shrink-0 ml-1.5 leading-none"
+                :class="stderrLogsCount > 0
+                  ? (themeStore.isDark ? 'bg-rose-950/70 text-rose-300 border border-rose-700/60' : 'bg-rose-100 text-rose-800 border border-rose-300')
+                  : (themeStore.isDark ? 'bg-[#27272a] text-zinc-300' : ($route.name === 'console' ? 'bg-zinc-800 text-zinc-200' : 'bg-zinc-200 text-zinc-700'))"
+              >
+                <span v-if="stderrLogsCount > 0" class="w-1.5 h-1.5 rounded-full bg-rose-400 flex-shrink-0 -translate-y-[0.5px]" />
+                <span class="leading-none">{{ stderrLogsCount > 0 ? stderrLogsCount + ' 错' : runnerStore.logs.length }}</span>
+              </div>
+            </div>
+
+            <!-- Collapsed Float Badge: Positioned at outside square top-right corner, 100% round and unclipped -->
+            <span
+              v-if="stderrLogsCount > 0 || (runnerStore.runningCount > 0 && runnerStore.logs.length > 0)"
+              class="absolute -top-1 -right-1 min-w-[16px] h-[16px] px-1 rounded-full text-[9px] font-mono font-bold flex items-center justify-center border shadow-xs z-20 select-none leading-none"
+              :class="[
+                sidebarStore.isCollapsed ? 'opacity-100 scale-100' : 'opacity-0 scale-50 pointer-events-none',
+                stderrLogsCount > 0
+                  ? (themeStore.isDark ? 'bg-rose-950 text-rose-300 border-rose-700' : 'bg-rose-100 text-rose-800 border-rose-300')
+                  : (themeStore.isDark ? 'bg-[#27272a] text-white border-[#3f3f46]' : 'bg-zinc-200 text-zinc-900 border-zinc-300')
+              ]"
+            >
+              {{ stderrLogsCount > 0 ? stderrLogsCount : runnerStore.logs.length }}
+            </span>
+          </router-link>
         </nav>
       </div>
 
       <!-- Bottom Settings -->
       <div
-        class="border-t p-2 transition-all duration-300 ease-in-out overflow-hidden flex-shrink-0"
+        class="border-t p-2 overflow-hidden flex-shrink-0"
         :class="themeStore.isDark ? 'border-[#27272a]' : 'border-[#e4e4e7]'"
         @click.stop
       >
         <router-link
           to="/settings"
-          class="h-9 w-full rounded-lg flex items-center overflow-hidden transition-all duration-150 group relative"
+          class="h-9 w-full rounded-lg flex items-center overflow-hidden group relative select-none transition-colors duration-150"
           :class="[
             $route.name === 'settings'
-              ? (themeStore.isDark ? 'bg-white/10 text-white border border-white/20 shadow-xs font-semibold' : 'bg-black text-white border border-black font-semibold shadow-xs')
-              : (themeStore.isDark ? 'text-zinc-400 hover:bg-[#18181b] hover:text-zinc-100 border border-transparent' : 'text-zinc-600 hover:bg-zinc-200/70 hover:text-zinc-950 border border-transparent')
+              ? (themeStore.isDark ? 'bg-white/10 text-white font-semibold' : 'bg-black text-white font-semibold shadow-xs')
+              : (themeStore.isDark ? 'text-zinc-400 hover:bg-[#18181b] hover:text-zinc-100' : 'text-zinc-600 hover:bg-zinc-200/70 hover:text-zinc-950')
           ]"
           :title="sidebarStore.isCollapsed ? '系统设置' : ''"
         >
@@ -204,16 +260,16 @@
           <div class="w-10 h-9 flex items-center justify-center flex-shrink-0 relative">
             <IconSettings
               :size="16"
-              class="transition-transform duration-500 ease-in-out"
-              :class="$route.name === 'settings' ? 'rotate-90 scale-105' : 'group-hover:rotate-180 group-hover:scale-110'"
+              class="transition-transform duration-400 ease-in-out"
+              :class="$route.name === 'settings' ? 'rotate-90 group-hover:rotate-[270deg]' : 'group-hover:rotate-180'"
             />
           </div>
 
           <div
-            class="flex items-center justify-between min-w-0 flex-1 overflow-hidden transition-all duration-300 ease-in-out whitespace-nowrap pr-2"
+            class="flex items-center justify-between min-w-0 flex-1 overflow-hidden whitespace-nowrap pr-2"
             :class="sidebarStore.isCollapsed ? 'max-w-0 opacity-0 -translate-x-2 pointer-events-none' : 'max-w-[145px] opacity-100 translate-x-0'"
           >
-            <span class="truncate text-xs font-medium transition-transform duration-200 group-hover:translate-x-0.5">系统设置</span>
+            <span class="truncate text-xs font-medium transition-transform duration-150 group-hover:translate-x-0.5">系统设置</span>
           </div>
         </router-link>
       </div>
@@ -238,7 +294,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useProjectStore } from '../stores/projectStore.js';
 import { useRunnerStore } from '../stores/runnerStore.js';
 import { useThemeStore } from '../stores/themeStore.js';
@@ -248,6 +304,7 @@ import QuickSearchModal from '../components/QuickSearchModal.vue';
 import {
   IconProjectGrid,
   IconRunnerZap,
+  IconTerminalAnimated,
   IconSettings,
   IconCodeHelmLogo,
   IconSearchAnimated,
@@ -261,8 +318,13 @@ const sidebarStore = useSidebarStore();
 // Hover states for icon animations
 const isOverviewHovered = ref(false);
 const isRunnerHovered = ref(false);
+const isConsoleHovered = ref(false);
 const isSearchHovered = ref(false);
 const searchModalVisible = ref(false);
+
+const stderrLogsCount = computed(() => {
+  return runnerStore.logs.filter((l) => l.stream === 'stderr').length;
+});
 
 watch(
   () => projectStore.searchModalVisible,

@@ -42,15 +42,20 @@
             </div>
 
             <!-- Search Results List -->
-            <div
+            <NVirtualList
+              v-if="filteredProjects.length"
               ref="listRef"
-              class="max-h-[380px] overflow-y-auto p-2 space-y-1.5 focus:outline-none"
+              :items="filteredProjects"
+              :item-size="64"
+              key-field="id"
+              :style="{ height: Math.min(380, filteredProjects.length * 64 + 16) + 'px' }"
+              :padding-top="8"
+              :padding-bottom="8"
+              :items-style="{ padding: '0 8px' }"
             >
-              <!-- Project Item -->
+              <template #default="{ item: project, index }">
               <div
-                v-for="(project, index) in filteredProjects"
-                :key="project.id"
-                class="p-2.5 rounded-xl flex items-center justify-between gap-3 cursor-pointer transition-all duration-100 border"
+                class="h-[58px] mb-1.5 p-2.5 rounded-xl flex items-center justify-between gap-3 cursor-pointer transition-colors duration-100 border"
                 :class="[
                   selectedIndex === index
                     ? (themeStore.isDark ? 'bg-[#1c1c22] border-white/20 shadow-xs' : 'bg-zinc-100 border-zinc-300 shadow-2xs')
@@ -106,10 +111,12 @@
                   </div>
                 </div>
               </div>
+              </template>
+            </NVirtualList>
 
               <!-- Empty State -->
               <div
-                v-if="filteredProjects.length === 0"
+                v-else
                 class="py-12 text-center select-none"
               >
                 <IconSearch :size="32" class="mx-auto text-zinc-400/60 mb-2.5" />
@@ -120,7 +127,6 @@
                   可尝试搜索其他名称、本地路径或语言画像关键词
                 </p>
               </div>
-            </div>
 
             <!-- Bottom Status Footer (Clean, No Shortcut Displays) -->
             <div
@@ -139,6 +145,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue';
+import { NVirtualList, type VirtualListInst } from 'naive-ui';
 import { useRouter } from 'vue-router';
 import { useProjectStore } from '../stores/projectStore.js';
 import { useThemeStore } from '../stores/themeStore.js';
@@ -171,7 +178,7 @@ const isVisible = computed(() => {
 const query = ref('');
 const selectedIndex = ref(0);
 const inputRef = ref<HTMLInputElement | null>(null);
-const listRef = ref<HTMLElement | null>(null);
+const listRef = ref<VirtualListInst | null>(null);
 
 const filteredProjects = computed(() => {
   const q = query.value.trim().toLowerCase();
@@ -185,6 +192,11 @@ const filteredProjects = computed(() => {
     const fwMatch = (p.primaryFrameworks || []).some((f) => f.toLowerCase().includes(q));
     return nameMatch || pathMatch || langMatch || fwMatch;
   });
+});
+
+watch(filteredProjects, () => {
+  selectedIndex.value = 0;
+  nextTick(() => listRef.value?.scrollTo({ index: 0 }));
 });
 
 watch(
@@ -237,12 +249,7 @@ function handleKeyDown(e: KeyboardEvent) {
 
 function scrollToSelected() {
   nextTick(() => {
-    if (!listRef.value) return;
-    const items = listRef.value.children;
-    const activeItem = items[selectedIndex.value] as HTMLElement;
-    if (activeItem) {
-      activeItem.scrollIntoView({ block: 'nearest' });
-    }
+    listRef.value?.scrollTo({ index: selectedIndex.value });
   });
 }
 </script>
@@ -282,5 +289,14 @@ function scrollToSelected() {
 .search-modal-leave-to .search-modal-card {
   opacity: 0;
   transform: translateY(-14px) scale(0.96);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .search-modal-enter-active,
+  .search-modal-leave-active,
+  .search-modal-enter-active .search-modal-card,
+  .search-modal-leave-active .search-modal-card {
+    transition: none;
+  }
 }
 </style>

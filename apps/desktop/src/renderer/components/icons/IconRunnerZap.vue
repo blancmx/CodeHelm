@@ -12,14 +12,14 @@
     class="inline-block flex-shrink-0 align-middle pointer-events-none"
     :class="$props.class"
   >
-    <!-- Lightning Bolt Body: Outline initially, solid fill + energy tilt when hovered or active -->
+    <!-- Lightning Bolt Body: Subtle energetic spring when active or hovered -->
     <polygon
       points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"
       class="zap-body"
       :class="{ 'is-active': active || hovered }"
     />
 
-    <!-- Top Right Spark Particle -->
+    <!-- Top Right Spark -->
     <line
       x1="18"
       y1="3"
@@ -29,7 +29,7 @@
       :class="{ 'is-active': active || hovered }"
     />
 
-    <!-- Bottom Left Spark Particle -->
+    <!-- Bottom Left Spark -->
     <line
       x1="5"
       y1="21"
@@ -67,32 +67,29 @@ withDefaults(
   transform-origin: 12px 12px;
   fill: currentColor;
   fill-opacity: 0;
-  transform: scale(1) rotate(0deg);
+  transform: scale(1);
   transition:
-    transform 280ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    transform 260ms cubic-bezier(0.34, 1.56, 0.64, 1),
     fill-opacity 200ms ease;
   will-change: transform, fill-opacity;
 }
 
-/* Hover effect: Instant solid energy fill + energetic spring tilt */
-.zap-body.is-active,
-:global(.group:hover) .zap-body {
-  fill-opacity: 1;
-  transform: scale(1.15) rotate(-10deg);
+.zap-body.is-active {
+  fill-opacity: 0.85;
+  transform: scale(1.08);
 }
 
 .spark-line {
   opacity: 0;
   transform-origin: 12px 12px;
-  transform: scale(0.2);
+  transform: scale(0.3);
   transition:
-    opacity 220ms ease,
-    transform 280ms cubic-bezier(0.34, 1.56, 0.64, 1);
+    opacity 200ms ease,
+    transform 260ms cubic-bezier(0.34, 1.56, 0.64, 1);
   stroke-width: 2;
 }
 
-.spark-line.is-active,
-:global(.group:hover) .spark-line {
+.spark-line.is-active {
   opacity: 1;
   transform: scale(1);
 }

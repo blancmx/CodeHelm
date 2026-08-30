@@ -55,15 +55,12 @@ withDefaults(
 
 <style scoped>
 .dock-piece {
-  /* Default initial state: Detached outwards */
-  transform: translate(2.5px, 2.5px);
-  transition: transform 260ms cubic-bezier(0.16, 1, 0.3, 1);
+  transform: translate(2px, 2px);
+  transition: transform 240ms cubic-bezier(0.16, 1, 0.3, 1);
   will-change: transform;
 }
 
-/* Snaps together when hovered or when active/selected */
-.dock-piece.is-active,
-:global(.group:hover) .dock-piece {
-  transform: translate(0px, 0px) !important;
+.dock-piece.is-active {
+  transform: translate(0px, 0px);
 }
 </style>

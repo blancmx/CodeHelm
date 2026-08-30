@@ -287,10 +287,10 @@
                 <div class="text-xs font-medium" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">服务编排状态</div>
                 <div
                   class="text-xl font-bold mt-2 flex items-center gap-2"
-                  :class="isAnyServiceRunning ? (themeStore.isDark ? 'text-white' : 'text-zinc-950') : (themeStore.isDark ? 'text-zinc-400' : 'text-zinc-400')"
+                  :class="profileStatusTextClass"
                 >
-                  <span v-if="isAnyServiceRunning" class="w-2.5 h-2.5 rounded-full bg-emerald-400 pulsing-dot-active" />
-                  <span>{{ isAnyServiceRunning ? 'RUNNING' : 'IDLE' }}</span>
+                  <span v-if="profileStatusDotClass" class="w-2.5 h-2.5 rounded-full" :class="profileStatusDotClass" />
+                  <span>{{ profilePresentation.status }}</span>
                 </div>
                 <div class="text-xs mt-1" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
                   当前方案包含 {{ activeProfile?.services.length || 0 }} 个服务
@@ -523,9 +523,9 @@
                           </a>
                         </td>
                         <td class="py-2.5">
-                          <span class="px-2 py-0.5 rounded text-[10px] font-semibold border flex items-center gap-1 w-max" :class="themeStore.isDark ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-emerald-50 text-emerald-700 border-emerald-200'">
-                            <span>●</span>
-                            <span>{{ ep.statusCode || 200 }} 就绪</span>
+                          <span class="px-2 py-0.5 rounded text-[10px] font-semibold border flex items-center gap-1.5 w-max leading-none" :class="themeStore.isDark ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-emerald-50 text-emerald-700 border-emerald-200'">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 pulsing-dot-active flex-shrink-0 -translate-y-[0.5px]" />
+                            <span class="leading-none">{{ ep.statusCode || 200 }} 就绪</span>
                           </span>
                         </td>
                         <td class="py-2.5 text-right font-sans">
@@ -615,7 +615,7 @@
                               v-if="getServiceStatus(service.id).status === 'RUNNING'"
                               class="w-1.5 h-1.5 rounded-full bg-emerald-400 pulsing-dot-active flex-shrink-0 -translate-y-[0.5px]"
                             />
-                            <span class="leading-none">{{ getServiceStatus(service.id).status }}</span>
+                            <span class="leading-none">{{ serviceStatusLabel(getServiceStatus(service.id).status) }}</span>
                           </span>
                           <span v-if="getServiceStatus(service.id).pid" class="text-[11px] font-mono" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
                             PID: {{ getServiceStatus(service.id).pid }}
@@ -1110,6 +1110,7 @@
       :percentage="analysisTask?.percentage"
       :current-file="analysisTask?.currentFile"
       :busy="isAnalyzing"
+      :status="analysisTask?.status"
       :can-cancel="canCancelAnalysis"
       :is-cancelling="analysisTask?.status === 'cancelling'"
       @cancel="analysis.cancel()"
@@ -1127,6 +1128,7 @@ import { useRunnerStore } from '../stores/runnerStore.js';
 import { useThemeStore } from '../stores/themeStore.js';
 import { useAnalysisTask } from '../composables/useAnalysisTask.js';
 import { displayIpcError } from '../utils/ipc-error.js';
+import { failurePolicyLabel, getProfilePresentation } from '../utils/runner-presentation.js';
 import EditServiceModal from '../components/EditServiceModal.vue';
 import AnalysisProgressModal from '../components/AnalysisProgressModal.vue';
 import ProjectFileTree from '../components/ProjectFileTree.vue';
@@ -1269,6 +1271,33 @@ async function refreshLegacyAnalysis() {
 }
 
 const activeProfile = computed(() => editingProfile.value);
+const profilePresentation = computed(() => getProfilePresentation(
+  props.id,
+  activeProfile.value?.id,
+  runnerStore.activeSessions,
+  runnerStore.displayHistory,
+  runnerStore.serviceStatuses,
+  runnerStore.stateLoaded && !runnerStore.stateError,
+  activeProfile.value?.services.map((service) => service.id) ?? [],
+));
+const profileStatusTextClass = computed(() => {
+  const status = profilePresentation.value.status;
+  if (status === 'FAILED' || status === 'PARTIAL_FAILED') return 'text-rose-500';
+  if (status === 'UNKNOWN') return 'text-amber-500';
+  if (['RUNNING', 'STARTING', 'STOPPING', 'DEGRADED'].includes(status)) {
+    return themeStore.isDark ? 'text-white' : 'text-zinc-950';
+  }
+  return 'text-zinc-400';
+});
+const profileStatusDotClass = computed(() => {
+  const status = profilePresentation.value.status;
+  if (status === 'FAILED' || status === 'PARTIAL_FAILED') return 'bg-rose-500';
+  if (status === 'UNKNOWN') return 'bg-amber-500';
+  if (['RUNNING', 'STARTING', 'STOPPING', 'DEGRADED'].includes(status)) {
+    return 'bg-emerald-400 pulsing-dot-active';
+  }
+  return '';
+});
 
 const allDetectedTechs = computed<DetectedTechnologyDto[]>(() => {
   if (!latestSnapshot.value?.modules) return [];
@@ -1400,7 +1429,11 @@ const activeEndpointsList = computed(() => {
 });
 
 function getServiceStatus(serviceId: string) {
-  return runnerStore.serviceStatuses.get(serviceId) || { status: 'STOPPED' as ProcessStatus };
+  const live = runnerStore.serviceStatuses.get(serviceId);
+  if (live) return live;
+  const historical = profilePresentation.value.statuses.get(serviceId);
+  if (historical) return { status: historical };
+  return { status: profilePresentation.value.historical ? 'IDLE' as ProcessStatus : 'STOPPED' as ProcessStatus };
 }
 
 const filteredLogs = computed(() => {
@@ -1638,10 +1671,6 @@ function categoryLabel(cat: string) {
   return map[cat] || cat;
 }
 
-function failurePolicyLabel(p: string) {
-  return p === 'block_dependents' ? '阻断依赖它的下游服务' : '允许下游继续启动';
-}
-
 function statusDotClass(status: ProcessStatus) {
   switch (status) {
     case 'RUNNING':
@@ -1667,6 +1696,27 @@ function statusBadgeClass(status: ProcessStatus) {
       return themeStore.isDark ? 'bg-rose-950/40 text-rose-300 border border-rose-800' : 'bg-rose-100 text-rose-700 border border-rose-300';
     default:
       return themeStore.isDark ? 'bg-zinc-800 text-zinc-400 border border-zinc-700' : 'bg-zinc-100 text-zinc-600 border border-zinc-200';
+  }
+}
+
+function serviceStatusLabel(status: ProcessStatus | string) {
+  switch (status) {
+    case 'RUNNING':
+      return '运行中';
+    case 'STARTING':
+      return '启动中';
+    case 'STOPPING':
+      return '停止中';
+    case 'STOPPED':
+      return '已停止';
+    case 'FAILED':
+      return '失败';
+    case 'DEGRADED':
+      return '异常';
+    case 'IDLE':
+      return '空闲';
+    default:
+      return status;
   }
 }
 </script>

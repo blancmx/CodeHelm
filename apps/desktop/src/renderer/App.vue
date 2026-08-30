@@ -5,11 +5,11 @@
     class="h-full w-full"
   >
     <div
-      class="h-full w-full font-sans flex flex-col antialiased overflow-hidden select-none transition-colors duration-300 relative z-1"
+      class="h-full w-full font-sans flex flex-col antialiased overflow-hidden select-none transition-colors duration-300 relative"
       :class="themeStore.isDark ? 'bg-[#09090b] text-[#ffffff]' : 'bg-[#fafafa] text-[#09090b]'"
     >
       <!-- Modern Frameless Window Header Bar with Drag Region & Windows 11 Controls -->
-      <WindowHeaderBar class="relative z-30" />
+      <WindowHeaderBar class="desktop-window-header relative" />
 
       <!-- Main Application Router View -->
       <div class="flex-1 min-h-0 w-full overflow-hidden relative z-10">
@@ -358,6 +358,11 @@ const currentThemeOverrides = computed(() => {
 </script>
 
 <style>
+/* Keep desktop window controls reachable above teleported page modals. */
+.desktop-window-header {
+  z-index: 10000;
+}
+
 /* Commit the palette atomically; the small feedback ring animates separately. */
 html.theme-changing,
 html.theme-changing *,
@@ -785,30 +790,89 @@ html.dark ::-webkit-scrollbar-thumb:hover {
   transform-origin: top center !important;
 }
 
-/* Override default scale/zoom with top-to-bottom slide-down transition */
-.fade-in-scale-up-transition-enter-active,
-.fade-in-scale-up-transition-leave-active,
-.slide-in-from-top-transition-enter-active,
-.slide-in-from-top-transition-leave-active {
+/* =========================================================
+   Top-to-Bottom Slide/Pull-Down Transitions for Dropdowns & Select Menus
+   ========================================================= */
+.v-binder-follower-content .fade-in-scale-up-transition-enter-active,
+.v-binder-follower-content .fade-in-scale-up-transition-leave-active,
+.v-binder-follower-content .slide-in-from-top-transition-enter-active,
+.v-binder-follower-content .slide-in-from-top-transition-leave-active {
   transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1),
               transform 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
   will-change: opacity, transform !important;
 }
 
-.fade-in-scale-up-transition-enter-from,
-.fade-in-scale-up-transition-leave-to,
-.slide-in-from-top-transition-enter-from,
-.slide-in-from-top-transition-leave-to {
+.v-binder-follower-content .fade-in-scale-up-transition-enter-from,
+.v-binder-follower-content .fade-in-scale-up-transition-leave-to,
+.v-binder-follower-content .slide-in-from-top-transition-enter-from,
+.v-binder-follower-content .slide-in-from-top-transition-leave-to {
   opacity: 0 !important;
   transform: translateY(-8px) scaleY(0.92) !important;
 }
 
-.fade-in-scale-up-transition-enter-to,
-.fade-in-scale-up-transition-leave-from,
-.slide-in-from-top-transition-enter-to,
-.slide-in-from-top-transition-leave-from {
+.v-binder-follower-content .fade-in-scale-up-transition-enter-to,
+.v-binder-follower-content .fade-in-scale-up-transition-leave-from,
+.v-binder-follower-content .slide-in-from-top-transition-enter-to,
+.v-binder-follower-content .slide-in-from-top-transition-leave-from {
   opacity: 1 !important;
   transform: translateY(0) scaleY(1) !important;
+}
+
+/* =========================================================
+   Unified Dialog & Modal Smooth Scale & Fade Animation
+   ========================================================= */
+.n-dialog-container .fade-in-scale-up-transition-enter-active,
+.n-modal-container .fade-in-scale-up-transition-enter-active,
+.n-dialog.fade-in-scale-up-transition-enter-active,
+.n-modal.fade-in-scale-up-transition-enter-active {
+  transition: opacity 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.24s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  will-change: opacity, transform !important;
+}
+
+.n-dialog-container .fade-in-scale-up-transition-leave-active,
+.n-modal-container .fade-in-scale-up-transition-leave-active,
+.n-dialog.fade-in-scale-up-transition-leave-active,
+.n-modal.fade-in-scale-up-transition-leave-active {
+  transition: opacity 0.16s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.16s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  will-change: opacity, transform !important;
+}
+
+.n-dialog-container .fade-in-scale-up-transition-enter-from,
+.n-dialog-container .fade-in-scale-up-transition-leave-to,
+.n-modal-container .fade-in-scale-up-transition-enter-from,
+.n-modal-container .fade-in-scale-up-transition-leave-to,
+.n-dialog.fade-in-scale-up-transition-enter-from,
+.n-dialog.fade-in-scale-up-transition-leave-to,
+.n-modal.fade-in-scale-up-transition-enter-from,
+.n-modal.fade-in-scale-up-transition-leave-to {
+  opacity: 0 !important;
+  transform: scale(0.95) translateY(-6px) !important;
+}
+
+.n-dialog-container .fade-in-scale-up-transition-enter-to,
+.n-dialog-container .fade-in-scale-up-transition-leave-from,
+.n-modal-container .fade-in-scale-up-transition-enter-to,
+.n-modal-container .fade-in-scale-up-transition-leave-from,
+.n-dialog.fade-in-scale-up-transition-enter-to,
+.n-dialog.fade-in-scale-up-transition-leave-from,
+.n-modal.fade-in-scale-up-transition-enter-to,
+.n-modal.fade-in-scale-up-transition-leave-from {
+  opacity: 1 !important;
+  transform: scale(1) translateY(0) !important;
+}
+
+/* Modal Mask / Backdrop Fade Transition */
+.n-modal-mask.fade-in-transition-enter-active {
+  transition: opacity 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+.n-modal-mask.fade-in-transition-leave-active {
+  transition: opacity 0.16s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+.n-modal-mask.fade-in-transition-enter-from,
+.n-modal-mask.fade-in-transition-leave-to {
+  opacity: 0 !important;
 }
 
 /* Select & Dropdown menu dark/light container styling */

@@ -27,6 +27,9 @@ win:
     - target: dir
       arch:
         - x64
+    - target: nsis
+      arch:
+        - x64
   # Keep product metadata/icon editing enabled, without requiring a signing certificate.
   signExecutable: false
 

@@ -3,6 +3,7 @@ import MainLayout from '../layouts/MainLayout.vue';
 import OverviewView from '../views/OverviewView.vue';
 import ProjectDetailView from '../views/ProjectDetailView.vue';
 import RunnerView from '../views/RunnerView.vue';
+import ConsoleView from '../views/ConsoleView.vue';
 import SettingsView from '../views/SettingsView.vue';
 import { setPageTitle } from '../utils/title.js';
 
@@ -30,7 +31,13 @@ const router = createRouter({
           path: 'runner',
           name: 'runner',
           component: RunnerView,
-          meta: { title: '编排运行台' },
+          meta: { title: '运行中心' },
+        },
+        {
+          path: 'console',
+          name: 'console',
+          component: ConsoleView,
+          meta: { title: '实时控制台' },
         },
         {
           path: 'settings',

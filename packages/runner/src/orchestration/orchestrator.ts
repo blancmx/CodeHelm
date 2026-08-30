@@ -182,6 +182,8 @@ export class Orchestrator {
         if (profile.failurePolicy === 'block_dependents') {
           const hasFailedDep = s.dependsOn.some((depId) => failedServiceIds.has(depId));
           if (hasFailedDep) {
+            // A blocked service also blocks its own dependents in later layers.
+            failedServiceIds.add(s.id);
             this.logCollector.append(
               profile.projectId,
               runSession.id,
@@ -286,10 +288,30 @@ export class Orchestrator {
       });
 
       const results = await Promise.allSettled(servicePromises);
+      results.forEach((result, index) => {
+        if (result.status !== 'rejected') return;
+        const service = preparedServices[index]!;
+        failedServiceIds.add(service.id);
+        // Preparation can throw before ProcessManager records a child (for
+        // example an invalid cwd). Keep that failure visible and durable.
+        if (!runSession.services.some(s => s.serviceConfigId === service.id)) {
+          const failed: ServiceSession = {
+            id: generateId(), runSessionId: runSession.id, serviceConfigId: service.id,
+            serviceName: service.name, serviceType: service.type, status: 'FAILED', port: service.port,
+            errorMessage: '服务启动准备失败，请检查工作目录及启动配置。',
+            startedAt: new Date().toISOString(), stoppedAt: new Date().toISOString(),
+          };
+          runSession.services.push(failed);
+          this.logCollector.append(profile.projectId, runSession.id, failed.id, service.name,
+            'stderr', `[Start Error] ${failed.errorMessage}\n`);
+          this.notifyStatus(failed, profile.projectId, runSession.id);
+        }
+      });
 
       // Check failure policy rollback
       const anyFailed = portPreparationFailed || results.some(
-        (r) => r.status === 'rejected' || (r.status === 'fulfilled' && r.value?.status === 'FAILED')
+        (r) => r.status === 'rejected' || (r.status === 'fulfilled' && r.value
+          && ['FAILED', 'DEGRADED'].includes(r.value.status))
       );
 
       if (anyFailed && profile.failurePolicy === 'rollback_all') {
@@ -303,8 +325,20 @@ export class Orchestrator {
         );
         // Do not await our own startup task through stopSession.
         this.cancelled.add(runSession.id);
-        await Promise.allSettled(runSession.services.map(s => this.processManager.stopService(s.id)));
-        runSession.status = 'FAILED';
+        const liveStatuses = ['STARTING', 'RUNNING', 'DEGRADED', 'STOPPING', 'ORPHANED'];
+        await Promise.allSettled(runSession.services.filter(s => liveStatuses.includes(s.status)).map(async s => {
+          const readinessFailed = s.status === 'DEGRADED';
+          await this.processManager.stopService(s.id);
+          if (readinessFailed && s.status === 'STOPPED') {
+            // Rollback is cleanup, not recovery from the readiness failure.
+            s.status = 'FAILED';
+            this.notifyStatus(s, profile.projectId, runSession.id);
+          }
+        }));
+        const stillActive = runSession.services.some(s => liveStatuses.includes(s.status));
+        runSession.status = stillActive ? 'PARTIAL_FAILED' : 'FAILED';
+        runSession.stoppedAt = stillActive ? undefined : new Date().toISOString();
+        this.persist(runSession);
         return;
       }
     }

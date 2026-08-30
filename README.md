@@ -4,7 +4,7 @@
 **A Local Project Dashboard & Multi-Process Orchestrator for the AI & Vibe Coding Era**
 
 <p align="left">
-  <img src="https://img.shields.io/badge/Electron-33.x-black?style=flat-square&logo=electron" alt="Electron" />
+  <img src="https://img.shields.io/badge/Electron-44.x-black?style=flat-square&logo=electron" alt="Electron" />
   <img src="https://img.shields.io/badge/Vue-3.5-black?style=flat-square&logo=vue.js" alt="Vue 3" />
   <img src="https://img.shields.io/badge/TypeScript-5.x-black?style=flat-square&logo=typescript" alt="TypeScript" />
   <img src="https://img.shields.io/badge/Vite-6.x-black?style=flat-square&logo=vite" alt="Vite" />
@@ -69,7 +69,7 @@ desk/
 ## 🚀 快速上手 (Getting Started)
 
 ### 前置环境 (Prerequisites)
-- [Node.js](https://nodejs.org/) (>= 18.0.0)
+- [Node.js](https://nodejs.org/) (>= 22.12.0 for the current Electron/native build toolchain)
 - [pnpm](https://pnpm.io/) (>= 9.0.0)
 - Windows / macOS / Linux
 
@@ -86,13 +86,47 @@ pnpm install
 pnpm build
 ```
 
+### 3. 本地检查与 Windows 交付
+
+```bash
+# 类型检查、全量单元/集成测试、Renderer/Main/Preload/Worker 构建
+pnpm typecheck
+pnpm test
+pnpm build
+
+# 生成目录包；产物位于仓库根目录 dist-release/
+pnpm package:dir
+
+# 按 electron-builder 配置生成目录包和 NSIS 安装包
+pnpm package
+```
+
+当前工作区的 v0.1 依赖版本为 Electron 44.0.0、electron-builder 26.15.3、better-sqlite3 13.0.3。开发和构建建议使用 Node.js >= 22.12.0；打包应用自带 Electron，但被管理项目所需的 Node.js、Python、JDK、包管理器和项目依赖仍由各项目自行提供。
+
+## v0.1 试用边界
+
+v0.1 面向 Windows 内部试用。数据库、备份和日志均为本地数据：
+
+- 数据库：`%APPDATA%\CodeHelm\codehelm.sqlite`
+- 启动备份：`%APPDATA%\CodeHelm\backups\`
+- 开发版日志：CodeHelm 仓库根目录 `logs\`
+- 打包版日志：`CodeHelm.exe` 所在目录 `logs\`
+
+关闭窗口时，应用会先停止由当前应用管理的运行会话，再关闭分析任务、日志存储和数据库；未确认归属的历史遗留进程不会被自动接管或终止。数据库启动保护失败时请保留主库及其 `-wal`/`-shm` 文件和备份目录，不要删除或覆盖原文件，按 `docs/v0.1/06-数据库启动保护与自动备份实施记录.md` 的恢复边界处理。
+
+升级前请保留 `%APPDATA%\CodeHelm\` 及其备份目录。当前 v0.1 未完成安装器升级/卸载/重装的实机验收，不能把“卸载后用户数据必然保留”作为承诺；进行这些操作前应先导出或复制经验证备份，并在内部试用记录中核对数据保留结果。
+
+当前仍需在正式发布前处理或明确决策的限制包括：主窗口仍使用 `sandbox: false`，生产 CSP 仍保留 `unsafe-eval`；尚无实际 Electron E2E/CI 门禁；未完成安装、卸载、重装数据保留和完整干净 Windows 业务流程验收；活动 WAL 异常的来源与受控恢复仍待授权和演练。`CODEHELM_USER_DATA_DIR` 仅供隔离验收/诊断，不是普通用户迁移数据的接口。
+
+详细验收记录位于 `docs/v0.1/`。当前仓库保留既有忽略规则，该目录未自动纳入 Git；发布时应将对应验收记录作为交付归档或另行调整版本控制规则。
+
 ---
 
 ## 🛠️ 技术栈 (Tech Stack)
 
 | 领域 | 技术方案 |
 | :--- | :--- |
-| **桌面框架** | [Electron](https://www.electronjs.org/) 33.x |
+| **桌面框架** | [Electron](https://www.electronjs.org/) 44.0.0 |
 | **前端视图** | [Vue 3](https://vuejs.org/) (Composition API, `<script setup>`), [Vue Router](https://router.vuejs.org/), [Pinia](https://pinia.vuejs.org/) |
 | **构建工具** | [Vite](https://vitejs.dev/) 6.x + `vite-plugin-electron` |
 | **组件 & 样式** | [Naive UI](https://www.naiveui.com/), [UnoCSS](https://unocss.dev/), Lucide Icons |

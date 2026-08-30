@@ -91,8 +91,9 @@ export async function registerRunnerHandlers(db: DatabaseInstance, logs?: LogSto
     const activeSessions = orchestrator.getActiveSessions();
     const activeIds = new Set(activeSessions.map(s => s.id));
     return RunnerStateDtoSchema.parse({
-      activeSessions: activeSessions.map(s => ({ ...s, services: s.services.filter(service =>
-        ['STARTING','RUNNING','STOPPING','DEGRADED','ORPHANED'].includes(service.status)) })),
+      // Retain failed/stopped siblings in an active run. The renderer gates actions by
+      // service status; filtering here loses failures whenever it refreshes.
+      activeSessions,
       history: sessionRepo.listRecent(100).filter(s => !activeIds.has(s.id)).slice(0, 50),
       unresolvedSessions: sessionRepo.listUnresolved(),
       persistenceError: orchestrator.getPersistenceError(),

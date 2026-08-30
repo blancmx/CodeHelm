@@ -1,6 +1,6 @@
 <template>
   <div
-    class="h-8 w-full select-none flex items-center justify-between flex-shrink-0 z-50 transition-colors duration-200 drag-header"
+    class="h-8 w-full select-none flex items-center justify-between flex-shrink-0 transition-colors duration-200 drag-header"
     :class="themeStore.isDark ? 'bg-[#0f0f12] text-zinc-400' : 'bg-[#f4f4f5] text-zinc-600'"
     @dblclick="handleToggleMaximize"
   >

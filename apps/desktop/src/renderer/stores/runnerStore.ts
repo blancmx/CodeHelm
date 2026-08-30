@@ -246,21 +246,23 @@ export const useRunnerStore = defineStore('runner', () => {
   async function startProfile(profileId: string, approvalToken: string) {
     if (!window.codehelm) return null;
     setupListeners();
-    const session = await window.codehelm.runner.start(profileId, approvalToken);
-    currentSession.value = session;
-    serviceStatuses.value = mergeRunSessionStatuses(serviceStatuses.value, session);
-    await fetchState();
-    return session;
+    try {
+      const session = await window.codehelm.runner.start(profileId, approvalToken);
+      currentSession.value = session;
+      serviceStatuses.value = mergeRunSessionStatuses(serviceStatuses.value, session);
+      return session;
+    } finally { await fetchState(); }
   }
 
   async function installAndStartProfile(profileId: string, approvalToken: string) {
     if (!window.codehelm) return null;
     setupListeners();
-    const session = await window.codehelm.runner.installAndStart(profileId, approvalToken);
-    currentSession.value = session;
-    serviceStatuses.value = mergeRunSessionStatuses(serviceStatuses.value, session);
-    await fetchState();
-    return session;
+    try {
+      const session = await window.codehelm.runner.installAndStart(profileId, approvalToken);
+      currentSession.value = session;
+      serviceStatuses.value = mergeRunSessionStatuses(serviceStatuses.value, session);
+      return session;
+    } finally { await fetchState(); }
   }
 
   async function stopSession(sessionId: string) {

@@ -21,11 +21,9 @@
           </span>
           <span
             class="text-[10px] font-mono px-2 py-0.5 rounded border flex-shrink-0"
-            :class="busy
-              ? (themeStore.isDark ? 'bg-[#27272a] text-zinc-300 border-[#3f3f46]' : 'bg-white text-zinc-700 border-zinc-200')
-              : (themeStore.isDark ? 'bg-emerald-950/60 text-emerald-300 border-emerald-500/30' : 'bg-emerald-50 text-emerald-700 border-emerald-200')"
+            :class="statusClass"
           >
-            {{ busy ? '扫描分析中' : '分析完成' }}
+            {{ presentation.label }}
           </span>
         </div>
         <p v-if="rootPath" class="font-mono text-xs text-zinc-500 break-all">
@@ -50,7 +48,7 @@
             </span>
           </div>
           <span class="font-mono font-bold flex-shrink-0" :class="themeStore.isDark ? 'text-zinc-200' : 'text-zinc-800'">
-            {{ (percentage ?? 0) > 0 ? `${percentage}%` : '扫描中' }}
+            {{ busy ? ((percentage ?? 0) > 0 ? `${percentage}%` : '扫描中') : presentation.label }}
           </span>
         </div>
 
@@ -60,7 +58,7 @@
           :percentage="percentage ?? 0"
           :show-indicator="false"
           :processing="busy"
-          status="success"
+          :status="presentation.tone"
         />
 
         <!-- Stats details -->
@@ -101,6 +99,8 @@
 import { computed } from 'vue';
 import { useThemeStore } from '../stores/themeStore.js';
 import { IconLock } from './icons/index.js';
+import type { AnalysisTaskDto } from '@codehelm/contracts';
+import { getAnalysisPresentation } from '../utils/analysis-presentation.js';
 
 const themeStore = useThemeStore();
 
@@ -113,9 +113,19 @@ const props = defineProps<{
   percentage?: number;
   currentFile?: string;
   busy?: boolean;
+  status?: AnalysisTaskDto['status'];
   canCancel?: boolean;
   isCancelling?: boolean;
 }>();
+
+const presentation = computed(() => getAnalysisPresentation(props.status));
+const statusClass = computed(() => {
+  const dark = themeStore.isDark;
+  if (presentation.value.tone === 'success') return dark ? 'bg-emerald-950/60 text-emerald-300 border-emerald-500/30' : 'bg-emerald-50 text-emerald-700 border-emerald-200';
+  if (presentation.value.tone === 'error') return dark ? 'bg-rose-950/60 text-rose-300 border-rose-500/30' : 'bg-rose-50 text-rose-700 border-rose-200';
+  if (presentation.value.tone === 'warning') return dark ? 'bg-amber-950/60 text-amber-300 border-amber-500/30' : 'bg-amber-50 text-amber-700 border-amber-200';
+  return dark ? 'bg-[#27272a] text-zinc-300 border-[#3f3f46]' : 'bg-white text-zinc-700 border-zinc-200';
+});
 
 const emit = defineEmits<{
   (e: 'update:show', val: boolean): void;

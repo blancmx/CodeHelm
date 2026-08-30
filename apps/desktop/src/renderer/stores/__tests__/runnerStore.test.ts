@@ -15,6 +15,18 @@ import { useProjectStore } from '../projectStore.js';
 afterEach(() => vi.unstubAllGlobals());
 
 describe('authoritative runner state', () => {
+  it.each(['startProfile', 'installAndStartProfile'] as const)('refreshes persisted rollback history when %s rejects', async method => {
+    setActivePinia(createPinia());
+    const failed = { ...session('a'), status: 'FAILED', services: [{ ...session('a').services[0], status: 'FAILED' }] };
+    const getState = vi.fn().mockResolvedValue({ activeSessions: [], unresolvedSessions: [], history: [failed] });
+    const reject = vi.fn().mockRejectedValue(new Error('readiness failed'));
+    vi.stubGlobal('window', { codehelm: { runner: { getState, start: reject, installAndStart: reject, onStatus: vi.fn(), onLogs: vi.fn() } } });
+    const store = useRunnerStore();
+    await expect(store[method]('profile', 'approved')).rejects.toThrow('readiness failed');
+    expect(getState).toHaveBeenCalledTimes(2); // Initial subscription and the rejected launch's finally.
+    expect(store.history[0]).toEqual(failed);
+    expect(store.serviceStatuses.size).toBe(0);
+  });
   it('uses one confirmation on first launch and reuses approval without another dialog', async () => {
     setActivePinia(createPinia());
     const session = { id: 'run', projectId: 'project', runProfileId: 'profile', services: [] };
@@ -94,6 +106,25 @@ describe('authoritative runner state', () => {
     expect(await reading).toBe(false);
     expect(store.serviceStatuses.get('service-config')?.status).toBe('RUNNING');
     expect(store.unresolvedSessions).toEqual([]);
+  });
+
+  it('retains failed siblings across refresh and drops all live controls once the run becomes history', async () => {
+    setActivePinia(createPinia());
+    const run: RunSessionDto = { ...session('a'), status: 'PARTIAL_FAILED', services: [
+      { ...session('a').services[0], status: 'FAILED', exitCode: 7 },
+      { ...session('a').services[0], id: 'child-d', serviceConfigId: 'config-d', status: 'RUNNING', port: 5180 },
+    ] };
+    const getState = vi.fn().mockResolvedValue({ activeSessions: [run], unresolvedSessions: [], history: [] });
+    vi.stubGlobal('window', { codehelm: { runner: { getState } } });
+    const store = useRunnerStore();
+    await store.fetchState();
+    await store.fetchState();
+    expect(store.serviceStatuses.get('config-a')?.status).toBe('FAILED');
+    expect(store.runningCount).toBe(1);
+    getState.mockResolvedValue({ activeSessions: [], unresolvedSessions: [], history: [{ ...run, status: 'FAILED' }] });
+    await store.fetchState();
+    expect(store.serviceStatuses.size).toBe(0);
+    expect(store.history[0].services[0].status).toBe('FAILED');
   });
 
   it('keeps all unresolved notices separate from live controls, across failure and resolution', async () => {

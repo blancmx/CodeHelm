@@ -221,10 +221,8 @@ export const IconEyeOff = createIcon('IconEyeOff', () => [
   h('line', { x1: 1, y1: 1, x2: 23, y2: 23 }),
 ]);
 
-export const IconTrash = createIcon('IconTrash', () => [
-  h('polyline', { points: '3 6 5 6 21 6' }),
-  h('path', { d: 'M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2' }),
-]);
+export { default as IconTrash } from './IconTrashAnimated.vue';
+export { default as IconTrashAnimated } from './IconTrashAnimated.vue';
 
 export const IconEdit = createIcon('IconEdit', () => [
   h('path', { d: 'M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7' }),
@@ -304,6 +302,4 @@ export { default as IconSunAnimated } from './IconSunAnimated.vue';
 export { default as IconMonitorAnimated } from './IconMonitorAnimated.vue';
 export { default as IconSearchAnimated } from './IconSearchAnimated.vue';
 export { default as IconSidebarAnimated } from './IconSidebarAnimated.vue';
-
-
-
+export { default as IconTerminalAnimated } from './IconTerminalAnimated.vue';

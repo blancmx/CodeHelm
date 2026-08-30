@@ -25,8 +25,14 @@ Menu.setApplicationMenu(null);
 // "@codehelm/desktop". On Windows that becomes a nested path and Chromium can
 // fail to create its singleton/cache files there. Use the same stable path in
 // development and packaged builds before requesting the single-instance lock.
+// An explicit data-root override is reserved for isolated acceptance/diagnostic
+// runs; normal development and packaged launches continue to use the stable
+// per-user CodeHelm directory.
+const requestedUserDataPath = process.env.CODEHELM_USER_DATA_DIR?.trim();
 const legacyUserDataPath = app.getPath('userData');
-const stableUserDataPath = path.join(app.getPath('appData'), 'CodeHelm');
+const stableUserDataPath = requestedUserDataPath
+  ? path.resolve(requestedUserDataPath)
+  : path.join(app.getPath('appData'), 'CodeHelm');
 const stableSessionDataPath = path.join(stableUserDataPath, 'SessionData');
 fs.mkdirSync(stableSessionDataPath, { recursive: true });
 app.setName(APP_NAME);
@@ -38,6 +44,10 @@ let mainWindow: BrowserWindow | null = null;
 let db: DatabaseInstance | null = null;
 let trustedRenderer: TrustedRenderer | null = null;
 let isQuitting = false;
+// The validation harness may request a native frame so Windows UI discovery
+// can target the otherwise frameless application window. Normal launches keep
+// the custom title bar unchanged.
+const validationWindowFrame = process.env.CODEHELM_VALIDATION_WINDOW === '1';
 
 // Set Windows taskbar AppUserModelId for stable icon grouping
 if (process.platform === 'win32') {
@@ -131,8 +141,8 @@ async function createWindow() {
     height: 850,
     minWidth: 960,
     minHeight: 600,
-    frame: false,
-    titleBarStyle: 'hidden',
+    frame: validationWindowFrame,
+    ...(validationWindowFrame ? {} : { titleBarStyle: 'hidden' as const }),
     show: false, // Apply taskbar identity before Windows first displays the button.
     backgroundColor: '#09090b',
     ...(iconPath ? { icon: iconPath } : {}),
@@ -255,7 +265,9 @@ app.whenReady().then(async () => {
     console.log('[Main] Initializing database at:', dbPath);
     const opened = await openProtectedDatabase({
       databasePath: dbPath, backupDirectory,
-      legacyDatabasePath: path.join(legacyUserDataPath, 'codehelm.sqlite'),
+      legacyDatabasePath: requestedUserDataPath
+        ? undefined
+        : path.join(legacyUserDataPath, 'codehelm.sqlite'),
     });
     db = opened.db;
     if (isQuitting) { db.close(); db = null; return; }

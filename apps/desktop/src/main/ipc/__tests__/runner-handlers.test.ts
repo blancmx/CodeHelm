@@ -71,10 +71,11 @@ const harness = vi.hoisted(() => {
   const createPlans = vi.fn(() => plans);
   const handlers = new Map<string, (...args: any[]) => Promise<unknown>>();
   const onLogs = vi.fn();
+  const getActiveSessions = vi.fn((): unknown[] => []);
 
   class MockOrchestrator {
     setSessionPersistence = vi.fn();
-    getActiveSessions = vi.fn(() => []);
+    getActiveSessions = getActiveSessions;
     getPersistenceError = vi.fn();
     assertCanStart = vi.fn();
     onStatusChange = vi.fn();
@@ -125,6 +126,7 @@ const harness = vi.hoisted(() => {
     createPlans,
     handlers,
     onLogs,
+    getActiveSessions,
     MockOrchestrator,
     MockProfileRepository,
     MockProjectRepository,
@@ -179,6 +181,14 @@ function handler(channel: string) {
 }
 
 describe('runner IPC execution authorization', () => {
+  it('retains failed siblings in an active partial run without promoting history into live state', () => {
+    const run = { ...harness.session, status: 'PARTIAL_FAILED', services: [
+      { id: 'failed', runSessionId: harness.session.id, serviceConfigId: 'a', serviceName: 'A', serviceType: 'tool', status: 'FAILED', exitCode: 7 },
+      { id: 'live', runSessionId: harness.session.id, serviceConfigId: 'd', serviceName: 'D', serviceType: 'backend', status: 'RUNNING', port: 5180 },
+    ] };
+    harness.getActiveSessions.mockReturnValueOnce([run]);
+    expect(handler(IpcChannels.RUNNER_GET_STATE)({})).toMatchObject({ activeSessions: [run], history: [] });
+  });
   it('rejects confirmation requests from unowned windows or child frames', async () => {
     const request = { profileId: harness.profile.id, mode: 'start' };
     await expect(handler(IpcChannels.RUNNER_CONFIRM_EXECUTION)({ sender: {}, senderFrame: {} }, request)).rejects.toThrow('主窗口');
