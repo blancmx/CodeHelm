@@ -331,8 +331,8 @@
         <!-- Log Rows -->
         <div
           v-for="(entry, idx) in filteredLogs"
-          :key="idx"
-          class="leading-relaxed break-all flex items-start gap-2.5 hover:bg-[#15151a] px-2 py-0.5 rounded transition-colors group"
+          :key="entry.id"
+          class="terminal-log-row leading-relaxed break-all flex items-start gap-2.5 hover:bg-[#15151a] px-2 py-0.5 rounded transition-colors group"
         >
           <!-- Line Number -->
           <span
@@ -682,5 +682,11 @@ onMounted(async () => {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   font-size: 12px;
   line-height: 1.6;
+}
+
+.terminal-log-row {
+  contain: layout paint style;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 24px;
 }
 </style>

@@ -215,6 +215,9 @@ export const useRunnerStore = defineStore('runner', () => {
         }
       }
 
+      if (['STOPPED', 'FAILED', 'ORPHANED'].includes(event.status)) {
+        void fetchState();
+      }
     });
 
     window.codehelm.runner.onLogs((batch) => {

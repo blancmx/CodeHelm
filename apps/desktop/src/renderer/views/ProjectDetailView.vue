@@ -120,18 +120,19 @@
             {{ runningServicesWithPort[0].label }}
           </n-button>
 
-          <n-button
-            type="error"
-            secondary
-            size="small"
-            class="font-semibold shadow-xs !text-rose-600 dark:!text-rose-400 !border-rose-500/40 hover:!bg-rose-500/10"
+          <button
+            type="button"
+            class="group h-7.5 px-3 rounded-lg border text-xs font-sans font-semibold inline-flex items-center gap-1.5 transition-all duration-200 cursor-pointer select-none relative overflow-hidden bg-rose-500/10 hover:bg-rose-500/20 active:scale-95 text-rose-600 dark:text-rose-400 border-rose-500/30 hover:border-rose-500/60 shadow-2xs"
+            title="停止当前项目的所有运行中服务"
             @click="handleStopSession"
           >
-            <template #icon>
-              <IconSquare :size="14" class="text-rose-600 dark:text-rose-400" />
-            </template>
-            <span class="text-rose-600 dark:text-rose-400 font-semibold">停止服务</span>
-          </n-button>
+            <IconSquare
+              :size="13"
+              stroke-width="2"
+              class="text-rose-600 dark:text-rose-400 fill-current/30 group-hover:fill-current transition-all duration-200 group-hover:scale-90 flex-shrink-0 -translate-y-[0.5px]"
+            />
+            <span class="leading-none">停止服务</span>
+          </button>
         </template>
 
         <template v-else>
@@ -167,30 +168,7 @@
       </div>
     </header>
 
-    <!-- Analysis Progress Bar -->
-    <div
-      v-if="isAnalyzing"
-      class="border rounded-xl p-4 my-3 flex-shrink-0 shadow-sm transition-all"
-      :class="themeStore.isDark ? 'bg-[#18181b] border-[#27272a]' : 'bg-zinc-100 border-zinc-300'"
-    >
-      <div class="flex items-center justify-between text-xs mb-2">
-        <div class="flex items-center gap-2">
-          <span class="w-2 h-2 rounded-full pulsing-dot-active" :class="themeStore.isDark ? 'bg-white' : 'bg-black'" />
-          <span class="font-semibold tracking-wide" :class="themeStore.isDark ? 'text-white' : 'text-zinc-950'">
-            {{ analysisStage }}
-          </span>
-        </div>
-        <span class="font-mono font-bold" :class="themeStore.isDark ? 'text-zinc-300' : 'text-zinc-700'">
-          已发现 {{ analysisTask?.scannedFiles ?? 0 }} 个文件 · {{ analysisPercentage === 0 ? '扫描中' : `${analysisPercentage}%` }}
-        </span>
-      </div>
-      <n-progress
-        type="line"
-        :percentage="analysisPercentage"
-        :show-indicator="false"
-        processing
-      />
-    </div>
+
 
     <div v-if="analysisTask?.status === 'failed'" role="alert" class="my-3 p-3 rounded-lg border border-rose-500/40 text-rose-500 text-sm flex-shrink-0">
       {{ analysisTask.errorMessage || analysisTask.stage }}
@@ -626,45 +604,43 @@
 
                     <!-- Actions -->
                     <div class="flex items-center gap-2 flex-shrink-0">
-                      <n-button
+                      <button
                         v-if="service.port && getServiceStatus(service.id).status === 'RUNNING'"
-                        size="tiny"
-                        type="default"
-                        secondary
+                        type="button"
+                        class="group h-6 px-2 rounded-md border text-[11px] font-sans font-medium inline-flex items-center gap-1 transition-all duration-200 cursor-pointer select-none"
+                        :class="themeStore.isDark ? 'bg-[#18181b] hover:bg-[#27272a] text-zinc-200 border-[#3f3f46]' : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border-zinc-300'"
                         @click="openBrowser(service.type === 'backend' ? `http://localhost:${service.port}/docs` : `http://localhost:${service.port}`)"
                       >
-                        <template #icon>
-                          <IconExternalLink :size="12" />
-                        </template>
-                        {{ service.type === 'backend' ? '打开 API 文档 (/docs)' : '打开前端界面' }}
-                      </n-button>
+                        <IconExternalLink :size="11" stroke-width="2" class="flex-shrink-0" />
+                        <span class="leading-none">{{ service.type === 'backend' ? '打开 API 文档 (/docs)' : '打开前端界面' }}</span>
+                      </button>
 
-                      <n-button
+                      <button
                         v-if="getServiceStatus(service.id).status === 'RUNNING'"
-                        size="tiny"
-                        type="default"
-                        secondary
+                        type="button"
+                        class="group h-6 px-2 rounded-md border text-[11px] font-sans font-medium inline-flex items-center gap-1 transition-all duration-200 cursor-pointer select-none"
+                        :class="themeStore.isDark ? 'bg-[#18181b] hover:bg-[#27272a] text-zinc-300 border-[#3f3f46]' : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-700 border-zinc-300'"
+                        title="重启此服务进程"
                         @click="handleRestartSingleService(service.id)"
                       >
-                        <template #icon>
-                          <IconRefresh :size="12" />
-                        </template>
-                        重启
-                      </n-button>
+                        <IconRefresh :size="11" stroke-width="2" class="flex-shrink-0" />
+                        <span class="leading-none">重启</span>
+                      </button>
 
-                      <n-button
+                      <button
                         v-if="getServiceStatus(service.id).status === 'RUNNING' || getServiceStatus(service.id).status === 'STARTING'"
-                        size="tiny"
-                        type="error"
-                        secondary
-                        class="!text-rose-600 dark:!text-rose-400 !border-rose-500/30 hover:!bg-rose-500/10"
+                        type="button"
+                        class="group h-6 px-2 rounded-md border text-[11px] font-sans font-semibold inline-flex items-center gap-1 transition-all duration-200 cursor-pointer select-none bg-rose-500/10 hover:bg-rose-500/20 active:scale-95 text-rose-600 dark:text-rose-400 border-rose-500/30 hover:border-rose-500/60"
+                        title="终止此服务进程"
                         @click="handleStopSingleService(service.id)"
                       >
-                        <template #icon>
-                          <IconSquare :size="12" class="text-rose-600 dark:text-rose-400" />
-                        </template>
-                        <span class="text-rose-600 dark:text-rose-400 font-medium">停止</span>
-                      </n-button>
+                        <IconSquare
+                          :size="11"
+                          stroke-width="2"
+                          class="text-rose-600 dark:text-rose-400 fill-current/30 group-hover:fill-current transition-all flex-shrink-0 -translate-y-[0.5px]"
+                        />
+                        <span class="leading-none">停止</span>
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -780,302 +756,10 @@
           </div>
         </n-tab-pane>
 
-        <!-- Tab 5: 实时控制台 (Upgraded Modern Pro Terminal Logs) -->
-        <n-tab-pane name="logs" tab="实时控制台" class="h-full flex flex-col font-sans">
-          <div class="flex-1 flex flex-col bg-[#09090b] border border-[#27272a] rounded-xl overflow-hidden mt-1 mb-4 shadow-2xl">
-            <!-- Terminal Header / Titlebar (macOS Style Traffic Lights & Status) -->
-            <div class="h-10 px-4 bg-[#121216] border-b border-[#27272a] flex items-center justify-between flex-shrink-0 select-none">
-              <!-- Left: macOS Dots & Title -->
-              <div class="flex items-center gap-3 min-w-0">
-                <div class="flex items-center gap-1.5 flex-shrink-0">
-                  <span class="w-2.5 h-2.5 rounded-full bg-[#ff5f56]/90 border border-[#e0443e]/50 inline-block shadow-xs" />
-                  <span class="w-2.5 h-2.5 rounded-full bg-[#ffbd2e]/90 border border-[#dea123]/50 inline-block shadow-xs" />
-                  <span class="w-2.5 h-2.5 rounded-full bg-[#27c93f]/90 border border-[#1aab29]/50 inline-block shadow-xs" />
-                </div>
-
-                <div class="h-3.5 w-[1px] bg-[#27272a] flex-shrink-0" />
-
-                <div class="flex items-center gap-2 text-xs font-sans font-semibold text-zinc-100 whitespace-nowrap">
-                  <IconTerminal :size="14" class="text-zinc-400" />
-                  <span>控制台实时输出流</span>
-                  <span class="text-[10px] font-mono font-medium px-1.5 py-0.2 rounded border bg-[#18181b] text-zinc-300 border-[#27272a]">
-                    {{ filteredLogs.length }} 行
-                  </span>
-                  <span
-                    v-if="stderrLogsCount > 0"
-                    class="text-[10px] font-sans font-medium px-2 py-0.2 rounded border bg-rose-950/40 text-rose-300 border-rose-800 flex items-center gap-1"
-                  >
-                    <span>⚠️ {{ stderrLogsCount }} 条错误</span>
-                  </span>
-                </div>
-              </div>
-
-              <!-- Right: Process Live Status -->
-              <div class="flex items-center gap-2 flex-shrink-0">
-                <div
-                  class="flex items-center gap-1.5 px-2.5 py-0.5 rounded-md border text-[11px] font-sans font-medium"
-                  :class="isAnyServiceRunning
-                    ? 'bg-emerald-950/40 border-emerald-800/80 text-emerald-300'
-                    : 'bg-[#18181b] border-[#27272a] text-zinc-500'"
-                >
-                  <span
-                    class="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                    :class="isAnyServiceRunning ? 'bg-emerald-400 pulsing-dot-active' : 'bg-zinc-600'"
-                  />
-                  <span>{{ isAnyServiceRunning ? '捕获活跃中 (ACTIVE)' : '服务未运行 (IDLE)' }}</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Terminal Secondary Sub-Toolbar (Filters & Quick Actions) -->
-            <div class="px-3.5 py-2 bg-[#101014] border-b border-[#202028] flex items-center justify-between gap-3 flex-wrap flex-shrink-0 text-xs font-sans">
-              <!-- Left: Service Filter Capsules & Search -->
-              <div class="flex items-center gap-2 flex-wrap min-w-0">
-                <!-- Service Selector Pills -->
-                <div class="flex items-center gap-1 bg-[#18181b] p-0.5 rounded-lg border border-[#27272a]">
-                  <button
-                    type="button"
-                    class="px-2.5 py-1 rounded text-xs transition-colors cursor-pointer select-none font-medium flex items-center gap-1"
-                    :class="selectedServiceLogFilter === 'ALL'
-                      ? 'bg-white text-black font-semibold shadow-xs'
-                      : 'text-zinc-400 hover:text-zinc-200'"
-                    @click="selectedServiceLogFilter = 'ALL'"
-                  >
-                    <span>全部服务</span>
-                    <span class="font-mono text-[10px] opacity-80">({{ currentProjectLogs.length }})</span>
-                  </button>
-
-                  <button
-                    v-for="s in activeProfile?.services || []"
-                    :key="s.id"
-                    type="button"
-                    class="px-2.5 py-1 rounded text-xs transition-colors cursor-pointer select-none flex items-center gap-1.5 font-medium"
-                    :class="selectedServiceLogFilter === s.name
-                      ? 'bg-white text-black font-semibold shadow-xs'
-                      : 'text-zinc-400 hover:text-zinc-200'"
-                    @click="selectedServiceLogFilter = s.name"
-                  >
-                    <span
-                      class="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                      :class="getServiceStatus(s.id).status === 'RUNNING' ? 'bg-emerald-400' : 'bg-zinc-600'"
-                    />
-                    <span>{{ s.name }}</span>
-                    <span class="font-mono text-[10px] opacity-75">
-                      ({{ getServiceLogCount(s.name) }})
-                    </span>
-                  </button>
-                </div>
-
-                <!-- Stream Level Filter (ALL / OUT / ERR) -->
-                <div class="flex items-center gap-0.5 bg-[#18181b] p-0.5 rounded-lg border border-[#27272a] font-mono text-[11px]">
-                  <button
-                    type="button"
-                    class="px-2 py-1 rounded transition-colors cursor-pointer select-none font-semibold"
-                    :class="selectedStreamFilter === 'ALL'
-                      ? 'bg-zinc-700 text-white shadow-xs'
-                      : 'text-zinc-400 hover:text-zinc-200'"
-                    @click="selectedStreamFilter = 'ALL'"
-                  >
-                    ALL
-                  </button>
-                  <button
-                    type="button"
-                    class="px-2 py-1 rounded transition-colors cursor-pointer select-none font-semibold"
-                    :class="selectedStreamFilter === 'stdout'
-                      ? 'bg-zinc-700 text-white shadow-xs'
-                      : 'text-zinc-400 hover:text-zinc-200'"
-                    @click="selectedStreamFilter = 'stdout'"
-                  >
-                    OUT
-                  </button>
-                  <button
-                    type="button"
-                    class="px-2 py-1 rounded transition-colors cursor-pointer select-none font-semibold"
-                    :class="selectedStreamFilter === 'stderr'
-                      ? 'bg-rose-900 text-rose-200 shadow-xs'
-                      : 'text-zinc-400 hover:text-rose-400'"
-                    @click="selectedStreamFilter = 'stderr'"
-                  >
-                    ERR ({{ stderrLogsCount }})
-                  </button>
-                </div>
-
-                <!-- Terminal Search Box -->
-                <div class="relative flex items-center">
-                  <input
-                    v-model="logSearch"
-                    type="text"
-                    placeholder="检索日志关键字..."
-                    class="h-7 w-44 bg-[#18181b] border border-[#27272a] text-zinc-200 placeholder-zinc-500 text-xs rounded-lg pl-7 pr-6 outline-none focus:border-zinc-400 transition-colors font-sans"
-                  />
-                  <IconSearch :size="12" class="text-zinc-500 absolute left-2 pointer-events-none" />
-                  <button
-                    v-if="logSearch"
-                    type="button"
-                    class="text-zinc-500 hover:text-zinc-300 absolute right-2 text-xs"
-                    @click="logSearch = ''"
-                  >
-                    ×
-                  </button>
-                </div>
-              </div>
-
-              <!-- Right: Quick Utilities Toolbar -->
-              <div class="flex items-center gap-1.5 flex-shrink-0 font-sans">
-                <!-- Auto-scroll Toggle -->
-                <button
-                  type="button"
-                  class="h-7 px-2.5 rounded-lg border text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer select-none"
-                  :class="autoScroll
-                    ? 'bg-emerald-950/50 border-emerald-700 text-emerald-300 shadow-xs'
-                    : 'bg-[#18181b] border-[#27272a] text-zinc-400 hover:text-zinc-200'"
-                  :title="autoScroll ? '自动滚动已开启' : '点击开启自动滚动'"
-                  @click="autoScroll = !autoScroll"
-                >
-                  <IconZap :size="12" />
-                  <span>{{ autoScroll ? '滚屏锁定' : '自由滚动' }}</span>
-                </button>
-
-                <!-- Show Timestamps Toggle -->
-                <button
-                  type="button"
-                  class="h-7 px-2.5 rounded-lg border text-xs font-medium transition-colors cursor-pointer select-none"
-                  :class="showTimestamps
-                    ? 'bg-[#27272a] border-zinc-600 text-zinc-200 shadow-xs'
-                    : 'bg-[#18181b] border-[#27272a] text-zinc-500 hover:text-zinc-300'"
-                  title="切换时间戳显示"
-                  @click="showTimestamps = !showTimestamps"
-                >
-                  时间戳
-                </button>
-
-                <!-- Show Line Numbers Toggle -->
-                <button
-                  type="button"
-                  class="h-7 px-2.5 rounded-lg border text-xs font-medium transition-colors cursor-pointer select-none"
-                  :class="showLineNumbers
-                    ? 'bg-[#27272a] border-zinc-600 text-zinc-200 shadow-xs'
-                    : 'bg-[#18181b] border-[#27272a] text-zinc-500 hover:text-zinc-300'"
-                  title="切换行号显示"
-                  @click="showLineNumbers = !showLineNumbers"
-                >
-                  行号
-                </button>
-
-                <div class="h-4 w-[1px] bg-[#27272a] mx-0.5" />
-
-                <!-- Copy All Logs -->
-                <button
-                  type="button"
-                  class="h-7 px-2.5 bg-[#18181b] border border-[#27272a] text-zinc-300 hover:text-white rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer select-none hover:border-zinc-500"
-                  title="复制当前过滤的所有日志"
-                  @click="copyAllLogs"
-                >
-                  <IconCopy :size="12" />
-                  <span>复制</span>
-                </button>
-
-                <!-- Export Logs -->
-                <button
-                  type="button"
-                  class="h-7 px-2.5 bg-[#18181b] border border-[#27272a] text-zinc-300 hover:text-white rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer select-none hover:border-zinc-500"
-                  title="导出为 .log 文件"
-                  @click="exportLogsToFile"
-                >
-                  <IconDownload :size="12" />
-                  <span>导出</span>
-                </button>
-
-                <!-- Clear Logs -->
-                <button
-                  type="button"
-                  class="h-7 px-2.5 bg-rose-950/30 border border-rose-900/60 text-rose-300 hover:bg-rose-900/40 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer select-none"
-                  title="清空控制台历史日志"
-                  @click="handleClearLogs"
-                >
-                  <IconTrash :size="12" />
-                  <span>清屏</span>
-                </button>
-              </div>
-            </div>
-
-            <!-- Terminal Output Stream Window -->
-            <div
-              ref="logContainerRef"
-              class="flex-1 overflow-y-auto p-4 terminal-code-stream space-y-1 select-text bg-[#09090b] [scrollbar-gutter:stable]"
-            >
-              <!-- Empty State -->
-              <div
-                v-if="filteredLogs.length === 0"
-                class="text-zinc-500 text-center py-20 flex flex-col items-center justify-center gap-3 select-none font-sans"
-              >
-                <div class="w-12 h-12 rounded-2xl bg-[#121216] border border-[#27272a] flex items-center justify-center text-zinc-400 shadow-md">
-                  <IconTerminal :size="24" />
-                </div>
-                <div class="text-sm font-bold tracking-tight text-zinc-200">
-                  {{ isAnyServiceRunning ? '等待服务产生终端输出...' : '服务进程尚未启动' }}
-                </div>
-                <div class="text-xs text-zinc-400 max-w-md leading-relaxed">
-                  {{ isAnyServiceRunning ? '服务正在后台运行中，新的 stdout/stderr 日志流将自动实时呈现在此处。' : '请点击右上角【一键启动】或【服务控制】拉起服务，控制台将自动捕获实时进程输出。' }}
-                </div>
-              </div>
-
-              <!-- Log Rows -->
-              <div
-                v-for="(entry, idx) in filteredLogs"
-                :key="idx"
-                class="leading-relaxed break-all flex items-start gap-2.5 hover:bg-[#15151a] px-2 py-0.5 rounded transition-colors group"
-              >
-                <!-- Line Number -->
-                <span
-                  v-if="showLineNumbers"
-                  class="text-zinc-600 text-xs select-none flex-shrink-0 w-8 text-right font-mono"
-                >
-                  {{ String(idx + 1).padStart(3, '0') }}
-                </span>
-
-                <!-- Timestamp -->
-                <span
-                  v-if="showTimestamps"
-                  class="text-zinc-500 text-xs select-none flex-shrink-0 font-mono"
-                >
-                  {{ entry.timestamp ? new Date(entry.timestamp).toLocaleTimeString() : '' }}
-                </span>
-
-                <!-- Service Name Capsule -->
-                <span
-                  class="text-zinc-200 font-medium text-[11px] bg-[#1a1a22] px-2 py-0.2 rounded-md flex-shrink-0 select-none border border-zinc-700/80 font-sans"
-                >
-                  {{ entry.serviceName }}
-                </span>
-
-                <!-- Stream Type Badge (ERR / OUT) -->
-                <span
-                  class="text-[10px] font-bold px-1.5 py-0.2 rounded flex-shrink-0 select-none uppercase font-mono"
-                  :class="entry.stream === 'stderr' ? 'bg-rose-950 text-rose-300 border border-rose-800' : 'text-zinc-500'"
-                >
-                  {{ entry.stream === 'stderr' ? 'ERR' : 'OUT' }}
-                </span>
-
-                <!-- Log Message -->
-                <span
-                  class="flex-1 text-xs"
-                  :class="entry.stream === 'stderr' ? 'text-rose-400 font-medium' : 'text-zinc-200'"
-                >
-                  {{ entry.message }}
-                </span>
-
-                <!-- Hover Copy Line Button -->
-                <button
-                  type="button"
-                  class="opacity-0 group-hover:opacity-100 text-zinc-400 hover:text-white px-1.5 py-0.5 text-xs rounded transition-opacity flex-shrink-0 select-none bg-[#202028] border border-zinc-700 cursor-pointer shadow-2xs"
-                  title="复制单行日志"
-                  @click="copySingleLogLine(entry.message)"
-                >
-                  <IconCopy :size="11" />
-                </button>
-              </div>
-            </div>
+        <!-- Tab 6: 运行历史 (Run History) -->
+        <n-tab-pane name="history" tab="运行历史" class="h-full overflow-y-auto">
+          <div class="pt-2 pb-6 space-y-4 w-full">
+            <RunHistory :project-id="props.id || projectStore.currentProject?.id" />
           </div>
         </n-tab-pane>
       </n-tabs>
@@ -1107,7 +791,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { message } from '../utils/discrete.js';
 import { setPageTitle } from '../utils/title.js';
@@ -1120,6 +804,7 @@ import { failurePolicyLabel, getProfilePresentation } from '../utils/runner-pres
 import EditServiceModal from '../components/EditServiceModal.vue';
 import AnalysisProgressModal from '../components/AnalysisProgressModal.vue';
 import ProjectFileTree from '../components/ProjectFileTree.vue';
+import RunHistory from '../components/RunHistory.vue';
 import {
   IconArrowLeft,
   IconCopy,
@@ -1131,10 +816,7 @@ import {
   IconPlus,
   IconEdit,
   IconTrash,
-  IconTerminal,
   IconZap,
-  IconSearch,
-  IconDownload,
   IconCheck,
 } from '../components/icons/index.js';
 import type {
@@ -1181,60 +863,10 @@ const analysis = useAnalysisTask(window.codehelm.analysis, () => props.id, (stat
 }, (error) => message.error(error instanceof Error ? error.message : '分析任务操作失败'));
 const { task: analysisTask, busy: isAnalyzing, canCancel: canCancelAnalysis } = analysis;
 const isLaunching = ref(false);
-const analysisStage = computed(() => analysisTask.value?.stage ?? '正在启动扫描 Worker…');
-const analysisPercentage = computed(() => analysisTask.value?.percentage ?? 0);
 
 const editModalVisible = ref(false);
 const selectedServiceToEdit = ref<ServiceConfigDto | null>(null);
 const analysisModalVisible = ref(false);
-
-const logSearch = ref('');
-const selectedServiceLogFilter = ref('ALL');
-const selectedStreamFilter = ref<'ALL' | 'stdout' | 'stderr'>('ALL');
-const showTimestamps = ref(true);
-const showLineNumbers = ref(true);
-const autoScroll = ref(true);
-const logContainerRef = ref<HTMLDivElement | null>(null);
-
-const currentProjectLogs = computed(() => {
-  const curProjId = props.id || projectStore.currentProject?.id;
-  if (!curProjId) return runnerStore.logs;
-
-  const currentProjectServiceNames = new Set(
-    activeProfile.value?.services?.map((s) => s.name) || []
-  );
-  for (const session of runnerStore.activeSessions) {
-    if (session.projectId === curProjId) {
-      for (const s of session.services) {
-        if (s.serviceName) currentProjectServiceNames.add(s.serviceName);
-      }
-    }
-  }
-  for (const s of runnerStore.serviceStatuses.values()) {
-    if (s.projectId === curProjId && s.serviceName) {
-      currentProjectServiceNames.add(s.serviceName);
-    }
-  }
-
-  return runnerStore.logs.filter((log) => {
-    if (log.serviceSessionId) {
-      for (const s of runnerStore.serviceStatuses.values()) {
-        if (s.sessionServiceId === log.serviceSessionId) {
-          return s.projectId === curProjId;
-        }
-      }
-    }
-    return currentProjectServiceNames.has(log.serviceName);
-  });
-});
-
-const stderrLogsCount = computed(() => {
-  return currentProjectLogs.value.filter((l) => l.stream === 'stderr').length;
-});
-
-function getServiceLogCount(serviceName: string) {
-  return currentProjectLogs.value.filter((l) => l.serviceName === serviceName).length;
-}
 
 onMounted(async () => {
   analysis.subscribe();
@@ -1457,39 +1089,6 @@ function getServiceStatus(serviceId: string) {
   return { status: profilePresentation.value.historical ? 'IDLE' as ProcessStatus : 'STOPPED' as ProcessStatus };
 }
 
-const filteredLogs = computed(() => {
-  let list = currentProjectLogs.value;
-
-  if (selectedServiceLogFilter.value !== 'ALL') {
-    list = list.filter((l) => l.serviceName === selectedServiceLogFilter.value);
-  }
-
-  if (selectedStreamFilter.value !== 'ALL') {
-    list = list.filter((l) => l.stream === selectedStreamFilter.value);
-  }
-
-  if (logSearch.value.trim()) {
-    const q = logSearch.value.toLowerCase().trim();
-    list = list.filter((l) => l.message.toLowerCase().includes(q) || l.serviceName.toLowerCase().includes(q));
-  }
-
-  // 最新时间在最上面 (Latest first)
-  return list.slice().reverse();
-});
-
-watch(
-  () => runnerStore.logs.length,
-  () => {
-    if (autoScroll.value && logContainerRef.value) {
-      nextTick(() => {
-        if (logContainerRef.value) {
-          logContainerRef.value.scrollTop = 0;
-        }
-      });
-    }
-  }
-);
-
 const isEditPathOpen = ref(false);
 const editingPathInput = ref('');
 const isSavingPath = ref(false);
@@ -1524,46 +1123,7 @@ function copyRootPath() {
   }
 }
 
-function copyAllLogs() {
-  if (filteredLogs.value.length === 0) {
-    message.warning('暂无控制台日志可复制');
-    return;
-  }
-  const text = filteredLogs.value
-    .map((l) => `[${l.timestamp ? new Date(l.timestamp).toLocaleTimeString() : ''}] [${l.serviceName}] [${l.stream.toUpperCase()}] ${l.message}`)
-    .join('\n');
-  navigator.clipboard.writeText(text);
-  message.success(`已复制 ${filteredLogs.value.length} 行控制台日志`);
-}
 
-function copySingleLogLine(msg: string) {
-  navigator.clipboard.writeText(msg);
-  message.success('已复制单行日志');
-}
-
-function exportLogsToFile() {
-  if (filteredLogs.value.length === 0) {
-    message.warning('当前暂无日志可导出');
-    return;
-  }
-  const content = filteredLogs.value
-    .map((l) => `[${l.timestamp ? new Date(l.timestamp).toISOString() : ''}] [${l.serviceName}] [${l.stream.toUpperCase()}] ${l.message}`)
-    .join('\n');
-  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  const projectName = projectStore.currentProject?.name || 'project';
-  a.href = url;
-  a.download = `${projectName}-logs-${Date.now()}.log`;
-  a.click();
-  URL.revokeObjectURL(url);
-  message.success('已导出控制台日志文件');
-}
-
-function handleClearLogs() {
-  runnerStore.clearLogs();
-  message.info('控制台日志已清空');
-}
 
 async function handleStartAnalysis() {
   analysisModalVisible.value = true;
@@ -1753,4 +1313,5 @@ function serviceStatusLabel(status: ProcessStatus | string) {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
 </style>

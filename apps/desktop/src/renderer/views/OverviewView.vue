@@ -805,6 +805,7 @@ function handleSelectFilter(val: string) {
 }
 
 onMounted(() => {
+  runnerStore.setupListeners();
   void runnerStore.fetchState();
   updateIndicator();
   // Ensure indicator updates once child refs are mounted

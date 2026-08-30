@@ -138,8 +138,13 @@ const job = useProjectTask(window.codehelm.projects, (state) => {
   }
   if (state.kind === 'import') {
     void store.fetchProjects();
-    if (state.status === 'completed') message.success('导入任务完成，逐项结果如下');
-    else if (state.status === 'partial') message.warning('部分项目未完成，已保存的项目保留');
+    if (state.status === 'completed') {
+      const count = state.completedCount || 1;
+      message.success(mode.value === 'single' ? '项目导入成功' : `成功导入 ${count} 个项目`);
+      store.importModalVisible = false;
+    } else if (state.status === 'partial') {
+      message.warning('部分项目未完成，已保存的项目保留');
+    }
   }
 }, (error) => { errorText.value = error instanceof Error ? error.message : '项目任务操作失败'; });
 const { state: task, busy, starting } = job;

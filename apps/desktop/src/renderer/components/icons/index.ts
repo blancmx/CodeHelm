@@ -163,6 +163,12 @@ export const IconActivity = createIcon('IconActivity', () => [
   h('polyline', { points: '22 12 18 12 15 21 9 3 6 12 2 12' }),
 ]);
 
+export const IconHistory = createIcon('IconHistory', () => [
+  h('path', { d: 'M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8' }),
+  h('polyline', { points: '3 3 3 8 8 8' }),
+  h('polyline', { points: '12 7 12 12 15 15' }),
+]);
+
 export const IconTerminal = createIcon('IconTerminal', () => [
   h('polyline', { points: '4 17 10 11 4 5' }),
   h('line', { x1: 12, y1: 19, x2: 20, y2: 19 }),
