@@ -17,9 +17,10 @@
         <router-link
           v-if="projectId"
           to="/runner#run-history"
-          class="inline-flex items-center gap-1 mt-2 text-xs font-medium text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors underline"
+          class="inline-flex items-center gap-1.5 mt-2 text-xs font-sans font-medium text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors group/link select-none"
         >
-          查看全部项目记录 →
+          <span class="group-hover/link:underline underline-offset-4 decoration-zinc-400 dark:decoration-zinc-600">查看全部项目记录</span>
+          <IconArrowRight :size="12" stroke-width="2" class="transition-transform duration-150 group-hover/link:translate-x-0.5" />
         </router-link>
       </div>
 
@@ -167,7 +168,7 @@ import { computed, ref, watch, nextTick } from 'vue';
 import { useRunnerStore } from '../stores/runnerStore.js';
 import { useProjectStore } from '../stores/projectStore.js';
 import { useThemeStore } from '../stores/themeStore.js';
-import { IconRefresh, IconChevronRight } from './icons/index.js';
+import { IconRefresh, IconChevronRight, IconArrowRight } from './icons/index.js';
 import { message } from '../utils/discrete.js';
 
 const runner = useRunnerStore();

@@ -6,6 +6,7 @@ import RunnerView from '../views/RunnerView.vue';
 import ConsoleView from '../views/ConsoleView.vue';
 import SettingsView from '../views/SettingsView.vue';
 import { setPageTitle } from '../utils/title.js';
+import { useNavHistoryStore } from '../stores/navHistoryStore.js';
 
 const router = createRouter({
   history: createWebHashHistory(),
@@ -53,6 +54,7 @@ const router = createRouter({
 router.afterEach((to) => {
   const pageTitle = to.meta?.title as string | undefined;
   setPageTitle(pageTitle);
+  useNavHistoryStore().recordNavigation(to.fullPath);
 });
 
 export default router;

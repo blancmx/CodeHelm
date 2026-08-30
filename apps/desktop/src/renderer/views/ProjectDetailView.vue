@@ -792,7 +792,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { message } from '../utils/discrete.js';
 import { setPageTitle } from '../utils/title.js';
 import { useProjectStore } from '../stores/projectStore.js';
@@ -833,6 +833,7 @@ const props = defineProps<{
   id: string;
 }>();
 
+const router = useRouter();
 const route = useRoute();
 const projectStore = useProjectStore();
 const runnerStore = useRunnerStore();
@@ -848,7 +849,31 @@ watch(
   { immediate: true }
 );
 
-const activeMainTab = ref(typeof route?.query?.tab === 'string' ? route.query.tab : 'overview');
+const activeMainTab = ref<string>(typeof route?.query?.tab === 'string' ? route.query.tab : 'overview');
+
+// Two-way sync with router query so each tab switch creates a distinct history step
+watch(activeMainTab, (newTab) => {
+  const currentTabInQuery = typeof route.query.tab === 'string' ? route.query.tab : 'overview';
+  if (newTab !== currentTabInQuery) {
+    const query = { ...route.query };
+    if (newTab === 'overview') {
+      delete query.tab;
+    } else {
+      query.tab = newTab;
+    }
+    void router.push({ path: route.path, query });
+  }
+});
+
+watch(
+  () => route.query.tab,
+  (tabQuery) => {
+    const targetTab = typeof tabQuery === 'string' ? tabQuery : 'overview';
+    if (activeMainTab.value !== targetTab) {
+      activeMainTab.value = targetTab;
+    }
+  }
+);
 const latestSnapshot = ref<AnalysisSnapshotDto | null>(null);
 const readmeSummary = ref<ReadmeSummaryDto | null>(null);
 const profiles = ref<RunProfileDto[]>([]);

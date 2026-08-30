@@ -48,7 +48,7 @@
                 CodeHelm
               </h1>
               <p class="text-[9px] font-medium truncate select-none" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
-                本地多项目控制台
+                本地项目控制台
               </p>
             </div>
           </div>
@@ -282,7 +282,7 @@
     >
       <router-view v-slot="{ Component, route }">
         <transition name="page-fade-slide" mode="out-in">
-          <component :is="Component" :key="route.fullPath" />
+          <component :is="Component" :key="route.path" />
         </transition>
       </router-view>
     </main>

@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <svg
     xmlns="http://www.w3.org/2000/svg"
     :width="size"
@@ -57,29 +57,19 @@ withDefaults(
   transition: stroke 200ms ease;
 }
 
-/* Sidebar Pill with smooth width & opacity transition */
+/* Sidebar Pill with smooth width & opacity transition without any bounce or jitter */
 .panel-sidebar-pill {
   fill: currentColor;
   stroke: none;
-  transform-origin: 4.5px 12px;
   transition:
-    all 280ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    width 200ms ease,
+    rx 200ms ease,
     fill-opacity 200ms ease;
 }
 .panel-sidebar-pill:not(.is-collapsed) {
   fill-opacity: 0.95;
 }
 .panel-sidebar-pill.is-collapsed {
-  fill-opacity: 0.4;
-}
-
-/* Micro-interaction on parent button hover */
-:global(.group\/toggle:hover) .panel-sidebar-pill.is-collapsed {
-  transform: scaleX(1.35);
-  fill-opacity: 0.75;
-}
-
-:global(.group\/toggle:hover) .panel-sidebar-pill:not(.is-collapsed) {
-  transform: scaleX(0.92);
+  fill-opacity: 0.45;
 }
 </style>

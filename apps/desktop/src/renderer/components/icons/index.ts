@@ -245,6 +245,10 @@ export const IconArrowRight = createIcon('IconArrowRight', () => [
   h('polyline', { points: '12 5 19 12 12 19' }),
 ]);
 
+export const IconChevronLeft = createIcon('IconChevronLeft', () => [
+  h('polyline', { points: '15 18 9 12 15 6' }),
+]);
+
 export const IconChevronDown = createIcon('IconChevronDown', () => [
   h('polyline', { points: '6 9 12 15 18 9' }),
 ]);

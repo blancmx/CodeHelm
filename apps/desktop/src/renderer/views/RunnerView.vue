@@ -322,7 +322,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import RunHistory from '../components/RunHistory.vue';
 import { message, dialog } from '../utils/discrete.js';
 import { useRunnerStore } from '../stores/runnerStore.js';
@@ -338,17 +338,33 @@ import {
   IconRefresh,
 } from '../components/icons/index.js';
 
+const router = useRouter();
 const runnerStore = useRunnerStore();
 const route = useRoute();
 const projectStore = useProjectStore();
 const themeStore = useThemeStore();
-const activeTab = ref<'active' | 'history'>('active');
+const activeTab = ref<'active' | 'history'>((route.hash === '#run-history' || route.query.tab === 'history' || typeof route.query.project === 'string') ? 'history' : 'active');
+
+watch(activeTab, (newTab) => {
+  const currentTab = (route.hash === '#run-history' || route.query.tab === 'history' || typeof route.query.project === 'string') ? 'history' : 'active';
+  if (newTab !== currentTab) {
+    const query = { ...route.query };
+    if (newTab === 'active') {
+      delete query.tab;
+    } else {
+      query.tab = 'history';
+    }
+    void router.push({ path: route.path, query });
+  }
+});
 
 watch(
   () => [route.hash, route.query.tab, route.query.project],
   () => {
     if (route.hash === '#run-history' || route.query.tab === 'history' || typeof route.query.project === 'string') {
-      activeTab.value = 'history';
+      if (activeTab.value !== 'history') activeTab.value = 'history';
+    } else {
+      if (activeTab.value !== 'active') activeTab.value = 'active';
     }
   },
   { immediate: true }
