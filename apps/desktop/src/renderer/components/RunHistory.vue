@@ -115,7 +115,7 @@
               {{ statusLabels[session.status] || session.status }}
             </span>
           </div>
-          <span class="text-xs text-zinc-500 font-mono">{{ formatTime(session.startedAt) }} · {{ session.services.length }} 条服务记录</span>
+          <span class="text-xs text-zinc-500 font-sans"><span class="font-mono">{{ formatTime(session.startedAt) }}</span> · <span class="font-mono">{{ session.services.length }}</span> 条服务记录</span>
         </div>
 
         <!-- Buttery-Smooth CSS Grid Expand & Collapse Container -->
@@ -141,8 +141,8 @@
                   >
                     {{ service.status }}
                   </span>
-                  <span v-if="service.pid" class="text-zinc-500 text-xs font-mono">记录 PID {{ service.pid }}</span>
-                  <span v-if="service.port" class="text-zinc-500 text-xs font-mono">记录端口 {{ service.port }}</span>
+                  <span v-if="service.pid" class="text-zinc-500 text-xs font-sans">记录 PID <span class="font-mono font-medium">{{ service.pid }}</span></span>
+                  <span v-if="service.port" class="text-zinc-500 text-xs font-sans">记录端口 <span class="font-mono font-medium">{{ service.port }}</span></span>
                 </div>
                 <p v-if="service.recovery" class="text-xs mt-1 text-amber-600 dark:text-amber-400">
                   {{ recoveryLabels[service.recovery.outcome] }} · 核验于 {{ formatTime(service.recovery.checkedAt) }}

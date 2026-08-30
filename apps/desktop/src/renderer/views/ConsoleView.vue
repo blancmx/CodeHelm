@@ -332,6 +332,11 @@
         <div
           v-for="(entry, idx) in filteredLogs"
           :key="entry.id"
+          v-memo="[
+            entry.id, entry.message, entry.timestamp, entry.serviceName, entry.stream,
+            idx, showLineNumbers, showTimestamps,
+            selectedProjectFilter === 'ALL', getEntryProjectName(entry),
+          ]"
           class="terminal-log-row leading-relaxed break-all flex items-start gap-2.5 hover:bg-[#15151a] px-2 py-0.5 rounded transition-colors group"
         >
           <!-- Line Number -->
@@ -389,7 +394,16 @@
             title="复制单行日志"
             @click="copySingleLogLine(entry.message)"
           >
-            <IconCopy :size="11" />
+            <!-- Keep the repeated glyph static: no component instance per log entry. -->
+            <svg
+              xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+              width="11" height="11" fill="none" stroke="currentColor"
+              stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
+              aria-hidden="true" focusable="false"
+            >
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+            </svg>
           </button>
         </div>
       </div>
@@ -413,6 +427,7 @@ import {
   IconZap,
 } from '../components/icons/index.js';
 import type { LogEntryDto } from '@codehelm/contracts';
+import { countLogsByProject, resolveLogProjectId } from '../utils/console-logs.js';
 
 const route = useRoute();
 const runnerStore = useRunnerStore();
@@ -458,24 +473,19 @@ const serviceToProjectMap = computed(() => {
 });
 
 function getEntryProjectId(entry: LogEntryDto): string | undefined {
-  if (entry.serviceSessionId && serviceToProjectMap.value.has(entry.serviceSessionId)) {
-    return serviceToProjectMap.value.get(entry.serviceSessionId);
-  }
-  if (entry.serviceName && serviceToProjectMap.value.has(entry.serviceName)) {
-    return serviceToProjectMap.value.get(entry.serviceName);
-  }
-  return undefined;
+  return resolveLogProjectId(entry, serviceToProjectMap.value);
 }
+
+const projectNames = computed(() => new Map(projectStore.projects.map(p => [p.id, p.name])));
+const projectLogCounts = computed(() => countLogsByProject(runnerStore.logs, serviceToProjectMap.value));
 
 function getEntryProjectName(entry: LogEntryDto): string {
   const pId = getEntryProjectId(entry);
-  if (!pId) return '';
-  const p = projectStore.projects.find((x) => x.id === pId);
-  return p?.name || '';
+  return pId ? projectNames.value.get(pId) || '' : '';
 }
 
 function getProjectLogCount(projectId: string): number {
-  return runnerStore.logs.filter((l) => getEntryProjectId(l) === projectId).length;
+  return projectLogCounts.value.get(projectId) ?? 0;
 }
 
 // Only show projects that are currently started/running or have captured logs

@@ -3,7 +3,7 @@
     v-model:show="visible"
     preset="card"
     title="工程静态技术画像分析"
-    class="w-580px max-w-[calc(100vw-40px)] border shadow-2xl transition-colors duration-200"
+    class="w-580px max-w-[calc(100vw-40px)] border shadow-2xl transition-colors duration-200 font-sans"
     :class="themeStore.isDark ? 'bg-[#121216] border-[#27272a] shadow-black/90' : 'bg-white border-zinc-200 shadow-zinc-400/30'"
     :segmented="{ content: 'soft', footer: 'soft' }"
     :mask-closable="false"
@@ -20,7 +20,7 @@
             {{ projectName || '项目工程' }}
           </span>
           <span
-            class="text-[10px] font-mono px-2 py-0.5 rounded border flex-shrink-0"
+            class="text-[11px] font-sans font-semibold px-2 py-0.5 rounded-md border flex-shrink-0 leading-none transition-colors"
             :class="statusClass"
           >
             {{ presentation.label }}
@@ -40,14 +40,26 @@
         <div class="flex items-center justify-between text-xs">
           <div class="flex items-center gap-2 min-w-0 flex-1 pr-2">
             <span
-              class="w-2.5 h-2.5 rounded-full flex-shrink-0"
-              :class="busy ? 'pulsing-dot-active bg-emerald-500' : 'bg-zinc-400'"
+              class="w-2.5 h-2.5 rounded-full flex-shrink-0 transition-colors"
+              :class="[
+                busy ? 'pulsing-dot-active bg-emerald-500' :
+                presentation.tone === 'success' || status === 'completed' ? 'bg-emerald-500' :
+                presentation.tone === 'error' || status === 'failed' ? 'bg-rose-500' :
+                presentation.tone === 'warning' || status === 'cancelled' ? 'bg-amber-500' :
+                'bg-emerald-500'
+              ]"
             />
             <span class="font-semibold tracking-wide truncate" :class="themeStore.isDark ? 'text-white' : 'text-zinc-950'">
               {{ stage || '正在启动扫描 Worker…' }}
             </span>
           </div>
-          <span class="font-mono font-bold flex-shrink-0" :class="themeStore.isDark ? 'text-zinc-200' : 'text-zinc-800'">
+          <span
+            class="font-bold flex-shrink-0 text-xs"
+            :class="[
+              busy ? 'font-mono' : 'font-sans',
+              themeStore.isDark ? 'text-zinc-200' : 'text-zinc-800'
+            ]"
+          >
             {{ busy ? ((percentage ?? 0) > 0 ? `${percentage}%` : '扫描中') : presentation.label }}
           </span>
         </div>
@@ -121,10 +133,24 @@ const props = defineProps<{
 const presentation = computed(() => getAnalysisPresentation(props.status));
 const statusClass = computed(() => {
   const dark = themeStore.isDark;
-  if (presentation.value.tone === 'success') return dark ? 'bg-emerald-950/60 text-emerald-300 border-emerald-500/30' : 'bg-emerald-50 text-emerald-700 border-emerald-200';
-  if (presentation.value.tone === 'error') return dark ? 'bg-rose-950/60 text-rose-300 border-rose-500/30' : 'bg-rose-50 text-rose-700 border-rose-200';
-  if (presentation.value.tone === 'warning') return dark ? 'bg-amber-950/60 text-amber-300 border-amber-500/30' : 'bg-amber-50 text-amber-700 border-amber-200';
-  return dark ? 'bg-[#27272a] text-zinc-300 border-[#3f3f46]' : 'bg-white text-zinc-700 border-zinc-200';
+  if (presentation.value.tone === 'success' || props.status === 'completed') {
+    return dark
+      ? 'bg-emerald-950/60 text-emerald-300 border-emerald-500/40'
+      : 'bg-emerald-50 text-emerald-700 border-emerald-300 shadow-2xs';
+  }
+  if (presentation.value.tone === 'error' || props.status === 'failed') {
+    return dark
+      ? 'bg-rose-950/60 text-rose-300 border-rose-500/40'
+      : 'bg-rose-50 text-rose-700 border-rose-300 shadow-2xs';
+  }
+  if (presentation.value.tone === 'warning' || props.status === 'cancelled') {
+    return dark
+      ? 'bg-amber-950/60 text-amber-300 border-amber-500/40'
+      : 'bg-amber-50 text-amber-700 border-amber-300 shadow-2xs';
+  }
+  return dark
+    ? 'bg-[#27272a] text-zinc-300 border-[#3f3f46]'
+    : 'bg-zinc-100 text-zinc-700 border-zinc-200';
 });
 
 const emit = defineEmits<{

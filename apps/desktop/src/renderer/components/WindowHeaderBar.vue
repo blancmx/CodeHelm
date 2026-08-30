@@ -61,8 +61,8 @@
           stroke="currentColor"
           stroke-width="1.1"
         >
-          <rect x="2.5" y="0.75" width="6.75" height="6.75" rx="1.5" />
-          <path d="M0.75 3.25v4.5a1.5 1.5 0 0 0 1.5 1.5h4.5" stroke-linecap="round" />
+          <path d="M3.25 0.75h4.5a1.5 1.5 0 0 1 1.5 1.5v4.5" stroke-linecap="round" />
+          <rect x="0.75" y="2.5" width="6.75" height="6.75" rx="1.5" />
         </svg>
         <!-- Maximize Icon (with distinct rounded corners) -->
         <svg

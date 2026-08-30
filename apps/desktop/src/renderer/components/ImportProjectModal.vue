@@ -30,7 +30,7 @@
         </p>
         <div v-if="mode === 'single' && form.rootPath" class="text-xs space-y-1">
           <p>目录预览：{{ preview?.framework || (busy ? '正在探测…' : '尚未识别，导入后进行完整分析') }}</p>
-          <p v-if="preview?.recommendedRunCommand" class="font-mono break-all">建议命令：{{ preview.recommendedRunCommand }}</p>
+          <p v-if="preview?.recommendedRunCommand" class="font-sans text-xs break-all">建议命令：<span class="font-mono font-medium">{{ preview.recommendedRunCommand }}</span></p>
         </div>
         <div v-if="mode === 'batch'" class="flex items-center gap-3 text-xs">
           <span>扫描深度</span>

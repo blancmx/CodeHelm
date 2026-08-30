@@ -129,7 +129,7 @@
             <IconSquare
               :size="13"
               stroke-width="2"
-              class="text-rose-600 dark:text-rose-400 fill-current/30 group-hover:fill-current transition-all duration-200 group-hover:scale-90 flex-shrink-0 -translate-y-[0.5px]"
+              class="text-rose-600 dark:text-rose-400 fill-transparent group-hover:fill-current transition-all duration-200 group-hover:scale-90 flex-shrink-0 -translate-y-[0.5px]"
             />
             <span class="leading-none">停止服务</span>
           </button>
@@ -637,7 +637,7 @@
                         <IconSquare
                           :size="11"
                           stroke-width="2"
-                          class="text-rose-600 dark:text-rose-400 fill-current/30 group-hover:fill-current transition-all flex-shrink-0 -translate-y-[0.5px]"
+                          class="text-rose-600 dark:text-rose-400 fill-transparent group-hover:fill-current transition-all duration-200 group-hover:scale-90 flex-shrink-0 -translate-y-[0.5px]"
                         />
                         <span class="leading-none">停止</span>
                       </button>

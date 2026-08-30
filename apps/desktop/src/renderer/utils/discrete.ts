@@ -24,7 +24,7 @@ const monochromeThemeOverrides: GlobalThemeOverrides = {
     textColor3: '#a1a1aa',
     borderRadius: '12px',
     borderRadiusSmall: '8px',
-    fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif',
+    fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Helvetica Neue", sans-serif',
     fontFamilyMono: 'ui-monospace, "Cascadia Code", "Fira Code", "JetBrains Mono", Consolas, Menlo, Monaco, monospace',
   },
   Button: {

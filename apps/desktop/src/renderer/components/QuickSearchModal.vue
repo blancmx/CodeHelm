@@ -81,10 +81,10 @@
                         {{ project.name }}
                       </span>
                       <span
-                        class="text-[10px] font-mono px-1.5 py-0.2 rounded border flex-shrink-0"
+                        class="text-[10px] font-sans font-medium px-1.5 py-0.2 rounded border flex-shrink-0"
                         :class="themeStore.isDark ? 'bg-[#18181b] text-zinc-400 border-[#27272a]' : 'bg-zinc-100 text-zinc-600 border-zinc-200'"
                       >
-                        {{ project.moduleCount || 0 }} 模块 / {{ project.serviceCount || 0 }} 服务
+                        <span class="font-mono">{{ project.moduleCount || 0 }}</span> 模块 / <span class="font-mono">{{ project.serviceCount || 0 }}</span> 服务
                       </span>
                     </div>
                     <p
