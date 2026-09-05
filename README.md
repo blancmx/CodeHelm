@@ -89,7 +89,7 @@ pnpm build
 ### 3. 本地检查与 Windows 交付
 
 ```bash
-# 日常本地门禁：lint、类型检查、439 项单元/集成测试和生产构建
+# 日常本地门禁：lint、生产构建、类型检查和 439 项单元/集成测试
 pnpm check
 
 # 完整 Windows 门禁：上述检查 + 真实 Electron E2E

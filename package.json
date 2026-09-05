@@ -21,7 +21,7 @@
     "test:watch": "vitest",
     "test:e2e": "pnpm build && playwright test --config=playwright.config.ts",
     "test:e2e:built": "playwright test --config=playwright.config.ts",
-    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build",
+    "check": "pnpm lint && pnpm build && pnpm typecheck && pnpm test",
     "check:ci": "pnpm check && pnpm test:e2e:built",
     "clean": "pnpm -r run clean"
   },
