@@ -9,7 +9,7 @@
   <img src="https://img.shields.io/badge/TypeScript-5.x-black?style=flat-square&logo=typescript" alt="TypeScript" />
   <img src="https://img.shields.io/badge/Vite-6.x-black?style=flat-square&logo=vite" alt="Vite" />
   <img src="https://img.shields.io/badge/SQLite-Better--sqlite3-black?style=flat-square&logo=sqlite" alt="SQLite" />
-  <img src="https://img.shields.io/badge/License-Not%20declared-lightgrey?style=flat-square" alt="License not declared" />
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="MIT License" /></a>
 </p>
 
 ---
@@ -139,4 +139,8 @@ v0.1 面向 Windows 内部试用。数据库、备份和日志均为本地数据
 
 ## 📄 开源协议 (License)
 
-当前仓库尚未提供 `LICENSE` 文件，也未在包元数据中声明许可证，因此不能将本项目视为 MIT 或其他开源许可证。公开分发源代码或二进制文件前，应由项目所有者明确选择并加入项目许可证，同时核对随交付包分发的第三方组件许可与通知要求。
+本项目基于 **[MIT License](./LICENSE)** 开源，完整许可条款请参阅 [LICENSE](./LICENSE) 文件。
+
+Copyright (c) 2026 blancmx
+
+第三方组件遵循各自的许可证。

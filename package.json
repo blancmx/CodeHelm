@@ -2,6 +2,7 @@
   "name": "codehelm-monorepo",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "description": "CodeHelm - Local-first personal project management & orchestration desktop application",
   "packageManager": "pnpm@11.23.0",
   "engines": {
