@@ -18,16 +18,14 @@ jobs:
       PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/setup@v2
         with:
           version: 11.23.0
-          run_install: false
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: .node-version
-          cache: pnpm
+          runtime: node@24.16.0
+          cache: true
+          require-lockfile: true
+      - run: node --version
       - run: pnpm --version
-      - run: pnpm install --frozen-lockfile
       - run: pnpm check:ci
       - name: Upload Electron E2E diagnostics
         if: failure()
