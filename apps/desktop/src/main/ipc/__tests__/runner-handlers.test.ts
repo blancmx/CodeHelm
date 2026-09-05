@@ -1,5 +1,5 @@
 import { ipcMain } from 'electron';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 import fsp from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -10,6 +10,12 @@ import {
 
 const harness = await vi.hoisted(async () => {
   const { EventEmitter } = await import('node:events');
+  const fs = await import('node:fs/promises');
+  const os = await import('node:os');
+  const path = await import('node:path');
+  const projectRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'codehelm-runner-handlers-'));
+  const editedProjectRoot = path.join(projectRoot, 'edited-root');
+  await fs.mkdir(editedProjectRoot);
   const profile = {
     id: '00000000-0000-4000-8000-000000000001',
     projectId: '00000000-0000-4000-8000-000000000002',
@@ -36,7 +42,7 @@ const harness = await vi.hoisted(async () => {
   const project = {
     id: profile.projectId,
     name: 'Test project',
-    rootPath: 'E:/projects/codehelm-test',
+    rootPath: projectRoot,
     tags: [],
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
@@ -67,7 +73,7 @@ const harness = await vi.hoisted(async () => {
     args: string[];
     pythonModuleCheck?: { moduleName: string };
   }> = [{
-    key: 'node:npm:E:/projects/codehelm-test',
+    key: `node:npm:${projectRoot}`,
     label: '. (npm)',
     cwd: project.rootPath,
     executable: 'npm',
@@ -121,6 +127,8 @@ const harness = await vi.hoisted(async () => {
   return {
     profile,
     project,
+    projectRoot,
+    editedProjectRoot,
     applyConstraints,
     saveProfile,
     event,
@@ -179,6 +187,10 @@ const db = {
 
 const logSink = { accept: vi.fn() };
 await registerRunnerHandlers(ipcMain.handle, db as never, logSink as never);
+
+afterAll(async () => {
+  await fsp.rm(harness.projectRoot, { recursive: true, force: true });
+});
 
 function handler(channel: string) {
   const selected = harness.handlers.get(channel);
@@ -274,9 +286,9 @@ describe('runner IPC execution authorization', () => {
     harness.profile.services[0].moduleRelativePath = '.';
     harness.profile.services[0].cwdRelative = '';
     harness.createPlans.mockReturnValue([{
-      key: 'python-inferred:python:flask:e:/projects/codehelm-test',
+      key: `python-inferred:python:flask:${harness.projectRoot}`,
       label: '. (Flask, inferred if missing)',
-      cwd: 'E:/projects/codehelm-test',
+      cwd: harness.projectRoot,
       executable: 'python',
       args: ['-m', 'pip', 'install', 'Flask'],
       pythonModuleCheck: { moduleName: 'flask' },
@@ -302,7 +314,7 @@ describe('runner IPC execution authorization', () => {
     expect(harness.isPythonModuleAvailable).toHaveBeenCalledWith(
       'python',
       'flask',
-      'E:/projects/codehelm-test'
+      harness.projectRoot
     );
   });
 
@@ -449,7 +461,7 @@ describe('runner asynchronous approval boundaries', () => {
     await started;
     if (field === 'args') harness.profile.services[0].args = ['edited'];
     if (field === 'name') harness.profile.name = 'edited';
-    if (field === 'root') harness.project.rootPath = 'E:/synthetic-edited-root';
+    if (field === 'root') harness.project.rootPath = harness.editedProjectRoot;
     release();
     try {
       await expect(request).rejects.toThrow('执行内容已变化');

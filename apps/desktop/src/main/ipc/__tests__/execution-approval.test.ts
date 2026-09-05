@@ -150,26 +150,32 @@ describe('ExecutionApprovalGuard', () => {
       updatedAt: '2030-01-01T00:00:00.000Z',
       name: 'Renamed profile',
     };
-    const root = 'E:/projects/codehelm';
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'codehelm-approval-metadata-'));
+    const moduleRoot = path.join(root, 'web');
+    fs.mkdirSync(moduleRoot);
     const plans = [{
-      key: 'node:npm:E:/projects/codehelm/web',
+      key: `node:npm:${moduleRoot}`,
       label: 'web (npm)',
-      cwd: 'E:/projects/codehelm/web',
+      cwd: moduleRoot,
       executable: 'npm',
       args: ['install'],
     }];
 
-    expect(await createExecutionConfigurationFingerprint(first, root))
-      .toBe(await createExecutionConfigurationFingerprint(second, root));
-    expect(await createExecutionFingerprint(first, root, 'install', plans))
-      .toBe(await createExecutionFingerprint(second, root, 'install', plans));
+    try {
+      expect(await createExecutionConfigurationFingerprint(first, root))
+        .toBe(await createExecutionConfigurationFingerprint(second, root));
+      expect(await createExecutionFingerprint(first, root, 'install', plans))
+        .toBe(await createExecutionFingerprint(second, root, 'install', plans));
 
-    const changed = {
-      ...second,
-      services: [{ ...second.services[0], executable: 'pnpm' }],
-    };
-    expect(await createExecutionConfigurationFingerprint(first, root))
-      .not.toBe(await createExecutionConfigurationFingerprint(changed, root));
+      const changed = {
+        ...second,
+        services: [{ ...second.services[0], executable: 'pnpm' }],
+      };
+      expect(await createExecutionConfigurationFingerprint(first, root))
+        .not.toBe(await createExecutionConfigurationFingerprint(changed, root));
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it('invalidates an install approval when package input contents change', async () => {
@@ -287,7 +293,7 @@ describe('bounded execution input reads', () => {
     const realpath = vi.spyOn(fsp, 'realpath');
     for (const argument of ['same.js', '--ignored', 'ordinary']) {
       candidate.services[0].args = Array(EXECUTION_READ_LIMITS.candidates + 1).fill(argument);
-      await expect(createExecutionConfigurationFingerprint(candidate, 'E:/synthetic')).rejects.toThrow('候选数量');
+      await expect(createExecutionConfigurationFingerprint(candidate, path.join(os.tmpdir(), 'codehelm-synthetic'))).rejects.toThrow('候选数量');
     }
     expect(realpath).not.toHaveBeenCalled();
   });
