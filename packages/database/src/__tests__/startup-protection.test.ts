@@ -7,7 +7,11 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { SCHEMA_SQL } from '../schema.js';
 import { DATABASE_SCHEMA_VERSION } from '../db.js';
-import { openProtectedDatabase } from '../startup-protection.js';
+import {
+  DatabaseBackupCapacityError,
+  openProtectedDatabase,
+  startPeriodicDatabaseBackups,
+} from '../startup-protection.js';
 
 describe('protected database startup with real SQLite files', () => {
   let root: string;
@@ -52,6 +56,14 @@ describe('protected database startup with real SQLite files', () => {
   }
   function backups() {
     return fs.existsSync(backupDirectory) ? fs.readdirSync(backupDirectory).filter((name) => !name.startsWith('.pending-')) : [];
+  }
+  function verifiedBackups() {
+    return backups().filter((name) => {
+      try {
+        const manifest = JSON.parse(fs.readFileSync(path.join(backupDirectory, name, 'manifest.json'), 'utf8'));
+        return manifest.status === 'verified';
+      } catch { return false; }
+    });
   }
 
   it('initializes a new installation and publishes a standalone checked snapshot and hash', async () => {
@@ -98,6 +110,164 @@ describe('protected database startup with real SQLite files', () => {
     expect(second.backup.databasePath).not.toBe(first.backup.databasePath);
     expect(digest(first.backup.databasePath)).toBe(originalBackupHash);
     expect(second.db.prepare('SELECT name FROM projects').pluck().get()).toBe('保留项目');
+  });
+
+  it('refuses a backup before creating pending files when the volume cannot retain safety headroom', async () => {
+    seed().close();
+    const before = digest();
+    const result = openProtectedDatabase({
+      databasePath,
+      backupDirectory,
+      getAvailableBytes: async () => 1n,
+    });
+    await expect(result).rejects.toMatchObject({
+      stage: 'backup',
+      cause: expect.objectContaining({
+        name: 'DatabaseBackupCapacityError',
+        code: 'INSUFFICIENT_BACKUP_SPACE',
+        availableBytes: 1n,
+      }),
+    });
+    await expect(result).rejects.toSatisfy((error: unknown) =>
+      (error as { cause?: unknown }).cause instanceof DatabaseBackupCapacityError);
+    expect(digest()).toBe(before);
+    expect(fs.existsSync(backupDirectory) ? fs.readdirSync(backupDirectory) : []).toEqual([]);
+  });
+
+  it('prunes only the oldest strict verified snapshots after publishing a replacement', async () => {
+    seed().close();
+    const policy = { maxBackups: 3, minRetainedBackups: 2, maxTotalBytes: 1024 * 1024 * 1024 };
+    for (let index = 0; index < 5; index += 1) {
+      const result = await openProtectedDatabase({ databasePath, backupDirectory, backupPolicy: policy });
+      result.db.close();
+    }
+    const verifiedBeforeUnknown = verifiedBackups();
+    expect(verifiedBeforeUnknown).toHaveLength(3);
+
+    const unknownDirectory = path.join(backupDirectory, 'manual-recovery-evidence');
+    const pendingDirectory = path.join(backupDirectory, '.pending-interrupted');
+    fs.mkdirSync(unknownDirectory);
+    fs.writeFileSync(path.join(unknownDirectory, 'keep.txt'), 'do not delete');
+    fs.mkdirSync(pendingDirectory);
+    fs.writeFileSync(path.join(pendingDirectory, 'partial.sqlite'), 'keep pending evidence');
+    const snapshotBytes = fs.statSync(path.join(backupDirectory, verifiedBeforeUnknown[0], 'codehelm.sqlite')).size;
+
+    const result = await openProtectedDatabase({
+      databasePath,
+      backupDirectory,
+      backupPolicy: { ...policy, maxBackups: 10, maxTotalBytes: snapshotBytes * 2 },
+    });
+    expect(result.backup.maintenance.removedDirectories).toHaveLength(2);
+    expect(result.backup.maintenance.retainedBackups).toBe(2);
+    expect(result.backup.maintenance.limitsSatisfied).toBe(true);
+    expect(result.backup.maintenance.skippedDirectories).toEqual(expect.arrayContaining([
+      '.pending-interrupted', 'manual-recovery-evidence',
+    ]));
+    expect(verifiedBackups()).toHaveLength(2);
+    expect(fs.readFileSync(path.join(unknownDirectory, 'keep.txt'), 'utf8')).toBe('do not delete');
+    expect(fs.readFileSync(path.join(pendingDirectory, 'partial.sqlite'), 'utf8')).toBe('keep pending evidence');
+    result.db.close();
+  });
+
+  it('reports an unsatisfied size limit instead of deleting below the recovery-point floor', async () => {
+    seed().close();
+    let result;
+    for (let index = 0; index < 3; index += 1) {
+      result = await openProtectedDatabase({
+        databasePath,
+        backupDirectory,
+        backupPolicy: { maxBackups: 3, minRetainedBackups: 3, maxTotalBytes: 1 },
+      });
+      result.db.close();
+    }
+    expect(result!.backup.maintenance).toMatchObject({
+      retainedBackups: 3,
+      removedDirectories: [],
+      limitsSatisfied: false,
+    });
+    expect(verifiedBackups()).toHaveLength(3);
+  });
+
+  it('never deletes a snapshot whose bytes no longer match its verified hash', async () => {
+    seed().close();
+    for (let index = 0; index < 4; index += 1) {
+      const result = await openProtectedDatabase({
+        databasePath,
+        backupDirectory,
+        backupPolicy: { maxBackups: 10 },
+      });
+      result.db.close();
+    }
+    const entries = verifiedBackups().map((name) => ({
+      name,
+      createdAt: JSON.parse(fs.readFileSync(path.join(backupDirectory, name, 'manifest.json'), 'utf8')).createdAt as string,
+    })).sort((left, right) => left.createdAt.localeCompare(right.createdAt) || left.name.localeCompare(right.name));
+    const corruptedDirectory = path.join(backupDirectory, entries[0].name);
+    const corruptedDatabase = path.join(corruptedDirectory, 'codehelm.sqlite');
+    const handle = fs.openSync(corruptedDatabase, 'r+');
+    try {
+      const byte = Buffer.alloc(1);
+      fs.readSync(handle, byte, 0, 1, 128);
+      byte[0] ^= 0xff;
+      fs.writeSync(handle, byte, 0, 1, 128);
+    } finally { fs.closeSync(handle); }
+
+    const result = await openProtectedDatabase({
+      databasePath,
+      backupDirectory,
+      backupPolicy: { maxBackups: 3, minRetainedBackups: 2 },
+    });
+    expect(result.backup.maintenance.skippedDirectories).toContain(entries[0].name);
+    expect(result.backup.maintenance.removedDirectories).toHaveLength(1);
+    expect(fs.existsSync(corruptedDirectory)).toBe(true);
+    expect(fs.readdirSync(corruptedDirectory).sort()).toEqual(['codehelm.sqlite', 'manifest.json']);
+    result.db.close();
+  });
+
+  it('creates a single WAL-aware periodic backup and waits for it during shutdown', async () => {
+    const writer = seed();
+    writer.pragma('journal_mode = WAL');
+    writer.pragma('wal_autocheckpoint = 0');
+    writer.prepare('UPDATE projects SET name = ?').run('运行中提交');
+    const successes: string[] = [];
+    const errors: unknown[] = [];
+    const controller = startPeriodicDatabaseBackups({
+      source: writer,
+      sourcePath: databasePath,
+      backupDirectory,
+      policy: { intervalMs: 60_000 },
+      onSuccess: (backup) => successes.push(backup.sha256),
+      onError: (error) => errors.push(error),
+    });
+    const first = controller.runNow();
+    const second = controller.runNow();
+    const [firstBackup, secondBackup] = await Promise.all([first, second]);
+    expect(firstBackup?.databasePath).toBe(secondBackup?.databasePath);
+    expect(verifiedBackups()).toHaveLength(1);
+    expect(successes).toHaveLength(1);
+    expect(errors).toEqual([]);
+    const snapshot = open(firstBackup!.databasePath, true);
+    expect(snapshot.prepare('SELECT name FROM projects').pluck().get()).toBe('运行中提交');
+    await controller.stop();
+    expect(await controller.runNow()).toBeUndefined();
+  });
+
+  it('reports periodic capacity failures without publishing a snapshot', async () => {
+    const writer = seed();
+    const errors: unknown[] = [];
+    const controller = startPeriodicDatabaseBackups({
+      source: writer,
+      sourcePath: databasePath,
+      backupDirectory,
+      policy: { intervalMs: 60_000 },
+      getAvailableBytes: async () => 0n,
+      onError: (error) => errors.push(error),
+    });
+    expect(await controller.runNow()).toBeUndefined();
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toBeInstanceOf(DatabaseBackupCapacityError);
+    expect(fs.existsSync(backupDirectory) ? fs.readdirSync(backupDirectory) : []).toEqual([]);
+    await controller.stop();
   });
 
   it.each(['not-sqlite', 'truncated', 'zero-length', 'foreign-keys', 'unrelated', 'future-version'])('rejects %s without mutating or replacing the source', async (kind) => {
