@@ -9,7 +9,7 @@
   <img src="https://img.shields.io/badge/TypeScript-5.x-black?style=flat-square&logo=typescript" alt="TypeScript" />
   <img src="https://img.shields.io/badge/Vite-6.x-black?style=flat-square&logo=vite" alt="Vite" />
   <img src="https://img.shields.io/badge/SQLite-Better--sqlite3-black?style=flat-square&logo=sqlite" alt="SQLite" />
-  <img src="https://img.shields.io/badge/License-MIT-black?style=flat-square" alt="License" />
+  <img src="https://img.shields.io/badge/License-Not%20declared-lightgrey?style=flat-square" alt="License not declared" />
 </p>
 
 ---
@@ -115,9 +115,9 @@ v0.1 面向 Windows 内部试用。数据库、备份和日志均为本地数据
 
 关闭窗口时，应用会先停止由当前应用管理的运行会话，再关闭分析任务、日志存储和数据库；未确认归属的历史遗留进程不会被自动接管或终止。数据库启动保护失败时请保留主库及其 `-wal`/`-shm` 文件和备份目录，不要删除或覆盖原文件，按 `docs/v0.1/06-数据库启动保护与自动备份实施记录.md` 的恢复边界处理。
 
-升级前请保留 `%APPDATA%\CodeHelm\` 及其备份目录。当前 v0.1 未完成安装器升级/卸载/重装的实机验收，不能把“卸载后用户数据必然保留”作为承诺；进行这些操作前应先导出或复制经验证备份，并在内部试用记录中核对数据保留结果。
+升级前请保留 `%APPDATA%\CodeHelm\` 及其备份目录。2026-09-01 的旧候选已完成本机安装、同版本重装、卸载和用户数据保留验收，但该候选早于当前源码；最终包冒烟和真实跨版本升级仍未验收，不能据此承诺任意版本卸载或升级后数据必然保留。进行这些操作前应先复制经验证备份，并在内部试用记录中核对数据保留结果。
 
-当前主窗口和隔离确认窗口均启用 sandbox，生产 Renderer CSP 不允许 `unsafe-eval`。本地 `check:ci`、实际 Electron E2E 与 GitHub Windows CI 已通过；main 分支已要求 GitHub Actions 的 `windows-quality-gates` 检查通过且规则对管理员生效。v0.1 仍为未签名内测渠道，安装、卸载、重装数据保留和完整干净 Windows 业务流程尚未验收，活动 WAL 异常来源与系统故障恢复演练也仍开放。`CODEHELM_USER_DATA_DIR` 仅供隔离验收/诊断，不是普通用户迁移数据的接口。
+当前主窗口和隔离确认窗口均启用 sandbox，生产 Renderer CSP 不允许 `unsafe-eval`。本地 `check:ci`、实际 Electron E2E 与 GitHub Windows CI 已通过；main 分支已要求 GitHub Actions 的 `windows-quality-gates` 检查通过且规则对管理员生效。v0.1 仍为未签名内测渠道，当前源码最终包、干净 Windows 完整业务流程、真实跨版本升级、活动 WAL 异常来源和系统故障恢复演练仍开放。`CODEHELM_USER_DATA_DIR` 仅供隔离验收/诊断，不是普通用户迁移数据的接口。
 
 详细验收记录位于 `docs/v0.1/`。当前仓库保留既有忽略规则，该目录未自动纳入 Git；发布时应将对应验收记录作为交付归档或另行调整版本控制规则。
 
@@ -139,4 +139,4 @@ v0.1 面向 Windows 内部试用。数据库、备份和日志均为本地数据
 
 ## 📄 开源协议 (License)
 
-本项目采用 [MIT License](LICENSE) 开源协议。
+当前仓库尚未提供 `LICENSE` 文件，也未在包元数据中声明许可证，因此不能将本项目视为 MIT 或其他开源许可证。公开分发源代码或二进制文件前，应由项目所有者明确选择并加入项目许可证，同时核对随交付包分发的第三方组件许可与通知要求。
