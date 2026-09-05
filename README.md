@@ -69,9 +69,9 @@ desk/
 ## 🚀 快速上手 (Getting Started)
 
 ### 前置环境 (Prerequisites)
-- [Node.js](https://nodejs.org/) (>= 22.12.0 for the current Electron/native build toolchain)
-- [pnpm](https://pnpm.io/) (>= 9.0.0)
-- Windows / macOS / Linux
+- [Node.js](https://nodejs.org/) (`>=22.12.0 <25`；本仓库 `.node-version` 固定 24.16.0)
+- [pnpm](https://pnpm.io/) (`11.23.x`；根 `packageManager` 固定 11.23.0)
+- Windows x64（v0.1 内部试用与当前 CI 范围）
 
 ### 1. 克隆与安装依赖
 ```bash
@@ -89,10 +89,11 @@ pnpm build
 ### 3. 本地检查与 Windows 交付
 
 ```bash
-# 类型检查、全量单元/集成测试、Renderer/Main/Preload/Worker 构建
-pnpm typecheck
-pnpm test
-pnpm build
+# 日常本地门禁：lint、类型检查、439 项单元/集成测试和生产构建
+pnpm check
+
+# 完整 Windows 门禁：上述检查 + 真实 Electron E2E
+pnpm check:ci
 
 # 生成目录包；产物位于仓库根目录 dist-release/
 pnpm package:dir
@@ -101,7 +102,7 @@ pnpm package:dir
 pnpm package
 ```
 
-当前工作区的 v0.1 依赖版本为 Electron 44.0.0、electron-builder 26.15.3、better-sqlite3 13.0.3。开发和构建建议使用 Node.js >= 22.12.0；打包应用自带 Electron，但被管理项目所需的 Node.js、Python、JDK、包管理器和项目依赖仍由各项目自行提供。
+当前工作区的 v0.1 依赖版本为 Electron 44.0.0、electron-builder 26.15.3、better-sqlite3 13.0.3。安装使用冻结锁文件；`pnpm-workspace.yaml` 开启 `engineStrict`。打包应用自带 Electron，但被管理项目所需的 Node.js、Python、JDK、包管理器和项目依赖仍由各项目自行提供。
 
 ## v0.1 试用边界
 
@@ -116,7 +117,7 @@ v0.1 面向 Windows 内部试用。数据库、备份和日志均为本地数据
 
 升级前请保留 `%APPDATA%\CodeHelm\` 及其备份目录。当前 v0.1 未完成安装器升级/卸载/重装的实机验收，不能把“卸载后用户数据必然保留”作为承诺；进行这些操作前应先导出或复制经验证备份，并在内部试用记录中核对数据保留结果。
 
-当前仍需在正式发布前处理或明确决策的限制包括：主窗口仍使用 `sandbox: false`，生产 CSP 仍保留 `unsafe-eval`；尚无实际 Electron E2E/CI 门禁；未完成安装、卸载、重装数据保留和完整干净 Windows 业务流程验收；活动 WAL 异常的来源与受控恢复仍待授权和演练。`CODEHELM_USER_DATA_DIR` 仅供隔离验收/诊断，不是普通用户迁移数据的接口。
+当前主窗口和隔离确认窗口均启用 sandbox，生产 Renderer CSP 不允许 `unsafe-eval`。本地 `check:ci` 与实际 Electron E2E 已通过，但 GitHub Windows workflow 尚待提交后的首次远端运行及 required check 核对；v0.1 仍为未签名内测渠道，安装、卸载、重装数据保留和完整干净 Windows 业务流程尚未验收，活动 WAL 异常来源与系统故障恢复演练也仍开放。`CODEHELM_USER_DATA_DIR` 仅供隔离验收/诊断，不是普通用户迁移数据的接口。
 
 详细验收记录位于 `docs/v0.1/`。当前仓库保留既有忽略规则，该目录未自动纳入 Git；发布时应将对应验收记录作为交付归档或另行调整版本控制规则。
 

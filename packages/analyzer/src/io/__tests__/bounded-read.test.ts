@@ -101,6 +101,8 @@ describe('bounded analyzer reads', () => {
     tempDirs.push(root);
     await fs.writeFile(path.join(root, 'sample.txt'), '12345');
 
+    // Assigned after detector construction because detect closes over this run-local engine.
+    // eslint-disable-next-line prefer-const
     let engine: AnalyzerEngine;
     const detector: Detector = {
       id: 'bounded-cancel-test',

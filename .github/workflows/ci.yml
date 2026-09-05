@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-quality-gates:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    env:
+      CI: 'true'
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.23.0
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm --version
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check:ci
+      - name: Upload Electron E2E diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: electron-e2e-diagnostics
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 7

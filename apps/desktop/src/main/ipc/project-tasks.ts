@@ -154,6 +154,7 @@ export class ProjectTasks {
   private async scan(task: Task, input: WorkspaceScanInput): Promise<void> {
     const boundary = this.createBoundary(input.rootPath, this.scanLimit());
     let worker: Worker | undefined;
+    let scanError: unknown;
     try {
       const sessionId = await boundary.ready;
       if (task.controller.signal.aborted) throw new Error('已取消工作区发现');
@@ -190,10 +191,25 @@ export class ProjectTasks {
         task.controller.signal.addEventListener('abort', abort, { once: true });
         if (task.controller.signal.aborted) abort();
       });
-    } finally {
-      try { await boundary.close(); } catch (boundaryError) {
-        throw new Error(`无法释放工作区安全边界：${String(boundaryError)}`);
+    } catch (error) {
+      scanError = error;
+    }
+
+    let boundaryError: unknown;
+    try {
+      await boundary.close();
+    } catch (error) {
+      boundaryError = error;
+    }
+
+    if (scanError !== undefined) {
+      if (boundaryError !== undefined) {
+        throw new AggregateError([scanError, boundaryError], '工作区发现失败且无法释放安全边界');
       }
+      throw scanError;
+    }
+    if (boundaryError !== undefined) {
+      throw new Error(`无法释放工作区安全边界：${String(boundaryError)}`, { cause: boundaryError });
     }
   }
 

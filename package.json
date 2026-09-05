@@ -3,6 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "description": "CodeHelm - Local-first personal project management & orchestration desktop application",
+  "packageManager": "pnpm@11.23.0",
+  "engines": {
+    "node": ">=22.12.0 <25",
+    "pnpm": ">=11.23.0 <12"
+  },
   "scripts": {
     "dev": "pnpm --filter @codehelm/desktop dev",
     "build": "pnpm -r --filter \"./packages/*\" run build && pnpm --filter @codehelm/desktop exec vite build",
@@ -10,15 +15,27 @@
     "package:unsigned": "pnpm build && pnpm --filter @codehelm/desktop exec electron-builder && pnpm verify:release && node apps/desktop/scripts/finalize-unsigned-release.mjs dist-release",
     "package:dir": "pnpm build && pnpm --filter @codehelm/desktop exec electron-builder --dir && pnpm verify:release",
     "verify:release": "node apps/desktop/scripts/verify-release-artifacts.mjs dist-release/win-unpacked/resources",
-    "typecheck": "pnpm -r run typecheck",
-    "test": "vitest run",
+    "lint": "eslint . --max-warnings=0",
+    "typecheck": "pnpm -r run typecheck && tsc -p tsconfig.e2e.json",
+    "test": "vitest run --exclude e2e/**",
     "test:watch": "vitest",
+    "test:e2e": "pnpm build && playwright test --config=playwright.config.ts",
+    "test:e2e:built": "playwright test --config=playwright.config.ts",
+    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build",
+    "check:ci": "pnpm check && pnpm test:e2e:built",
     "clean": "pnpm -r run clean"
   },
   "devDependencies": {
-    "typescript": "^5.7.3",
-    "vitest": "^3.0.7",
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.62.1",
+    "@types/node": "^22.13.9",
+    "eslint": "^10.9.1",
+    "eslint-plugin-vue": "^10.10.0",
+    "globals": "^17.12.0",
     "rimraf": "^6.0.1",
-    "@types/node": "^22.13.9"
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.69.0",
+    "vitest": "^3.0.7",
+    "vue-eslint-parser": "^10.4.1"
   }
 }
