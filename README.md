@@ -117,7 +117,7 @@ v0.1 面向 Windows 内部试用。数据库、备份和日志均为本地数据
 
 升级前请保留 `%APPDATA%\CodeHelm\` 及其备份目录。当前 v0.1 未完成安装器升级/卸载/重装的实机验收，不能把“卸载后用户数据必然保留”作为承诺；进行这些操作前应先导出或复制经验证备份，并在内部试用记录中核对数据保留结果。
 
-当前主窗口和隔离确认窗口均启用 sandbox，生产 Renderer CSP 不允许 `unsafe-eval`。本地 `check:ci` 与实际 Electron E2E 已通过，但 GitHub Windows workflow 尚待提交后的首次远端运行及 required check 核对；v0.1 仍为未签名内测渠道，安装、卸载、重装数据保留和完整干净 Windows 业务流程尚未验收，活动 WAL 异常来源与系统故障恢复演练也仍开放。`CODEHELM_USER_DATA_DIR` 仅供隔离验收/诊断，不是普通用户迁移数据的接口。
+当前主窗口和隔离确认窗口均启用 sandbox，生产 Renderer CSP 不允许 `unsafe-eval`。本地 `check:ci`、实际 Electron E2E 与 GitHub Windows CI 已通过；main 分支尚未配置 required check/branch protection。v0.1 仍为未签名内测渠道，安装、卸载、重装数据保留和完整干净 Windows 业务流程尚未验收，活动 WAL 异常来源与系统故障恢复演练也仍开放。`CODEHELM_USER_DATA_DIR` 仅供隔离验收/诊断，不是普通用户迁移数据的接口。
 
 详细验收记录位于 `docs/v0.1/`。当前仓库保留既有忽略规则，该目录未自动纳入 Git；发布时应将对应验收记录作为交付归档或另行调整版本控制规则。
 
