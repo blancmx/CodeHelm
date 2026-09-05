@@ -1,10 +1,12 @@
 import { createHash, randomBytes } from 'node:crypto';
-import fs from 'node:fs';
 import path from 'node:path';
 import type { RunnerExecutionMode } from '@codehelm/contracts';
 import type { RunProfile } from '@codehelm/domain';
-import { safeResolvePath } from '@codehelm/shared';
 import type { DependencyInstallPlan } from './dependency-installer.js';
+import {
+  ExecutionReadBudget, isExecutionInputInside, withExecutionReadBudget,
+  type ExecutionReadOptions,
+} from './execution-input-reader.js';
 
 export const EXECUTION_CONFIRMATION_REQUIRED_MESSAGE =
   'Execution confirmation required or expired. Review the current run profile and confirm before starting.';
@@ -78,18 +80,9 @@ function executionProfile(profile: RunProfile) {
   };
 }
 
-function isInside(parent: string, child: string): boolean {
-  const relative = path.relative(parent, child);
-  return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
-}
-
 function addInputPath(inputPaths: Set<string>, projectRoot: string, candidate: string): void {
-  try {
-    const absolute = safeResolvePath(projectRoot, candidate);
-    if (isInside(projectRoot, absolute)) inputPaths.add(absolute);
-  } catch {
-    // Inputs that cross a physical symlink boundary are not approval inputs.
-  }
+  const absolute = path.resolve(projectRoot, candidate);
+  if (isExecutionInputInside(projectRoot, absolute)) inputPaths.add(absolute);
 }
 
 function addServiceReference(
@@ -107,38 +100,33 @@ function addServiceReference(
 function executionInputPaths(
   profile: RunProfile,
   projectRoot: string,
-  plans: DependencyInstallPlan[]
+  plans: DependencyInstallPlan[],
+  budget: ExecutionReadBudget
 ): string[] {
   const inputPaths = new Set<string>();
-  for (const service of profile.services.filter((entry) => entry.enabled)) {
-    let serviceRoot: string;
-    try {
-      serviceRoot = safeResolvePath(
-        projectRoot,
-        service.cwdRelative || service.moduleRelativePath || '.'
-      );
-    } catch {
-      continue;
-    }
-    if (!isInside(projectRoot, serviceRoot)) continue;
+  for (const service of profile.services) {
+    budget.candidate();
+    if (!service.enabled) continue;
+    const serviceRoot = path.resolve(projectRoot, service.cwdRelative || service.moduleRelativePath || '.');
+    if (!isExecutionInputInside(projectRoot, serviceRoot)) continue;
     for (const filename of DEPENDENCY_INPUT_FILENAMES) {
+      budget.candidate();
       addInputPath(inputPaths, projectRoot, path.join(serviceRoot, filename));
     }
+    budget.candidate();
     addServiceReference(inputPaths, projectRoot, serviceRoot, service.executable);
     for (const argument of service.args) {
+      budget.candidate();
       addServiceReference(inputPaths, projectRoot, serviceRoot, argument);
     }
   }
 
   for (const plan of plans) {
-    let planRoot: string;
-    try {
-      planRoot = safeResolvePath(projectRoot, plan.cwd);
-    } catch {
-      continue;
-    }
-    if (!isInside(projectRoot, planRoot)) continue;
+    budget.candidate();
+    const planRoot = path.resolve(projectRoot, plan.cwd);
+    if (!isExecutionInputInside(projectRoot, planRoot)) continue;
     for (const filename of DEPENDENCY_INPUT_FILENAMES) {
+      budget.candidate();
       addInputPath(inputPaths, projectRoot, path.join(planRoot, filename));
     }
   }
@@ -146,52 +134,61 @@ function executionInputPaths(
   return [...inputPaths].sort((left, right) => left.localeCompare(right));
 }
 
-function executionInputFingerprints(
-  profile: RunProfile,
-  projectRoot: string,
-  plans: DependencyInstallPlan[]
-) {
-  const normalizedRoot = path.normalize(path.resolve(projectRoot));
-  return executionInputPaths(profile, normalizedRoot, plans).map((file) => {
-    let digest = 'missing';
-    try {
-      const stat = fs.statSync(file);
-      if (stat.isFile()) {
-        digest = createHash('sha256').update(fs.readFileSync(file)).digest('hex');
-      }
-    } catch {
-      digest = 'unreadable';
-    }
-    return {
-      path: path.relative(normalizedRoot, file).replace(/\\/g, '/'),
-      sha256: digest,
-    };
-  });
+// No I/O: used after asynchronous reads to reject a stale repository snapshot.
+export function createExecutionProfileFingerprint(profile: RunProfile, projectRoot: string): string {
+  return fingerprint({ projectRoot: path.resolve(projectRoot), profile: executionProfile(profile) });
 }
 
-export function createExecutionConfigurationFingerprint(
-  profile: RunProfile,
-  projectRoot: string
-): string {
-  return fingerprint({
-    projectRoot: path.normalize(path.resolve(projectRoot)),
-    profile: executionProfile(profile),
-    inputFiles: executionInputFingerprints(profile, projectRoot, []),
-  });
-}
-
-export function createExecutionFingerprint(
+export async function createExecutionApprovalContext(
   profile: RunProfile,
   projectRoot: string,
   mode: RunnerExecutionMode,
-  plans: DependencyInstallPlan[]
-): string {
-  return fingerprint({
-    configurationFingerprint: createExecutionConfigurationFingerprint(profile, projectRoot),
-    mode,
-    plans,
-    inputFiles: executionInputFingerprints(profile, projectRoot, plans),
-  });
+  plans: DependencyInstallPlan[],
+  options: ExecutionReadOptions = {}
+): Promise<ExecutionApprovalContext> {
+  return withExecutionReadBudget(async budget => {
+    budget.check();
+    const root = path.resolve(projectRoot);
+    // Count attempts before deduplication or cloning unbounded input arrays.
+    const configurationPaths = new Set(executionInputPaths(profile, root, [], budget));
+    const planPaths = executionInputPaths({ ...profile, services: [] }, root, plans, budget);
+    const snapshot = structuredClone({ profile: executionProfile(profile), plans });
+    const physicalRoot = await budget.physical(root);
+    const inputFiles: Array<{ path: string; sha256: string }> = [];
+    const configurationFiles: typeof inputFiles = [];
+    for (const file of [...new Set([...configurationPaths, ...planPaths])].sort((a, b) => a.localeCompare(b))) {
+      const physicalFile = await budget.physical(file);
+      // Preserve the existing exclusion of references outside the physical root.
+      if (!isExecutionInputInside(physicalRoot, physicalFile)) continue;
+      const entry = { path: path.relative(root, file).replace(/\\/g, '/'), sha256: await budget.hash(physicalFile) };
+      inputFiles.push(entry);
+      if (configurationPaths.has(file)) configurationFiles.push(entry);
+    }
+    budget.check();
+    const configurationFingerprint = fingerprint({ projectRoot: root, profile: snapshot.profile, inputFiles: configurationFiles });
+    return {
+      profileId: snapshot.profile.id, mode, configurationFingerprint,
+      executionFingerprint: fingerprint({ configurationFingerprint, mode, plans: snapshot.plans, inputFiles }),
+    };
+  }, options);
+}
+
+export async function createExecutionConfigurationFingerprint(
+  profile: RunProfile,
+  projectRoot: string,
+  options: ExecutionReadOptions = {}
+): Promise<string> {
+  return (await createExecutionApprovalContext(profile, projectRoot, 'start', [], options)).configurationFingerprint;
+}
+
+export async function createExecutionFingerprint(
+  profile: RunProfile,
+  projectRoot: string,
+  mode: RunnerExecutionMode,
+  plans: DependencyInstallPlan[],
+  options: ExecutionReadOptions = {}
+): Promise<string> {
+  return (await createExecutionApprovalContext(profile, projectRoot, mode, plans, options)).executionFingerprint;
 }
 
 function sameContext(left: ExecutionApprovalContext, right: ExecutionApprovalContext): boolean {

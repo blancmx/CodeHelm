@@ -2,7 +2,7 @@ import { BrowserWindow } from 'electron';
 import type { Database as DatabaseInstance } from 'better-sqlite3';
 import { AnalysisRepository, ProfileRepository, ProjectRepository } from '@codehelm/database';
 import { IpcChannels } from '@codehelm/contracts';
-import { AnalysisTasks, type AnalysisWorkerFactory } from './analysis-tasks.js';
+import { AnalysisTasks, createNativeAnalysisBoundary, type AnalysisWorkerFactory } from './analysis-tasks.js';
 import { prepareAutoDetectedProfile } from './auto-profile.js';
 import { getPersistentPortAllocator } from './persistent-port-allocator.js';
 
@@ -28,7 +28,7 @@ export function getAnalysisTasks(db: DatabaseInstance, createWorker?: AnalysisWo
     for (const window of BrowserWindow.getAllWindows()) {
       if (!window.isDestroyed() && !window.webContents.isDestroyed()) window.webContents.send(IpcChannels.ANALYSIS_ON_PROGRESS, state);
     }
-  }, createWorker);
+  }, createWorker, 120_000, createWorker ? (() => ({ ready: Promise.resolve(undefined), async close() {} })) : createNativeAnalysisBoundary);
   services.set(db, tasks);
   return tasks;
 }

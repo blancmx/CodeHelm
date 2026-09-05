@@ -7,6 +7,7 @@ import type { DiscoveryContext } from '../types.js';
 import {
   DEFAULT_MAX_ANALYZER_FILE_BYTES,
   readUtf8FileWithinLimit,
+  readUtf8FileFromLockedRoot,
 } from '../io/bounded-read.js';
 
 export const DEFAULT_IGNORES = [
@@ -99,6 +100,7 @@ export const DEFAULT_MAX_DISCOVERY_FILES = 50_000;
 export const MAX_DISCOVERY_FILES = 50_000;
 
 export interface DiscoveryOptions {
+  rootSessionId?: string;
   maxFiles?: number;
   maxFileBytes?: number;
   customIgnores?: string[];
@@ -141,11 +143,16 @@ export class DiscoveryEngine {
     try {
       const gitignoreStat = await fs.lstat(gitignorePath);
       if (!gitignoreStat.isSymbolicLink() && gitignoreStat.isFile()) {
-        const gitignoreContent = (await readUtf8FileWithinLimit(
+        const gitignoreContent = (await (options.rootSessionId ? readUtf8FileFromLockedRoot(
+          options.rootSessionId,
+          '.gitignore',
+          options.maxFileBytes ?? DEFAULT_MAX_ANALYZER_FILE_BYTES,
+          options.signal
+        ) : readUtf8FileWithinLimit(
           safeResolvePath(normalizedRoot, '.gitignore'),
           options.maxFileBytes ?? DEFAULT_MAX_ANALYZER_FILE_BYTES,
           options.signal
-        )).text;
+        ))).text;
         ig.add(gitignoreContent);
       }
     } catch (error) {

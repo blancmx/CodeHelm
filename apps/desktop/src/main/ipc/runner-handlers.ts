@@ -1,4 +1,6 @@
-import { ipcMain, BrowserWindow } from 'electron';
+import type { RegisterIpcHandler } from './trusted-ipc.js';
+import { BrowserWindow } from 'electron';
+import type { IpcMainInvokeEvent } from 'electron';
 import { showExecutionConfirmation } from '../execution-confirmation-window.js';
 import type { Database as DatabaseInstance } from 'better-sqlite3';
 import {
@@ -22,7 +24,8 @@ import {
 } from './dependency-installer.js';
 import {
   createExecutionConfigurationFingerprint,
-  createExecutionFingerprint,
+  createExecutionApprovalContext,
+  createExecutionProfileFingerprint,
   ExecutionApprovalGuard,
   ExecutionSlotGuard,
 } from './execution-approval.js';
@@ -33,10 +36,12 @@ import { recoverInterruptedSessions } from './session-recovery.js';
 
 const orchestrator = new Orchestrator();
 const activeInstallerProcesses = new Set<ChildProcess>();
+const activeExecutionReads = new Set<AbortController>();
 let runnerShutdownRequested = false;
 
 export async function stopAllRunnerSessions(): Promise<void> {
   runnerShutdownRequested = true;
+  for (const controller of activeExecutionReads) controller.abort();
   const installerStops = [...activeInstallerProcesses].map(async (child) => {
     const pid = child.pid;
     try {
@@ -77,7 +82,7 @@ function requireStartedSession(session: Awaited<ReturnType<Orchestrator['startSe
   );
 }
 
-export async function registerRunnerHandlers(db: DatabaseInstance, logs?: LogStorage) {
+export async function registerRunnerHandlers(handle: RegisterIpcHandler, db: DatabaseInstance, logs?: LogStorage) {
   const profileRepo = new ProfileRepository(db);
   const projectRepo = new ProjectRepository(db);
   const sessionRepo = new SessionRepository(db);
@@ -87,7 +92,7 @@ export async function registerRunnerHandlers(db: DatabaseInstance, logs?: LogSto
   const executionApprovals = new ExecutionApprovalGuard();
   const activeExecutions = new ExecutionSlotGuard();
 
-  ipcMain.handle(IpcChannels.RUNNER_GET_STATE, () => {
+  handle(IpcChannels.RUNNER_GET_STATE, () => {
     const activeSessions = orchestrator.getActiveSessions();
     const activeIds = new Set(activeSessions.map(s => s.id));
     return RunnerStateDtoSchema.parse({
@@ -198,7 +203,8 @@ export async function registerRunnerHandlers(db: DatabaseInstance, logs?: LogSto
     });
   }
 
-  function reconcileProfile(profileId: string) {
+  async function reconcileProfile(profileId: string, signal: AbortSignal) {
+    signal.throwIfAborted();
     const storedProfile = profileRepo.findById(profileId);
     if (!storedProfile) throw new Error(`Profile not found: ${profileId}`);
     const protectedResult = protectProfileSecrets(storedProfile);
@@ -217,7 +223,15 @@ export async function registerRunnerHandlers(db: DatabaseInstance, logs?: LogSto
     const project = projectRepo.findById(persistedProfile.projectId);
     if (!project) throw new Error(`Project not found: ${persistedProfile.projectId}`);
 
-    const constrained = applyRuntimeProfileConstraints(project.rootPath, persistedProfile);
+    const snapshot = structuredClone({ profile: persistedProfile, project });
+    const revision = JSON.stringify(snapshot);
+    const constrained = await applyRuntimeProfileConstraints(snapshot.project.rootPath, snapshot.profile, { signal });
+    signal.throwIfAborted();
+    if (runnerShutdownRequested) throw new Error('Runner shutdown in progress');
+    // Discovery yields to edits. Do not overwrite newer metadata or execution state.
+    if (JSON.stringify({ profile: profileRepo.findById(profileId), project: projectRepo.findById(project.id) }) !== revision) {
+      throw new Error('Execution confirmation required: 执行内容已变化，请重新核对后启动。');
+    }
     let profile = constrained.profile;
     if (constrained.messages.length > 0) {
       profile = profileRepo.save({
@@ -234,42 +248,79 @@ export async function registerRunnerHandlers(db: DatabaseInstance, logs?: LogSto
         broadcastLog('CodeHelm Runtime', `${message}\n`);
       }
     }
-    return { profile: decryptProfileSecrets(profile), project };
+    return { profile: decryptProfileSecrets(profile), project: snapshot.project };
   }
 
-  function getExecutionContext(profileId: string, mode: RunnerExecutionMode) {
-    const { profile, project } = reconcileProfile(profileId);
+  async function getExecutionContext(profileId: string, mode: RunnerExecutionMode, signal: AbortSignal) {
+    const { profile, project } = await reconcileProfile(profileId, signal);
     const plans = mode === 'install'
       ? createDependencyInstallPlans(project.rootPath, profile.services)
       : [];
-    return buildExecutionContext(profile, project, mode, plans);
+    return buildExecutionContext(profile, project, mode, plans, signal);
   }
 
-  function buildExecutionContext(
-    profile: ReturnType<typeof reconcileProfile>['profile'],
-    project: ReturnType<typeof reconcileProfile>['project'],
+  async function buildExecutionContext(
+    profile: Awaited<ReturnType<typeof reconcileProfile>>['profile'],
+    project: Awaited<ReturnType<typeof reconcileProfile>>['project'],
     mode: RunnerExecutionMode,
-    plans: DependencyInstallPlan[]
+    plans: DependencyInstallPlan[],
+    signal: AbortSignal
   ) {
+    const snapshot = structuredClone({ profile, project, plans });
     return {
-      profile,
-      project,
-      plans,
-      approvalContext: {
-        profileId: profile.id,
-        mode,
-        configurationFingerprint: createExecutionConfigurationFingerprint(
-          profile,
-          project.rootPath
-        ),
-        executionFingerprint: createExecutionFingerprint(
-          profile,
-          project.rootPath,
-          mode,
-          plans
-        ),
-      },
+      ...snapshot,
+      approvalContext: await createExecutionApprovalContext(
+        snapshot.profile, snapshot.project.rootPath, mode, snapshot.plans, { signal }
+      ),
     };
+  }
+
+  function assertCurrentSnapshot(
+    profile: Awaited<ReturnType<typeof reconcileProfile>>['profile'],
+    project: Awaited<ReturnType<typeof reconcileProfile>>['project'],
+    signal: AbortSignal
+  ): void {
+    signal.throwIfAborted();
+    if (runnerShutdownRequested) throw new Error('Runner shutdown in progress');
+    // Compare repository state only. Re-running discovery here adds unrelated
+    // filesystem work after the bounded read and may mutate the reviewed plan.
+    const storedProfile = profileRepo.findById(profile.id);
+    const currentProject = storedProfile && projectRepo.findById(storedProfile.projectId);
+    if (!storedProfile || !currentProject) throw new Error('Execution confirmation required: 执行内容已变化。');
+    if (createExecutionProfileFingerprint(profile, project.rootPath)
+      !== createExecutionProfileFingerprint(decryptProfileSecrets(storedProfile), currentProject.rootPath)) {
+      throw new Error('Execution confirmation required: 执行内容已变化，请重新核对后启动。');
+    }
+  }
+
+  const pendingRequests = new Set<number>();
+  function handleExecutionRequest(
+    channel: string,
+    callback: (event: IpcMainInvokeEvent, request: unknown, signal: AbortSignal) => Promise<unknown>
+  ): void {
+    handle(channel, async (event, request) => {
+      const owner = BrowserWindow.fromWebContents(event.sender);
+      if (!owner || owner.isDestroyed() || event.senderFrame !== event.sender.mainFrame) {
+        throw new Error('执行确认必须来自应用主窗口。');
+      }
+      if (runnerShutdownRequested) throw new Error('Runner shutdown in progress');
+      if (pendingRequests.has(event.sender.id)) throw new Error('已有执行请求，请先完成或取消。');
+      const controller = new AbortController();
+      const cancel = () => controller.abort(new Error('执行请求已取消。'));
+      pendingRequests.add(event.sender.id);
+      activeExecutionReads.add(controller);
+      owner.once('closed', cancel);
+      event.sender.on('did-start-navigation', cancel);
+      event.sender.once('render-process-gone', cancel);
+      try { return await callback(event, request, controller.signal); }
+      finally {
+        owner.removeListener('closed', cancel);
+        event.sender.removeListener('did-start-navigation', cancel);
+        event.sender.removeListener('render-process-gone', cancel);
+        activeExecutionReads.delete(controller);
+        pendingRequests.delete(event.sender.id);
+      }
+    });
   }
 
   function requireExecutionSlot(profileId: string): void {
@@ -289,21 +340,26 @@ export async function registerRunnerHandlers(db: DatabaseInstance, logs?: LogSto
     activeExecutions.assertAvailable(profileId);
   }
 
-  ipcMain.handle(IpcChannels.RUNNER_CONFIRM_EXECUTION, async (event, rawRequest) => {
+  handleExecutionRequest(IpcChannels.RUNNER_CONFIRM_EXECUTION, async (event, rawRequest, signal) => {
     const request = RunnerExecutionConfirmationRequestSchema.parse(rawRequest);
     const owner = BrowserWindow.fromWebContents(event.sender);
     if (!owner || owner.isDestroyed() || event.senderFrame !== event.sender.mainFrame) {
       throw new Error('执行确认必须来自应用主窗口。');
     }
     requireNoActiveExecution(request.profileId);
-    const { profile, project, plans, approvalContext } = getExecutionContext(request.profileId, request.mode);
+    const { profile, project, plans, approvalContext } = await getExecutionContext(request.profileId, request.mode, signal);
+    assertCurrentSnapshot(profile, project, signal);
+    requireNoActiveExecution(request.profileId);
     const approved = await showExecutionConfirmation(owner, {
       profile, projectRoot: project.rootPath, plans, mode: request.mode, theme: request.theme,
     });
     if (!approved) throw new Error('Execution confirmation cancelled.');
     requireNoActiveExecution(request.profileId);
     // Review and execution must describe the same main-process snapshot.
-    const current = getExecutionContext(request.profileId, request.mode).approvalContext;
+    const checked = await getExecutionContext(request.profileId, request.mode, signal);
+    assertCurrentSnapshot(checked.profile, checked.project, signal);
+    requireNoActiveExecution(request.profileId);
+    const current = checked.approvalContext;
     if (current.configurationFingerprint !== approvalContext.configurationFingerprint
       || current.executionFingerprint !== approvalContext.executionFingerprint) {
       throw new Error('Execution confirmation required: 执行内容已变化，请重新核对后启动。');
@@ -311,30 +367,28 @@ export async function registerRunnerHandlers(db: DatabaseInstance, logs?: LogSto
     return executionApprovals.confirm(approvalContext);
   });
 
-  ipcMain.handle(IpcChannels.RUNNER_REUSE_EXECUTION_APPROVAL, async (_event, rawRequest) => {
+  handleExecutionRequest(IpcChannels.RUNNER_REUSE_EXECUTION_APPROVAL, async (_event, rawRequest, signal) => {
     const request = RunnerExecutionConfirmationRequestSchema.parse(rawRequest);
     requireNoActiveExecution(request.profileId);
-    const { profile, project } = reconcileProfile(request.profileId);
-    const configurationFingerprint = createExecutionConfigurationFingerprint(
-      profile,
-      project.rootPath
-    );
+    const { profile, project, approvalContext } = await getExecutionContext(request.profileId, 'start', signal);
+    assertCurrentSnapshot(profile, project, signal);
+    requireNoActiveExecution(request.profileId);
     if (request.mode === 'install') {
       return executionApprovals.reuseConfiguration(
         profile.id,
         request.mode,
-        configurationFingerprint
+        approvalContext.configurationFingerprint
       );
     }
-    const { approvalContext } = buildExecutionContext(profile, project, request.mode, []);
     return executionApprovals.reuse(approvalContext);
   });
 
-  ipcMain.handle(IpcChannels.RUNNER_START_SESSION, async (_event, rawRequest) => {
+  handleExecutionRequest(IpcChannels.RUNNER_START_SESSION, async (_event, rawRequest, signal) => {
     const request = RunnerExecutionRequestSchema.parse(rawRequest);
     requireExecutionSlot(request.profileId);
     try {
-      const { profile, project, approvalContext } = getExecutionContext(request.profileId, 'start');
+      const { profile, project, approvalContext } = await getExecutionContext(request.profileId, 'start', signal);
+      assertCurrentSnapshot(profile, project, signal);
       executionApprovals.consume(approvalContext, request.approvalToken);
 
       const session = requireStartedSession(
@@ -357,15 +411,17 @@ export async function registerRunnerHandlers(db: DatabaseInstance, logs?: LogSto
   });
 
   // Install dependencies and then start session
-  ipcMain.handle(IpcChannels.RUNNER_INSTALL_AND_START, async (_event, rawRequest) => {
+  handleExecutionRequest(IpcChannels.RUNNER_INSTALL_AND_START, async (_event, rawRequest, signal) => {
     const request = RunnerExecutionRequestSchema.parse(rawRequest);
     requireExecutionSlot(request.profileId);
     try {
-      const { profile, project } = reconcileProfile(request.profileId);
-      const configurationFingerprint = createExecutionConfigurationFingerprint(
+      const { profile, project } = await reconcileProfile(request.profileId, signal);
+      const configurationFingerprint = await createExecutionConfigurationFingerprint(
         profile,
-        project.rootPath
+        project.rootPath,
+        { signal }
       );
+      assertCurrentSnapshot(profile, project, signal);
       executionApprovals.assertConfiguration(request.approvalToken, {
         profileId: profile.id,
         mode: 'install',
@@ -376,10 +432,12 @@ export async function registerRunnerHandlers(db: DatabaseInstance, logs?: LogSto
       // checks below. In particular, inferred Python checks can spawn a
       // local interpreter and must not happen for an unapproved request.
       const plans = createDependencyInstallPlans(project.rootPath, profile.services);
-      const { approvalContext } = buildExecutionContext(profile, project, 'install', plans);
+      const { approvalContext } = await buildExecutionContext(profile, project, 'install', plans, signal);
+      assertCurrentSnapshot(profile, project, signal);
       executionApprovals.consume(approvalContext, request.approvalToken);
 
       for (const plan of plans) {
+        signal.throwIfAborted();
         await runDependencyPlan(plan);
       }
       if (plans.length > 0) {
@@ -387,6 +445,8 @@ export async function registerRunnerHandlers(db: DatabaseInstance, logs?: LogSto
       }
 
       // Now start the session
+      signal.throwIfAborted();
+      if (runnerShutdownRequested) throw new Error('Runner shutdown in progress');
       const session = requireStartedSession(
         await orchestrator.startSession(project.rootPath, profile)
       );
@@ -402,17 +462,17 @@ export async function registerRunnerHandlers(db: DatabaseInstance, logs?: LogSto
     }
   });
 
-  ipcMain.handle(IpcChannels.RUNNER_STOP_SESSION, async (_event, sessionId: string) => {
+  handle(IpcChannels.RUNNER_STOP_SESSION, async (_event, sessionId: string) => {
     await orchestrator.stopSession(sessionId);
     return { success: true };
   });
 
-  ipcMain.handle(IpcChannels.RUNNER_STOP_SERVICE, async (_event, serviceSessionId: string) => {
+  handle(IpcChannels.RUNNER_STOP_SERVICE, async (_event, serviceSessionId: string) => {
     await orchestrator.stopService(serviceSessionId);
     return { success: true };
   });
 
-  ipcMain.handle(IpcChannels.RUNNER_RESTART_SERVICE, async (_event, serviceSessionId: string) => {
+  handle(IpcChannels.RUNNER_RESTART_SERVICE, async (_event, serviceSessionId: string) => {
     const newSession = await orchestrator.restartService(serviceSessionId);
     if (newSession.status !== 'RUNNING') {
       throw new Error(newSession.errorMessage || `服务重启未完成：${newSession.status}`);

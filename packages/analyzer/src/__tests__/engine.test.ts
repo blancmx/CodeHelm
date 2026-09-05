@@ -3,6 +3,7 @@ import { AnalyzerEngine } from '../engine/analyzer-engine.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
+import { closeRoot, openRoot } from '@codehelm/safe-fs';
 
 describe('Analyzer Engine Full Analysis', () => {
   let tempDir: string;
@@ -16,6 +17,32 @@ describe('Analyzer Engine Full Analysis', () => {
 
   afterEach(async () => {
     await fs.rm(tempDir, { recursive: true, force: true });
+  });
+
+  it('keeps project hooks, executable config, and Python sources inert during analysis', async () => {
+    const canary = "require('node:fs').writeFileSync(require('node:path').join(__dirname, 'EXECUTED.marker'), 'executed');";
+    const inputs: Record<string, string> = {
+      'package.json': JSON.stringify({ name: 'analysis-only', scripts: {
+        preinstall: 'node canary.cjs', install: 'node canary.cjs', postinstall: 'node canary.cjs',
+        dev: 'node canary.cjs', build: 'node canary.cjs',
+      }, devDependencies: { vite: '^5.0.0' } }),
+      'canary.cjs': canary,
+      'vite.config.js': "require('./canary.cjs'); module.exports = {};",
+      'requirements.txt': 'fastapi\nuvicorn\n',
+      'setup.py': "from pathlib import Path\nPath(__file__).with_name('EXECUTED.marker').write_text('executed')\n",
+      'main.py': "from pathlib import Path\nPath(__file__).with_name('EXECUTED.marker').write_text('executed')\nfrom fastapi import FastAPI\napp = FastAPI()\n",
+    };
+    await Promise.all(Object.entries(inputs).map(([name, content]) => fs.writeFile(path.join(tempDir, name), content)));
+
+    const snapshot = await engine.analyze(tempDir);
+
+    expect(snapshot.status).toBe('completed');
+    expect(snapshot.modules.flatMap(module => module.suggestedCommands ?? []).length).toBeGreaterThan(0);
+    // Checking the complete tree also detects installs/build output, not just our execution marker.
+    expect((await fs.readdir(tempDir)).sort()).toEqual(Object.keys(inputs).sort());
+    for (const [name, content] of Object.entries(inputs)) {
+      expect(await fs.readFile(path.join(tempDir, name), 'utf8')).toBe(content);
+    }
   });
 
   it('should analyze a full Vue 3 + Vite + pnpm project', async () => {
@@ -217,6 +244,31 @@ describe('Analyzer Engine Full Analysis', () => {
 
     expect(backend?.suggestedCommands?.[0]?.executable).toBe('.venv/Scripts/python.exe');
     expect(snapshot.modules.some((module) => module.relativePath.includes('.venv'))).toBe(false);
+  });
+
+  it('keeps a module-local virtualenv launcher available through the locked native root', async () => {
+    await fs.mkdir(path.join(tempDir, 'backend/app'), { recursive: true });
+    await fs.mkdir(path.join(tempDir, 'backend/.venv/Scripts'), { recursive: true });
+    await fs.mkdir(path.join(tempDir, 'backend/.venv/Lib/site-packages/dependency'), { recursive: true });
+    await fs.writeFile(path.join(tempDir, 'backend/.venv/Scripts/python.exe'), '');
+    await fs.writeFile(path.join(tempDir, 'backend/.venv/Lib/site-packages/dependency/module.py'), 'ignored');
+    await fs.writeFile(path.join(tempDir, 'backend/requirements.txt'), 'fastapi\nuvicorn\n');
+    await fs.writeFile(
+      path.join(tempDir, 'backend/app/main.py'),
+      'from fastapi import FastAPI\napp = FastAPI()\n'
+    );
+
+    const rootSessionId = openRoot(tempDir, 64);
+    try {
+      const snapshot = await new AnalyzerEngine({ rootSessionId }).analyze(tempDir);
+      const backend = snapshot.modules.find((module) => module.relativePath === 'backend');
+
+      expect(snapshot.status).toBe('completed');
+      expect(backend?.suggestedCommands?.[0]?.executable).toBe('.venv/Scripts/python.exe');
+      expect(snapshot.modules.some((module) => module.relativePath.includes('.venv'))).toBe(false);
+    } finally {
+      closeRoot(rootSessionId);
+    }
   });
 
   it('should prefer an explicit Windows desktop launcher over an inferred Flask server', async () => {

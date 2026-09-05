@@ -1,3 +1,4 @@
+import { ipcMain } from 'electron';
 import { describe, expect, it, vi } from 'vitest';
 import { IpcChannels } from '@codehelm/contracts';
 
@@ -69,7 +70,7 @@ vi.mock('@codehelm/database', () => ({
 
 import { registerProfileHandlers } from '../profile-handlers.js';
 
-registerProfileHandlers({} as never);
+registerProfileHandlers(ipcMain.handle, {} as never);
 
 function handler(channel: string) {
   const selected = harness.handlers.get(channel);

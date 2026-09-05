@@ -4,10 +4,12 @@ import { generateId, normalizePath } from '@codehelm/shared';
 import { BatchImportInputSchema, WorkspaceScanInputSchema } from '@codehelm/contracts';
 import type { ImportProjectInput, ProjectDto, ProjectTaskDto, ProjectTaskProgressDto, WorkspaceScanInput } from '@codehelm/contracts';
 import type { AnalysisTasks } from './analysis-tasks.js';
+import type { AnalysisBoundaryFactory } from './analysis-tasks.js';
 
-export type WorkspaceWorkerFactory = (input: WorkspaceScanInput) => Worker;
-const defaultWorker: WorkspaceWorkerFactory = (input) =>
-  new Worker(path.join(__dirname, 'workspace-worker.js'), { workerData: input });
+export type WorkspaceWorkerFactory = (input: WorkspaceScanInput, rootSessionId?: string) => Worker;
+const defaultWorker: WorkspaceWorkerFactory = (input, rootSessionId) =>
+  new Worker(path.join(__dirname, 'workspace-worker.js'), { workerData: { ...input, rootSessionId } });
+const noBoundary: AnalysisBoundaryFactory = () => ({ ready: Promise.resolve(undefined), async close() {} });
 
 interface Task {
   key: string;
@@ -32,6 +34,7 @@ export class ProjectTasks {
     private readonly publish: (state: ProjectTaskProgressDto) => void = () => {},
     private readonly createWorker = defaultWorker,
     private readonly scanTimeoutMs = 120_000,
+    private readonly createBoundary: AnalysisBoundaryFactory = noBoundary,
   ) {
     this.unsubscribe = analysis.subscribe((state) => {
       const task = this.active;
@@ -148,40 +151,50 @@ export class ProjectTasks {
     }
   }
 
-  private scan(task: Task, input: WorkspaceScanInput): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const worker = this.createWorker(input);
-      let settled = false;
-      const finish = async (error?: Error) => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timeout);
-        task.controller.signal.removeEventListener('abort', abort);
-        try { await worker.terminate(); } catch (terminationError) { error = new Error(`工作区 Worker 退出失败：${String(terminationError)}`); }
-        worker.removeAllListeners();
-        if (error) reject(error); else resolve();
-      };
-      const abort = () => { void finish(new Error('已取消工作区发现')); };
-      const timeout = setTimeout(() => { void finish(new Error('工作区发现超时，已停止扫描')); }, this.scanTimeoutMs);
-      timeout.unref();
-      worker.on('message', (message) => {
-        if (settled || task.controller.signal.aborted) return;
-        if (message.type === 'progress') {
-          task.state.scannedDirectories = message.scannedDirectories;
-          task.state.foundProjects = message.foundProjects;
-          task.state.stage = '正在发现工作区项目…';
-          this.emit(task);
-        } else if (message.type === 'result') {
-          task.state.discovered = message.discovered;
-          task.state.foundProjects = message.discovered.length;
-          void finish();
-        } else if (message.type === 'error') void finish(new Error(message.errorMessage));
+  private async scan(task: Task, input: WorkspaceScanInput): Promise<void> {
+    const boundary = this.createBoundary(input.rootPath, this.scanLimit());
+    let worker: Worker | undefined;
+    try {
+      const sessionId = await boundary.ready;
+      if (task.controller.signal.aborted) throw new Error('已取消工作区发现');
+      worker = this.createWorker(input, sessionId);
+      await new Promise<void>((resolve, reject) => {
+        let settled = false;
+        const finish = async (error?: Error) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timeout);
+          task.controller.signal.removeEventListener('abort', abort);
+          try { await worker!.terminate(); } catch (terminationError) { error = new Error(`工作区 Worker 退出失败：${String(terminationError)}`); }
+          worker!.removeAllListeners();
+          if (error) reject(error); else resolve();
+        };
+        const abort = () => { void finish(new Error('已取消工作区发现')); };
+        const timeout = setTimeout(() => { void finish(new Error('工作区发现超时，已停止扫描')); }, this.scanTimeoutMs);
+        timeout.unref();
+        worker!.on('message', (message) => {
+          if (settled || task.controller.signal.aborted) return;
+          if (message.type === 'progress') {
+            task.state.scannedDirectories = message.scannedDirectories;
+            task.state.foundProjects = message.foundProjects;
+            task.state.stage = '正在发现工作区项目…';
+            this.emit(task);
+          } else if (message.type === 'result') {
+            task.state.discovered = message.discovered;
+            task.state.foundProjects = message.discovered.length;
+            void finish();
+          } else if (message.type === 'error') void finish(new Error(message.errorMessage));
+        });
+        worker!.once('error', (error) => { void finish(error); });
+        worker!.once('exit', (code) => { if (!settled) void finish(new Error(`工作区 Worker 提前退出（${code}）`)); });
+        task.controller.signal.addEventListener('abort', abort, { once: true });
+        if (task.controller.signal.aborted) abort();
       });
-      worker.once('error', (error) => { void finish(error); });
-      worker.once('exit', (code) => { if (!settled) void finish(new Error(`工作区 Worker 提前退出（${code}）`)); });
-      task.controller.signal.addEventListener('abort', abort, { once: true });
-      if (task.controller.signal.aborted) abort();
-    });
+    } finally {
+      try { await boundary.close(); } catch (boundaryError) {
+        throw new Error(`无法释放工作区安全边界：${String(boundaryError)}`);
+      }
+    }
   }
 
   private async importProjects(task: Task): Promise<void> {

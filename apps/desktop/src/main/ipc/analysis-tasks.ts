@@ -4,9 +4,97 @@ import { generateId } from '@codehelm/shared';
 import type { AnalysisSnapshot } from '@codehelm/domain';
 import type { AnalysisTaskDto } from '@codehelm/contracts';
 
-export type AnalysisWorkerFactory = (rootPath: string, maxFiles: number) => Worker;
-export const createAnalysisWorker: AnalysisWorkerFactory = (rootPath, maxFiles) =>
-  new Worker(path.join(__dirname, 'analysis-worker.js'), { workerData: { rootPath, maxFiles } });
+export type AnalysisWorkerFactory = (rootPath: string, maxFiles: number, rootSessionId?: string) => Worker;
+export const createAnalysisWorker: AnalysisWorkerFactory = (rootPath, maxFiles, rootSessionId) =>
+  new Worker(path.join(__dirname, 'analysis-worker.js'), { workerData: { rootPath, maxFiles, rootSessionId } });
+
+export interface AnalysisBoundary {
+  ready: Promise<string | undefined>;
+  close(): Promise<void>;
+}
+
+export type AnalysisBoundaryFactory = (rootPath: string, maxDirectories: number) => AnalysisBoundary;
+export function createAnalysisBoundaryFromWorker(worker: Worker): AnalysisBoundary {
+  let readySettled = false;
+  let closeRequested = false;
+  let closeSettled = false;
+  let resolveReady!: (sessionId: string) => void;
+  let rejectReady!: (error: Error) => void;
+  let resolveClose!: () => void;
+  let rejectClose!: (error: Error) => void;
+  const ready = new Promise<string>((resolve, reject) => { resolveReady = resolve; rejectReady = reject; });
+  const closed = new Promise<void>((resolve, reject) => { resolveClose = resolve; rejectClose = reject; });
+
+  const fail = (error: Error) => {
+    if (!readySettled) {
+      readySettled = true;
+      rejectReady(error);
+    }
+    if (closeRequested && !closeSettled) {
+      closeSettled = true;
+      rejectClose(error);
+    }
+  };
+  worker.on('message', (message: { type?: string; sessionId?: string; errorMessage?: string }) => {
+    if (message.type === 'ready' && typeof message.sessionId === 'string') {
+      if (!readySettled) {
+        readySettled = true;
+        resolveReady(message.sessionId);
+      }
+    } else if (message.type === 'error') {
+      fail(new Error(message.errorMessage || '无法建立项目安全边界'));
+    } else if (message.type === 'closed') {
+      if (!closeSettled) {
+        closeSettled = true;
+        resolveClose();
+      }
+    } else if (message.type === 'close-error') {
+      if (!closeSettled) {
+        closeSettled = true;
+        rejectClose(new Error(message.errorMessage || '无法释放项目安全边界'));
+      }
+    }
+  });
+  worker.once('error', (error) => fail(error));
+  worker.once('exit', (code) => {
+    if (!readySettled) fail(new Error(`安全边界 Worker 提前退出（${code}）`));
+    if (closeRequested && !closeSettled) {
+      closeSettled = true;
+      if (code === 0) resolveClose();
+      else rejectClose(new Error(`安全边界 Worker 退出失败（${code}）`));
+    }
+  });
+
+  let closePromise: Promise<void> | undefined;
+  return {
+    ready,
+    close() {
+      if (closePromise) return closePromise;
+      closeRequested = true;
+      closePromise = (async () => {
+        try {
+          await ready;
+        } catch {
+          try { await worker.terminate(); } catch { /* Preserve the boundary creation error. */ }
+          return;
+        }
+        if (worker.threadId === -1) return;
+        worker.postMessage({ type: 'close' });
+        await closed;
+        try { await worker.terminate(); } catch { /* The worker already acknowledged cleanup. */ }
+      })();
+      return closePromise;
+    },
+  };
+}
+
+export const createNativeAnalysisBoundary: AnalysisBoundaryFactory = (rootPath, maxDirectories) => {
+  const worker = new Worker(path.join(__dirname, 'analysis-boundary-worker.js'), {
+    workerData: { rootPath, maxEntries: maxDirectories },
+  });
+  return createAnalysisBoundaryFromWorker(worker);
+};
+const noBoundary: AnalysisBoundaryFactory = () => ({ ready: Promise.resolve(undefined), async close() {} });
 
 interface Task {
   state: AnalysisTaskDto;
@@ -16,6 +104,7 @@ interface Task {
   worker?: Worker;
   settling: boolean;
   timeout?: ReturnType<typeof setTimeout>;
+  boundary?: ReturnType<AnalysisBoundaryFactory>;
 }
 
 /** One worker at a time bounds CPU/memory; duplicate requests share the same task. */
@@ -45,6 +134,8 @@ export class AnalysisTasks {
     private readonly publish: (state: AnalysisTaskDto) => void = () => {},
     private readonly createWorker = createAnalysisWorker,
     private readonly timeoutMs = 120_000,
+    private readonly createBoundary: AnalysisBoundaryFactory = noBoundary,
+    private readonly persistenceTimeoutMs = 30_000,
   ) {}
 
   get(projectId: string): AnalysisTaskDto | null {
@@ -73,7 +164,19 @@ export class AnalysisTasks {
     }, this.timeoutMs);
     task.timeout.unref();
     try {
-      const worker = this.createWorker(rootPath, maxFiles);
+      task.boundary = this.createBoundary(rootPath, maxFiles);
+      void this.launch(task, rootPath, maxFiles);
+    } catch (error) {
+      void this.finish(task, 'failed', error instanceof Error ? error.message : String(error));
+    }
+    return { taskId: task.state.taskId };
+  }
+
+  private async launch(task: Task, rootPath: string, maxFiles: number): Promise<void> {
+    try {
+      const sessionId = await task.boundary!.ready;
+      if (task.settling || task.controller.signal.aborted || task.state.status !== 'running') return;
+      const worker = this.createWorker(rootPath, maxFiles, sessionId);
       task.worker = worker;
       worker.on('message', (message) => {
         if (task.settling || task.controller.signal.aborted || task.state.status !== 'running') return;
@@ -92,14 +195,20 @@ export class AnalysisTasks {
           task.state.stage = '正在保存分析结果与启动方案…';
           task.state.percentage = 98;
           this.emit(task);
-          // Persistence is the commit point: cancel cannot report success after saving has begun.
+          // Persistence is the commit point: user cancellation cannot report success after saving has begun,
+          // but shutdown must still have a finite upper bound if profile preparation or storage stalls.
           clearTimeout(task.timeout);
+          task.timeout = setTimeout(() => {
+            task.controller.abort();
+            void this.finish(task, 'failed', '保存分析结果超时；原分析结果保留');
+          }, this.persistenceTimeoutMs);
+          task.timeout.unref();
           void (async () => {
             try {
               await worker.terminate();
               if (task.settling || task.controller.signal.aborted) return;
               worker.removeAllListeners();
-              await this.persist(snapshot, projectId, rootPath, task.controller.signal);
+              await this.persist(snapshot, task.state.projectId, rootPath, task.controller.signal);
               await this.finish(task, 'completed');
             } catch (error) {
               await this.finish(task, 'failed', error instanceof Error ? error.message : String(error));
@@ -116,9 +225,8 @@ export class AnalysisTasks {
         }
       });
     } catch (error) {
-      void this.finish(task, 'failed', error instanceof Error ? error.message : String(error));
+      if (!task.settling) await this.finish(task, 'failed', error instanceof Error ? error.message : String(error));
     }
-    return { taskId: task.state.taskId };
   }
 
   async wait(taskId: string): Promise<AnalysisTaskDto> {
@@ -171,6 +279,10 @@ export class AnalysisTasks {
       errorMessage = `无法终止扫描 Worker：${String(error)}`;
     }
     task.worker?.removeAllListeners();
+    try { await task.boundary?.close(); } catch (error) {
+      status = 'failed';
+      errorMessage = `无法释放项目安全边界：${String(error)}`;
+    }
     task.state = { ...task.state, status, errorMessage,
       stage: status === 'completed' ? '分析完成' : status === 'cancelled' ? '已取消，原分析结果保留' : '分析失败，原分析结果保留',
       percentage: status === 'completed' ? 100 : task.state.percentage };

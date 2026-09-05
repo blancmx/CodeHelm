@@ -6,7 +6,7 @@
   >
     <div
       class="h-full w-full font-sans flex flex-col antialiased overflow-hidden select-none transition-colors duration-300 relative"
-      :class="themeStore.isDark ? 'bg-[#09090b] text-[#ffffff]' : 'bg-[#fafafa] text-[#09090b]'"
+      :class="themeStore.isDark ? 'bg-[#0f0f12] text-[#ffffff]' : 'bg-[#f4f4f5] text-[#09090b]'"
     >
       <!-- Modern Frameless Window Header Bar with Drag Region & Windows 11 Controls -->
       <WindowHeaderBar class="desktop-window-header relative" />

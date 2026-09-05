@@ -1,3 +1,4 @@
+import type { RegisterIpcHandler } from './trusted-ipc.js';
 import type { Database as DatabaseInstance } from 'better-sqlite3';
 import { registerProjectHandlers } from './project-handlers.js';
 import { registerProfileHandlers } from './profile-handlers.js';
@@ -28,7 +29,7 @@ export async function closeLogStorage(): Promise<void> {
 
 export { stopAllRunnerSessions } from './runner-handlers.js';
 
-export async function registerAllIpcHandlers(db: DatabaseInstance) {
+export async function registerAllIpcHandlers(db: DatabaseInstance, handle: RegisterIpcHandler) {
   analysisTasks = getAnalysisTasks(db);
   projectTasks = getProjectTasks(db, analysisTasks);
   logs = new LogStorage(resolveLogDirectory({
@@ -36,10 +37,10 @@ export async function registerAllIpcHandlers(db: DatabaseInstance) {
     appPath: app.getAppPath(),
     executablePath: app.getPath('exe'),
   }), () => getAppSettings(db));
-  registerProjectHandlers(db);
-  registerProfileHandlers(db);
-  registerAnalysisHandlers(db);
-  await registerRunnerHandlers(db, logs);
-  registerSettingsHandlers(db, logs);
+  registerProjectHandlers(handle, db);
+  registerProfileHandlers(handle, db);
+  registerAnalysisHandlers(handle, db);
+  await registerRunnerHandlers(handle, db, logs);
+  registerSettingsHandlers(handle, db, logs);
   logs.start();
 }

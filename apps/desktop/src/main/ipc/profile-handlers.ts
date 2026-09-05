@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron';
+import type { RegisterIpcHandler } from './trusted-ipc.js';
 import type { Database as DatabaseInstance } from 'better-sqlite3';
 import {
   IpcChannels,
@@ -14,7 +14,7 @@ import {
   redactProfileSecrets,
 } from './profile-secrets.js';
 
-export function registerProfileHandlers(db: DatabaseInstance) {
+export function registerProfileHandlers(handle: RegisterIpcHandler, db: DatabaseInstance) {
   const profileRepo = new ProfileRepository(db);
 
   function mergeRedactedSecrets(input: ReturnType<typeof SaveRunProfileInputSchema.parse>, existing: RunProfile | null) {
@@ -74,7 +74,7 @@ export function registerProfileHandlers(db: DatabaseInstance) {
     return RunProfileDtoSchema.parse(redactProfileSecrets(protectStoredProfile(profile)));
   }
 
-  ipcMain.handle(IpcChannels.PROFILES_SAVE, async (_event, rawInput) => {
+  handle(IpcChannels.PROFILES_SAVE, async (_event, rawInput) => {
     const input = SaveRunProfileInputSchema.parse(rawInput);
     const existing = input.id ? profileRepo.findById(input.id) : null;
     if (existing && existing.projectId !== input.projectId) {
@@ -98,13 +98,13 @@ export function registerProfileHandlers(db: DatabaseInstance) {
     return toRendererProfile(savedProfile);
   });
 
-  ipcMain.handle(IpcChannels.PROFILES_LIST, async (_event, projectId: string) => {
+  handle(IpcChannels.PROFILES_LIST, async (_event, projectId: string) => {
     return RunProfileDtoSchema.array().parse(
       profileRepo.findByProjectId(projectId).map(toRendererProfile)
     );
   });
 
-  ipcMain.handle(IpcChannels.PROFILES_GET, async (_event, id: string) => {
+  handle(IpcChannels.PROFILES_GET, async (_event, id: string) => {
     const profile = profileRepo.findById(id);
     return profile ? toRendererProfile(profile) : null;
   });

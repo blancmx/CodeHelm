@@ -5,9 +5,10 @@ import path from 'node:path';
 import type { DiscoveredProjectDto } from '@codehelm/contracts';
 import { generateId, normalizePath } from '@codehelm/shared';
 import { parseJson } from '../parsers/index.js';
-import { readUtf8FileWithinLimit } from '../io/bounded-read.js';
+import { isPathBoundaryError, readUtf8FileFromLockedRoot, readUtf8FileWithinLimit } from '../io/bounded-read.js';
 
 export interface WorkspaceScannerOptions {
+  rootSessionId?: string;
   maxDepth?: number;
   onProgress?: (scannedDirectories: number, foundProjects: number) => void;
 }
@@ -70,10 +71,6 @@ function normalizeMaxDepth(value: number | undefined): number {
   return Math.min(value, MAX_WORKSPACE_SCAN_DEPTH);
 }
 
-async function readInspectionFile(filePath: string): Promise<string> {
-  return (await readUtf8FileWithinLimit(filePath, MAX_WORKSPACE_INSPECTION_FILE_BYTES)).text;
-}
-
 function parsePort(text: string): number | undefined {
   const patterns = [
     /(?:--port|-p)\s*[= ]\s*(\d{2,5})/i,
@@ -93,6 +90,8 @@ function pythonModuleName(relativeFile: string): string {
 }
 
 export class WorkspaceScanner {
+  private boundaryFailure: Error | undefined;
+
   async scan(rootPath: string, options: WorkspaceScannerOptions = {}): Promise<DiscoveredProjectDto[]> {
     const normalizedRoot = normalizePath(rootPath);
     const maxDepth = normalizeMaxDepth(options.maxDepth);
@@ -106,7 +105,8 @@ export class WorkspaceScanner {
     const inspected = () => options.onProgress?.(++scannedDirectories, results.length);
 
     // 1. Check if the root directory itself is a project
-    const rootProject = await this.inspectDirectory(normalizedRoot, normalizedRoot);
+    const rootProject = await this.inspectDirectory(normalizedRoot, normalizedRoot, options.rootSessionId);
+    this.throwBoundaryFailure();
     if (rootProject) {
       results.push(rootProject);
       scannedPaths.add(normalizedRoot);
@@ -114,7 +114,7 @@ export class WorkspaceScanner {
     inspected();
 
     // 2. Scan subdirectories up to maxDepth
-    await this.scanRecursive(normalizedRoot, normalizedRoot, 1, maxDepth, results, scannedPaths, inspected);
+    await this.scanRecursive(normalizedRoot, normalizedRoot, 1, maxDepth, results, scannedPaths, inspected, options.rootSessionId);
 
     return results;
   }
@@ -127,6 +127,7 @@ export class WorkspaceScanner {
     results: DiscoveredProjectDto[],
     scannedPaths: Set<string>,
     inspected: () => void,
+    rootSessionId?: string,
   ): Promise<void> {
     if (currentDepth > maxDepth || results.length >= MAX_WORKSPACE_SCAN_RESULTS) return;
 
@@ -162,7 +163,8 @@ export class WorkspaceScanner {
         // Inspect if subPath is a project
         const normalizedSub = normalizePath(subPath);
         if (!scannedPaths.has(normalizedSub)) {
-          const project = await this.inspectDirectory(normalizedSub, workspaceRoot);
+          const project = await this.inspectDirectory(normalizedSub, workspaceRoot, rootSessionId);
+          this.throwBoundaryFailure();
           // Count actual inspected directories, not an estimated percentage.
           inspected();
           if (project) {
@@ -177,14 +179,14 @@ export class WorkspaceScanner {
         }
 
         // Descend into next level
-        await this.scanRecursive(subPath, workspaceRoot, currentDepth + 1, maxDepth, results, scannedPaths, inspected);
+        await this.scanRecursive(subPath, workspaceRoot, currentDepth + 1, maxDepth, results, scannedPaths, inspected, rootSessionId);
       }
     } finally {
       await directory.close().catch(() => undefined);
     }
   }
 
-  private async inspectDirectory(dirPath: string, workspaceRoot: string): Promise<DiscoveredProjectDto | null> {
+  private async inspectDirectory(dirPath: string, workspaceRoot: string, rootSessionId?: string): Promise<DiscoveredProjectDto | null> {
     const dirName = path.basename(dirPath) || 'project';
     const relativePath = path.relative(workspaceRoot, dirPath) || '.';
 
@@ -207,7 +209,7 @@ export class WorkspaceScanner {
     if (hasPackageJson) {
       let pkg: any = {};
       try {
-        const pkgContent = await readInspectionFile(path.join(dirPath, 'package.json'));
+        const pkgContent = await this.readInspectionFile(path.join(dirPath, 'package.json'), workspaceRoot, rootSessionId);
         pkg = parseJson(pkgContent) || {};
       } catch {
         // ignore
@@ -362,19 +364,19 @@ export class WorkspaceScanner {
       let reqContent = '';
       if (hasRequirementsTxt) {
         try {
-          reqContent = await readInspectionFile(path.join(dirPath, 'requirements.txt'));
+          reqContent = await this.readInspectionFile(path.join(dirPath, 'requirements.txt'), workspaceRoot, rootSessionId);
         } catch {
           // ignore
         }
       }
       if (hasPyproject) {
         try {
-          reqContent += '\n' + await readInspectionFile(path.join(dirPath, 'pyproject.toml'));
+          reqContent += '\n' + await this.readInspectionFile(path.join(dirPath, 'pyproject.toml'), workspaceRoot, rootSessionId);
         } catch {}
       }
       if (hasPipfile) {
         try {
-          reqContent += '\n' + await readInspectionFile(path.join(dirPath, 'Pipfile'));
+          reqContent += '\n' + await this.readInspectionFile(path.join(dirPath, 'Pipfile'), workspaceRoot, rootSessionId);
         } catch {}
       }
 
@@ -387,7 +389,7 @@ export class WorkspaceScanner {
       });
       for (const pyF of prioritizedPythonFiles.slice(0, 20)) {
         try {
-          const code = await readInspectionFile(path.join(dirPath, pyF));
+          const code = await this.readInspectionFile(path.join(dirPath, pyF), workspaceRoot, rootSessionId);
           combinedPyCode += '\n' + code;
           pythonCode.set(pyF, code);
         } catch {}
@@ -594,5 +596,21 @@ export class WorkspaceScanner {
     }
 
     return null;
+  }
+
+  private async readInspectionFile(filePath: string, workspaceRoot: string, rootSessionId?: string): Promise<string> {
+    try {
+      const result = rootSessionId
+        ? await readUtf8FileFromLockedRoot(rootSessionId, path.relative(workspaceRoot, filePath), MAX_WORKSPACE_INSPECTION_FILE_BYTES)
+        : await readUtf8FileWithinLimit(filePath, MAX_WORKSPACE_INSPECTION_FILE_BYTES);
+      return result.text;
+    } catch (error) {
+      if (isPathBoundaryError(error)) this.boundaryFailure = error instanceof Error ? error : new Error(String(error));
+      throw error;
+    }
+  }
+
+  private throwBoundaryFailure(): void {
+    if (this.boundaryFailure) throw this.boundaryFailure;
   }
 }

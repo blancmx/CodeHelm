@@ -4,6 +4,7 @@ import { generateId } from '@codehelm/shared';
 import { protectProfileSecrets } from './profile-secrets.js';
 
 export const AUTO_PROFILE_NAME = 'Default (Auto-Detected)';
+export const DETECTED_BACKEND_START_TIMEOUT_MS = 30_000;
 
 export interface DetectedServicePortAllocator {
   allocate(
@@ -65,6 +66,12 @@ export function buildDetectedServices(snapshot: AnalysisSnapshot): ServiceConfig
         source: 'detected',
         healthCheck: command.port
           ? { type: 'tcp', port: command.port }
+          : undefined,
+        // Backend frameworks often compile or import their application before
+        // opening the health-check port. Ten seconds is too short for a warm
+        // local Maven/Spring start and incorrectly blocks dependent frontends.
+        startTimeoutMs: command.type === 'backend'
+          ? DETECTED_BACKEND_START_TIMEOUT_MS
           : undefined,
       });
     }

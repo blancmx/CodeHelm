@@ -1,7 +1,7 @@
 <template>
   <div
     class="h-8 w-full select-none flex items-center justify-between flex-shrink-0 transition-colors duration-200 drag-header"
-    :class="themeStore.isDark ? 'bg-black text-zinc-300' : 'bg-white text-zinc-700'"
+    :class="themeStore.isDark ? 'bg-[#0f0f12] text-zinc-300' : 'bg-[#f4f4f5] text-zinc-700'"
     @dblclick="handleToggleMaximize"
   >
     <!-- Left: Sidebar Collapse/Expand & Navigation History Controls -->
@@ -12,7 +12,7 @@
         class="w-6.5 h-6.5 rounded-md flex items-center justify-center transition-colors duration-150 cursor-pointer select-none group/toggle"
         :class="themeStore.isDark
           ? 'text-zinc-300 hover:text-white hover:bg-white/10'
-          : 'text-zinc-700 hover:text-black hover:bg-zinc-100'"
+          : 'text-zinc-700 hover:text-black hover:bg-zinc-200/80'"
         @click.stop="sidebarStore.toggleCollapse"
       >
         <IconSidebarAnimated :collapsed="sidebarStore.isCollapsed" :size="16" />
@@ -29,10 +29,10 @@
           :class="navHistoryStore.canGoBack
             ? (themeStore.isDark
                 ? 'text-zinc-300 hover:text-white hover:bg-white/10 cursor-pointer'
-                : 'text-zinc-700 hover:text-black hover:bg-zinc-100 cursor-pointer')
+                : 'text-zinc-700 hover:text-black hover:bg-zinc-200/80 cursor-pointer')
             : (themeStore.isDark
                 ? 'text-zinc-700 cursor-not-allowed opacity-35'
-                : 'text-zinc-300 cursor-not-allowed opacity-35')"
+                : 'text-zinc-400 cursor-not-allowed opacity-35')"
           @click="handleGoBack"
         >
           <IconArrowLeft :size="14" stroke-width="2.2" />
@@ -47,10 +47,10 @@
           :class="navHistoryStore.canGoForward
             ? (themeStore.isDark
                 ? 'text-zinc-300 hover:text-white hover:bg-white/10 cursor-pointer'
-                : 'text-zinc-700 hover:text-black hover:bg-zinc-100 cursor-pointer')
+                : 'text-zinc-700 hover:text-black hover:bg-zinc-200/80 cursor-pointer')
             : (themeStore.isDark
                 ? 'text-zinc-700 cursor-not-allowed opacity-35'
-                : 'text-zinc-300 cursor-not-allowed opacity-35')"
+                : 'text-zinc-400 cursor-not-allowed opacity-35')"
           @click="handleGoForward"
         >
           <IconArrowRight :size="14" stroke-width="2.2" />

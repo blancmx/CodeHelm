@@ -1255,7 +1255,8 @@ function handleSaveServiceModal(updatedService: ServiceConfigDto) {
 async function handleSaveProfile() {
   if (!editingProfile.value || !window.codehelm) return;
   try {
-    await window.codehelm.profiles.save(editingProfile.value);
+    // Normalize before contextBridge: its argument copy happens before preload.
+    await window.codehelm.profiles.save(JSON.parse(JSON.stringify(editingProfile.value)));
     message.success('启动方案已成功保存');
     await loadData();
   } catch (err: any) {

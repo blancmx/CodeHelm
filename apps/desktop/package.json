@@ -12,6 +12,7 @@
     "clean": "rimraf dist dist-electron"
   },
   "dependencies": {
+    "@codehelm/safe-fs": "workspace:*",
     "better-sqlite3": "^13.0.3"
   },
   "devDependencies": {

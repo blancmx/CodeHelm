@@ -10,6 +10,7 @@
     "clean": "rimraf dist tsconfig.tsbuildinfo"
   },
   "dependencies": {
+    "@codehelm/safe-fs": "workspace:*",
     "@codehelm/contracts": "workspace:*",
     "@codehelm/domain": "workspace:*",
     "@codehelm/shared": "workspace:*",

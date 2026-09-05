@@ -6,8 +6,10 @@
   "scripts": {
     "dev": "pnpm --filter @codehelm/desktop dev",
     "build": "pnpm -r --filter \"./packages/*\" run build && pnpm --filter @codehelm/desktop exec vite build",
-    "package": "pnpm build && pnpm --filter @codehelm/desktop exec electron-builder",
-    "package:dir": "pnpm build && pnpm --filter @codehelm/desktop exec electron-builder --dir",
+    "package": "pnpm package:unsigned",
+    "package:unsigned": "pnpm build && pnpm --filter @codehelm/desktop exec electron-builder && pnpm verify:release && node apps/desktop/scripts/finalize-unsigned-release.mjs dist-release",
+    "package:dir": "pnpm build && pnpm --filter @codehelm/desktop exec electron-builder --dir && pnpm verify:release",
+    "verify:release": "node apps/desktop/scripts/verify-release-artifacts.mjs dist-release/win-unpacked/resources",
     "typecheck": "pnpm -r run typecheck",
     "test": "vitest run",
     "test:watch": "vitest",

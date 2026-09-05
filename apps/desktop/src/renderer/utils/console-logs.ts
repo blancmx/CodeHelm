@@ -22,3 +22,14 @@ export function countLogsByProject(
   }
   return counts;
 }
+
+export function resolveDisplayedLogs<T>(live: readonly T[], frozen: readonly T[] | null): readonly T[] {
+  return frozen ?? live;
+}
+
+export function hasBufferedLogEntries<T extends { id: string }>(
+  live: readonly T[],
+  frozen: readonly T[] | null
+): boolean {
+  return frozen !== null && frozen.at(-1)?.id !== live.at(-1)?.id;
+}

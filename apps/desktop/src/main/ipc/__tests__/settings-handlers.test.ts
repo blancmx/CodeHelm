@@ -13,6 +13,7 @@ import { LogStorage } from '../log-storage.js';
 import { getAnalysisTasks } from '../analysis-service.js';
 import type { AnalysisTasks } from '../analysis-tasks.js';
 import { getProjectTasks } from '../project-task-service.js';
+import { createTrustedIpcRegistrar, type TrustedIpcContext } from '../trusted-ipc.js';
 
 const harness = vi.hoisted(() => ({
   handlers: new Map<string, (...args: any[]) => any>(), openPath: vi.fn(async () => ''),
@@ -21,8 +22,10 @@ vi.mock('electron', () => ({
   ipcMain: { handle: (channel: string, fn: (...args: any[]) => any) => harness.handlers.set(channel, fn) },
   dialog: {}, shell: { openPath: harness.openPath }, BrowserWindow: { getAllWindows: () => [] },
 }));
-const invoke = async (channel: string, ...args: unknown[]) =>
-  harness.handlers.get(channel)!({ sender: { send: vi.fn(), once: vi.fn() } }, ...args);
+let event: any;
+let context: TrustedIpcContext;
+const handle = createTrustedIpcRegistrar(() => context);
+const invoke = async (channel: string, ...args: unknown[]) => harness.handlers.get(channel)!(event, ...args);
 
 describe('persisted settings and desktop execution integration', () => {
   let root: string;
@@ -31,13 +34,28 @@ describe('persisted settings and desktop execution integration', () => {
   let tasks: AnalysisTasks;
 
   beforeEach(async () => {
+    const frame = { url: 'http://localhost:15173/#/settings', detached: false };
+    const sender = { mainFrame: frame, getURL: () => frame.url, isDestroyed: () => false, send: vi.fn(), once: vi.fn() };
+    event = { sender, senderFrame: frame };
+    context = { window: { webContents: sender, isDestroyed: () => false } as any, renderer: { kind: 'dev', origin: 'http://localhost:15173' } };
     root = await fs.mkdtemp(path.join(os.tmpdir(), 'codehelm-settings-'));
     db = createDatabase(path.join(root, 'settings.sqlite'));
     logs = new LogStorage(path.join(root, 'logs'), () => getAppSettings(db));
     tasks = getAnalysisTasks(db, (rootPath, maxFiles) => new Worker(path.resolve('packages/analyzer/dist/analysis-worker.js'), { workerData: { rootPath, maxFiles } }));
-    registerSettingsHandlers(db, logs);
-    registerProjectHandlers(db);
-    registerAnalysisHandlers(db);
+    registerSettingsHandlers(handle, db, logs);
+    registerProjectHandlers(handle, db);
+    registerAnalysisHandlers(handle, db);
+  });
+
+  it('rejects foreign callers across the registered project, analysis, and settings entry points', async () => {
+    const original = getAppSettings(db);
+    event = { ...event, sender: { ...event.sender } };
+    for (const channel of harness.handlers.keys()) {
+      await expect(invoke(channel, { maxScanFiles: 1200 })).rejects.toThrow('IPC 来源校验失败');
+    }
+    expect(getAppSettings(db)).toEqual(original);
+    expect(harness.openPath).not.toHaveBeenCalled();
+    expect(db.prepare('SELECT count(*) AS count FROM projects').get()).toEqual({ count: 0 });
   });
   afterEach(async () => {
     await getProjectTasks(db, tasks).close();
@@ -54,7 +72,7 @@ describe('persisted settings and desktop execution integration', () => {
     await expect(invoke(IpcChannels.SETTINGS_UPDATE, { maxScanFiles: 500001 })).rejects.toThrow();
     db.close();
     db = createDatabase(path.join(root, 'settings.sqlite'));
-    registerSettingsHandlers(db, logs);
+    registerSettingsHandlers(handle, db, logs);
     expect(await invoke(IpcChannels.SETTINGS_GET)).toMatchObject({ maxScanFiles: 1200, maxLogRetentionDays: 7, maxLogRetentionMb: 80 });
     db.close();
     await expect(invoke(IpcChannels.SETTINGS_UPDATE, { maxScanFiles: 1500 })).rejects.toThrow();

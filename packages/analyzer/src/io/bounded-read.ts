@@ -1,4 +1,5 @@
 import fs from 'node:fs/promises';
+import { readFile as readSafeFile, fileExists as safeFileExists } from '@codehelm/safe-fs';
 
 export const DEFAULT_MAX_ANALYZER_FILE_BYTES = 2 * 1024 * 1024;
 export const DEFAULT_MAX_ANALYZER_TOTAL_READ_BYTES = 32 * 1024 * 1024;
@@ -93,4 +94,25 @@ export async function readUtf8FileWithinLimit(
   } finally {
     await handle.close();
   }
+}
+
+export function isPathBoundaryError(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && 'code' in error
+    && (error as { code?: unknown }).code === 'CODEHELM_PATH_BOUNDARY';
+}
+
+export async function readUtf8FileFromLockedRoot(
+  sessionId: string,
+  relativePath: string,
+  maxBytes: number,
+  signal?: AbortSignal,
+): Promise<{ text: string; bytesRead: number }> {
+  if (signal?.aborted) throw new Error('Analysis cancelled');
+  const buffer = readSafeFile(sessionId, relativePath, maxBytes);
+  if (signal?.aborted) throw new Error('Analysis cancelled');
+  return { text: buffer.toString('utf8'), bytesRead: buffer.length };
+}
+
+export function fileExistsInLockedRoot(sessionId: string, relativePath: string): boolean {
+  return safeFileExists(sessionId, relativePath);
 }

@@ -147,7 +147,7 @@
     <div v-if="projectStore.hasLoadedProjects" class="flex items-center justify-between pt-3 pb-2 flex-shrink-0 gap-3">
       <!-- Left: Dynamic Ecosystem Tabs & Independent Running Toggle -->
       <div class="flex items-center gap-2.5 overflow-x-auto py-0.5 min-w-0">
-        <!-- Dynamic Ecosystem Filter Tabs with Silky Magnetic Sliding Pill -->
+        <!-- Dynamic Ecosystem Filter Tabs with Silky Magnetic Sliding Pill Indicator -->
         <div
           ref="tabContainerRef"
           class="relative flex items-center p-1 rounded-full border flex-shrink-0 select-none overflow-hidden"
@@ -155,17 +155,22 @@
         >
           <!-- Sliding Active Pill Indicator -->
           <div
-            class="absolute top-0 left-0 rounded-full transition-all duration-280 ease-[cubic-bezier(0.16,1,0.3,1)] shadow-xs pointer-events-none z-0"
+            class="ecosystem-tab-indicator absolute top-0 left-0 rounded-full shadow-xs pointer-events-none z-0"
+            :class="[
+              themeStore.isDark ? 'bg-white shadow-sm' : 'bg-black shadow-sm',
+              isTransitionReady ? 'transition-all duration-280 ease-[cubic-bezier(0.16,1,0.3,1)]' : 'transition-none'
+            ]"
             :style="indicatorStyle"
-            :class="themeStore.isDark ? 'bg-white shadow-sm' : 'bg-black shadow-sm'"
           />
 
           <button
             v-for="filter in filterOptions"
             :key="filter.value"
             :ref="(el) => setTabRef(filter.value, el)"
+            :data-tab="filter.value"
             type="button"
-            class="h-7.5 px-3.5 rounded-full text-xs font-medium transition-colors duration-200 cursor-pointer flex items-center justify-center flex-shrink-0 select-none relative z-10 border border-transparent"
+            :aria-pressed="activeFilter === filter.value"
+            class="ecosystem-filter-tab h-7.5 px-3.5 rounded-full text-xs font-medium transition-colors duration-200 cursor-pointer flex items-center justify-center flex-shrink-0 select-none relative z-10 border border-transparent"
             :class="activeFilter === filter.value
               ? (themeStore.isDark ? '!text-black font-bold' : '!text-white font-bold')
               : (themeStore.isDark ? 'text-zinc-400 hover:text-zinc-100' : 'text-zinc-600 hover:text-zinc-950')"
@@ -174,7 +179,7 @@
             <span>{{ filter.label }}</span>
             <span
               v-if="filter.count !== undefined"
-              class="ml-1 text-[10px] font-mono transition-colors"
+              class="ml-1 text-[10px] font-mono transition-colors duration-200"
               :class="activeFilter === filter.value
                 ? (themeStore.isDark ? 'text-black/80 font-bold' : 'text-white/80 font-bold')
                 : (themeStore.isDark ? 'text-zinc-500' : 'text-zinc-400')"
@@ -751,71 +756,101 @@ const isSortOpen = ref(false);
 // Smooth Sliding Magnetic Indicator for Ecosystem Filter Bar
 const tabContainerRef = ref<HTMLElement | null>(null);
 const tabRefs = new Map<string, HTMLElement>();
+const isTransitionReady = ref(false);
 
 function setTabRef(key: string, el: any) {
   if (el) {
-    tabRefs.set(key, el.$el || el);
+    tabRefs.set(key, (el as any).$el || el);
   } else {
     tabRefs.delete(key);
   }
 }
 
-const indicatorStyle = ref<{ transform: string; width: string; height: string; top: string; opacity: number }>({
-  transform: 'translateX(0px)',
+const indicatorStyle = ref<{
+  transform: string;
+  width: string;
+  height: string;
+  opacity: number;
+}>({
+  transform: 'translate3d(0, 0, 0)',
   width: '0px',
   height: '0px',
-  top: '0px',
   opacity: 0,
 });
 
 function updateIndicator() {
-  nextTick(() => {
-    const container = tabContainerRef.value;
-    const activeEl = tabRefs.get(activeFilter.value);
-    if (!container || !activeEl) {
-      indicatorStyle.value = {
-        transform: 'translateX(0px)',
-        width: '0px',
-        height: '0px',
-        top: '0px',
-        opacity: 0,
-      };
-      return;
-    }
+  const container = tabContainerRef.value;
+  if (!container) return;
 
-    const left = activeEl.offsetLeft;
-    const top = activeEl.offsetTop;
-    const width = activeEl.offsetWidth;
-    const height = activeEl.offsetHeight;
-
+  const activeEl = tabRefs.get(activeFilter.value) || container.querySelector<HTMLElement>(`[data-tab="${activeFilter.value}"]`);
+  if (!activeEl) {
     indicatorStyle.value = {
-      transform: `translateX(${left}px)`,
-      width: `${width}px`,
-      height: `${height}px`,
-      top: `${top}px`,
-      opacity: 1,
+      transform: 'translate3d(0, 0, 0)',
+      width: '0px',
+      height: '0px',
+      opacity: 0,
     };
-  });
+    return;
+  }
+
+  const left = activeEl.offsetLeft;
+  const top = activeEl.offsetTop;
+  const width = activeEl.offsetWidth;
+  const height = activeEl.offsetHeight;
+
+  if (width === 0 && height === 0) {
+    return;
+  }
+
+  indicatorStyle.value = {
+    transform: `translate3d(${left}px, ${top}px, 0)`,
+    width: `${width}px`,
+    height: `${height}px`,
+    opacity: 1,
+  };
 }
 
 function handleSelectFilter(val: string) {
   activeFilter.value = val;
   sessionStorage.setItem('codehelm_overview_filter', val);
-  updateIndicator();
+  nextTick(updateIndicator);
 }
+
+let resizeObserver: ResizeObserver | null = null;
 
 onMounted(() => {
   runnerStore.setupListeners();
   void runnerStore.fetchState();
-  updateIndicator();
-  // Ensure indicator updates once child refs are mounted
-  setTimeout(updateIndicator, 40);
-  setTimeout(updateIndicator, 150);
+
+  nextTick(() => {
+    updateIndicator();
+    if (typeof requestAnimationFrame !== 'undefined') {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          isTransitionReady.value = true;
+        });
+      });
+    } else {
+      isTransitionReady.value = true;
+    }
+  });
+
+  if (typeof ResizeObserver !== 'undefined' && tabContainerRef.value) {
+    resizeObserver = new ResizeObserver(() => {
+      updateIndicator();
+    });
+    resizeObserver.observe(tabContainerRef.value);
+  }
+
   window.addEventListener('resize', updateIndicator);
 });
 
 onUnmounted(() => {
   window.removeEventListener('resize', updateIndicator);
+  if (resizeObserver) {
+    resizeObserver.disconnect();
+    resizeObserver = null;
+  }
 });
 
 const sortOptions = [
@@ -982,7 +1017,7 @@ watch([() => activeFilter.value, () => filterOptions.value], () => {
       sessionStorage.setItem('codehelm_overview_filter', 'ALL');
     }
   }
-  updateIndicator();
+  nextTick(updateIndicator);
 }, { deep: true });
 
 const filteredProjects = computed(() => {
@@ -1100,6 +1135,14 @@ function statusBadgeClass(status?: string) {
 </script>
 
 <style scoped>
+@media (prefers-reduced-motion: reduce) {
+  .ecosystem-filter-tab,
+  .ecosystem-filter-tab span,
+  .ecosystem-tab-indicator {
+    transition: none !important;
+  }
+}
+
 /* Clean Ghost-Free Tab & View Crossfade Transition */
 .tab-crossfade-enter-active {
   transition: opacity 160ms cubic-bezier(0.16, 1, 0.3, 1), transform 160ms cubic-bezier(0.16, 1, 0.3, 1);

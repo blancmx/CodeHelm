@@ -101,7 +101,7 @@
               @click="handleSelectProject('ALL')"
             >
               <span>全部项目</span>
-              <span class="font-mono text-[10px] opacity-75">({{ runnerStore.logs.length }})</span>
+              <span class="font-mono text-[10px] opacity-75">({{ displayedLogsSource.length }})</span>
             </button>
 
             <button
@@ -248,10 +248,10 @@
               ? 'bg-emerald-950/50 border-emerald-700 text-emerald-300 shadow-xs'
               : 'bg-[#18181b] border-[#27272a] text-zinc-400 hover:text-zinc-200'"
             :title="autoScroll ? '自动滚动已开启' : '点击开启自动滚动'"
-            @click="autoScroll = !autoScroll"
+            @click="toggleAutoScroll"
           >
             <IconZap :size="12" />
-            <span>{{ autoScroll ? '滚屏锁定' : '自由滚动' }}</span>
+            <span>{{ autoScroll ? '滚屏锁定' : hasBufferedLogs ? '自由滚动 · 有新日志' : '自由滚动' }}</span>
           </button>
 
           <!-- Show Timestamps Toggle -->
@@ -296,15 +296,11 @@
       </div>
 
       <!-- 3. Terminal Output Stream Window -->
+      <!-- Empty State -->
       <div
-        ref="logContainerRef"
-        class="flex-1 overflow-y-auto p-4 terminal-code-stream space-y-1 select-text bg-[#09090b] text-zinc-300 [scrollbar-gutter:stable]"
+        v-if="filteredLogs.length === 0"
+        class="flex-1 text-zinc-500 text-center py-24 flex flex-col items-center justify-center gap-3 select-none font-sans bg-[#09090b]"
       >
-        <!-- Empty State -->
-        <div
-          v-if="filteredLogs.length === 0"
-          class="text-zinc-500 text-center py-24 flex flex-col items-center justify-center gap-3 select-none font-sans"
-        >
           <div class="w-14 h-14 rounded-2xl bg-[#121216] border border-[#27272a] flex items-center justify-center text-zinc-400 shadow-md">
             <IconTerminal :size="28" />
           </div>
@@ -326,18 +322,32 @@
               前往项目总览启动服务
             </button>
           </div>
-        </div>
+      </div>
 
-        <!-- Log Rows -->
+      <!-- Keep every filtered entry in memory while mounting only visible rows. -->
+      <NVirtualList
+        v-else
+        ref="logListRef"
+        :items="filteredLogs"
+        :item-size="24"
+        item-resizable
+        key-field="id"
+        class="flex-1 terminal-code-stream select-text bg-[#09090b] text-zinc-300"
+        style="min-height: 0"
+        :padding-top="16"
+        :padding-bottom="16"
+        :items-style="{ padding: '0 16px' }"
+      >
+        <template #default="{ item: entry, index: idx }">
         <div
-          v-for="(entry, idx) in filteredLogs"
           :key="entry.id"
+          :data-log-entry-id="entry.id"
           v-memo="[
             entry.id, entry.message, entry.timestamp, entry.serviceName, entry.stream,
             idx, showLineNumbers, showTimestamps,
             selectedProjectFilter === 'ALL', getEntryProjectName(entry),
           ]"
-          class="terminal-log-row leading-relaxed break-all flex items-start gap-2.5 hover:bg-[#15151a] px-2 py-0.5 rounded transition-colors group"
+          class="terminal-log-row mb-1 leading-relaxed break-all flex items-start gap-2.5 hover:bg-[#15151a] px-2 py-0.5 rounded transition-colors group"
         >
           <!-- Line Number -->
           <span
@@ -406,13 +416,15 @@
             </svg>
           </button>
         </div>
-      </div>
+        </template>
+      </NVirtualList>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick } from 'vue';
+import { NVirtualList, type VirtualListInst } from 'naive-ui';
 import { useRoute } from 'vue-router';
 import { useRunnerStore } from '../stores/runnerStore.js';
 import { useProjectStore } from '../stores/projectStore.js';
@@ -427,7 +439,12 @@ import {
   IconZap,
 } from '../components/icons/index.js';
 import type { LogEntryDto } from '@codehelm/contracts';
-import { countLogsByProject, resolveLogProjectId } from '../utils/console-logs.js';
+import {
+  countLogsByProject,
+  hasBufferedLogEntries,
+  resolveDisplayedLogs,
+  resolveLogProjectId,
+} from '../utils/console-logs.js';
 
 const route = useRoute();
 const runnerStore = useRunnerStore();
@@ -442,7 +459,10 @@ const showTimestamps = ref(true);
 const showLineNumbers = ref(true);
 const autoScroll = ref(true);
 const isTrashHovered = ref(false);
-const logContainerRef = ref<HTMLDivElement | null>(null);
+const logListRef = ref<VirtualListInst | null>(null);
+const frozenLogs = ref<LogEntryDto[] | null>(null);
+const displayedLogsSource = computed(() => resolveDisplayedLogs(runnerStore.logs, frozenLogs.value));
+const hasBufferedLogs = computed(() => hasBufferedLogEntries(runnerStore.logs, frozenLogs.value));
 
 // Initialize filter from query if present (?project=xxx)
 watch(
@@ -477,7 +497,7 @@ function getEntryProjectId(entry: LogEntryDto): string | undefined {
 }
 
 const projectNames = computed(() => new Map(projectStore.projects.map(p => [p.id, p.name])));
-const projectLogCounts = computed(() => countLogsByProject(runnerStore.logs, serviceToProjectMap.value));
+const projectLogCounts = computed(() => countLogsByProject(displayedLogsSource.value, serviceToProjectMap.value));
 
 function getEntryProjectName(entry: LogEntryDto): string {
   const pId = getEntryProjectId(entry);
@@ -511,12 +531,12 @@ const isAnyServiceActive = computed(() => {
 });
 
 const projectScopedTotalLogs = computed(() => {
-  if (selectedProjectFilter.value === 'ALL') return runnerStore.logs.length;
+  if (selectedProjectFilter.value === 'ALL') return displayedLogsSource.value.length;
   return getProjectLogCount(selectedProjectFilter.value);
 });
 
 function getServiceLogCount(serviceName: string): number {
-  return runnerStore.logs.filter((l) => {
+  return displayedLogsSource.value.filter((l) => {
     if (selectedProjectFilter.value !== 'ALL') {
       const pId = getEntryProjectId(l);
       if (pId !== selectedProjectFilter.value) return false;
@@ -527,7 +547,7 @@ function getServiceLogCount(serviceName: string): number {
 
 const availableServicesForFilter = computed(() => {
   const set = new Set<string>();
-  for (const log of runnerStore.logs) {
+  for (const log of displayedLogsSource.value) {
     if (selectedProjectFilter.value === 'ALL') {
       if (log.serviceName) set.add(log.serviceName);
     } else {
@@ -558,7 +578,7 @@ const availableServicesForFilter = computed(() => {
 });
 
 const stderrLogsCount = computed(() => {
-  return runnerStore.logs.filter((l) => l.stream === 'stderr').length;
+  return displayedLogsSource.value.filter((l) => l.stream === 'stderr').length;
 });
 
 const filteredStderrCount = computed(() => {
@@ -566,7 +586,7 @@ const filteredStderrCount = computed(() => {
 });
 
 const filteredLogs = computed((): LogEntryDto[] => {
-  const result = runnerStore.logs.filter((log: LogEntryDto) => {
+  const result = displayedLogsSource.value.filter((log: LogEntryDto) => {
     // Project filter
     if (selectedProjectFilter.value !== 'ALL') {
       const pId = getEntryProjectId(log);
@@ -598,19 +618,27 @@ const filteredLogs = computed((): LogEntryDto[] => {
   return result.slice().reverse();
 });
 
-// Auto-scroll watcher (keep at top for latest logs)
+// Keep latest logs pinned when locked. Free-scroll uses a frozen view so the
+// background stream cannot move or re-render the user's reading position.
 watch(
-  () => filteredLogs.value.length,
-  () => {
-    if (autoScroll.value) {
-      nextTick(() => {
-        if (logContainerRef.value) {
-          logContainerRef.value.scrollTop = 0;
-        }
-      });
-    }
-  }
+  () => filteredLogs.value[0]?.id,
+  () => { if (autoScroll.value) scrollToLatest(); }
 );
+
+function scrollToLatest() {
+  nextTick(() => logListRef.value?.scrollTo({ index: 0 }));
+}
+
+function toggleAutoScroll() {
+  if (autoScroll.value) {
+    frozenLogs.value = runnerStore.logs.slice();
+    autoScroll.value = false;
+  } else {
+    frozenLogs.value = null;
+    autoScroll.value = true;
+    scrollToLatest();
+  }
+}
 
 function copySingleLogLine(text: string) {
   navigator.clipboard.writeText(text);
@@ -669,6 +697,7 @@ function handleClearLogs() {
     negativeText: '取消',
     positiveButtonProps: { type: 'error' },
     onPositiveClick: () => {
+      frozenLogs.value = null;
       runnerStore.clearLogs();
       message.success('控制台日志已清空');
     },
@@ -681,9 +710,7 @@ onMounted(async () => {
     runnerStore.fetchState(),
     projectStore.fetchProjects(),
   ]);
-  if (autoScroll.value && logContainerRef.value) {
-    logContainerRef.value.scrollTop = 0;
-  }
+  if (autoScroll.value) scrollToLatest();
 });
 </script>
 

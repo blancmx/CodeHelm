@@ -8,6 +8,7 @@ import { ProjectTasks, type WorkspaceWorkerFactory } from './project-tasks.js';
 import { getAnalysisTasks } from './analysis-service.js';
 import { getAppSettings } from './app-settings.js';
 import type { AnalysisTasks } from './analysis-tasks.js';
+import { createNativeAnalysisBoundary } from './analysis-tasks.js';
 
 const services = new WeakMap<DatabaseInstance, ProjectTasks>();
 
@@ -31,7 +32,7 @@ export function getProjectTasks(db: DatabaseInstance, analysis: AnalysisTasks = 
     for (const window of BrowserWindow.getAllWindows()) {
       if (!window.isDestroyed() && !window.webContents.isDestroyed()) window.webContents.send(IpcChannels.PROJECTS_ON_TASK_PROGRESS, state);
     }
-  }, createWorker);
+  }, createWorker, 120_000, createWorker ? (() => ({ ready: Promise.resolve(undefined), async close() {} })) : createNativeAnalysisBoundary);
   services.set(db, tasks);
   return tasks;
 }

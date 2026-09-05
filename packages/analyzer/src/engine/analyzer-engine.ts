@@ -26,6 +26,9 @@ import {
   DEFAULT_MAX_ANALYZER_TOTAL_READ_BYTES,
   ReadBudget,
   readUtf8FileWithinLimit,
+  readUtf8FileFromLockedRoot,
+  fileExistsInLockedRoot,
+  isPathBoundaryError,
 } from '../io/bounded-read.js';
 
 function isInsideModule(filePath: string, modulePath: string): boolean {
@@ -102,6 +105,7 @@ function readCacheKey(relativePath: string): string {
 }
 
 export interface AnalyzerEngineOptions {
+  rootSessionId?: string;
   detectors?: Detector[];
   maxFiles?: number;
   maxFileBytes?: number;
@@ -147,6 +151,11 @@ export class AnalyzerEngine implements ProjectAnalyzer {
     const snapshotId = generateId();
     const normalizedRoot = normalizePath(projectRoot);
     let scannedFiles = 0;
+    let boundaryFailure: Error | undefined;
+    const rememberBoundaryFailure = (error: unknown) => {
+      if (isPathBoundaryError(error)) boundaryFailure = error instanceof Error ? error : new Error(String(error));
+    };
+    const throwBoundaryFailure = () => { if (boundaryFailure) throw boundaryFailure; };
     const report = (percent: number, stage: string) => onProgress?.(percent, stage, scannedFiles);
 
     try {
@@ -162,6 +171,7 @@ export class AnalyzerEngine implements ProjectAnalyzer {
           scannedFiles = count;
           report(0, '正在发现项目文件（总量待确定）...');
         },
+        rootSessionId: this.options.rootSessionId,
       });
       throwIfAnalysisCancelled(controller.signal);
 
@@ -194,7 +204,12 @@ export class AnalyzerEngine implements ProjectAnalyzer {
             this.options.maxFileBytes ?? DEFAULT_MAX_ANALYZER_FILE_BYTES
           );
           try {
-            const result = await readUtf8FileWithinLimit(
+            const result = this.options.rootSessionId ? await readUtf8FileFromLockedRoot(
+              this.options.rootSessionId,
+              relPath,
+              reservedBytes,
+              controller.signal
+            ) : await readUtf8FileWithinLimit(
               safeResolvePath(normalizedRoot, relPath),
               reservedBytes,
               controller.signal
@@ -202,6 +217,7 @@ export class AnalyzerEngine implements ProjectAnalyzer {
             readBudget.commit(reservedBytes, result.bytesRead);
             return result.text;
           } catch (error) {
+            rememberBoundaryFailure(error);
             readBudget.release(reservedBytes);
             throw error;
           }
@@ -215,6 +231,7 @@ export class AnalyzerEngine implements ProjectAnalyzer {
         }
       };
 
+      const rootSessionId = this.options.rootSessionId;
       const analysisContext: AnalysisContext = {
         ...discoveryContext,
         readFile,
@@ -224,15 +241,18 @@ export class AnalyzerEngine implements ProjectAnalyzer {
             return parseJson<T>(content);
           } catch (error) {
             if (isAnalysisCancelled(error, controller.signal)) throw error;
+            rememberBoundaryFailure(error);
             return null;
           }
         },
         async fileExists(relPath: string): Promise<boolean> {
           try {
+            if (rootSessionId) return fileExistsInLockedRoot(rootSessionId, relPath);
             const abs = safeResolvePath(normalizedRoot, relPath);
             await fs.access(abs);
             return true;
-          } catch {
+          } catch (error) {
+            rememberBoundaryFailure(error);
             return false;
           }
         },
@@ -268,8 +288,10 @@ export class AnalyzerEngine implements ProjectAnalyzer {
             }
           } catch (err) {
             if (isAnalysisCancelled(err, controller.signal)) throw err;
+            rememberBoundaryFailure(err);
             console.warn(`Detector ${detector.id} warning in ${mod.relativePath}:`, err);
           }
+          throwBoundaryFailure();
         }
 
         mod.technologies = dedupeTechnologies(detected);

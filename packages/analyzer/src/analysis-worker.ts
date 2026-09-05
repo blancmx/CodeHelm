@@ -3,7 +3,7 @@ import { AnalyzerEngine } from './engine/analyzer-engine.js';
 
 if (!parentPort) throw new Error('Analysis worker requires a parent port');
 const port = parentPort;
-const analyzer = new AnalyzerEngine({ maxFiles: workerData.maxFiles, failOnLimit: true });
+const analyzer = new AnalyzerEngine({ maxFiles: workerData.maxFiles, failOnLimit: true, rootSessionId: workerData.rootSessionId });
 let lastProgressAt = 0;
 let latestProgress = { type: 'progress', percentage: 0, stage: '正在发现项目文件…', scannedFiles: 0 };
 void analyzer.analyze(workerData.rootPath, (percentage, stage, scannedFiles) => {

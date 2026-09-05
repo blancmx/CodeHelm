@@ -4,7 +4,12 @@ import { parse, compileTemplate } from 'vue/compiler-sfc';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import type { LogEntryDto } from '@codehelm/contracts';
-import { countLogsByProject, resolveLogProjectId } from '../console-logs.js';
+import {
+  countLogsByProject,
+  hasBufferedLogEntries,
+  resolveDisplayedLogs,
+  resolveLogProjectId,
+} from '../console-logs.js';
 
 const log = (id: string, serviceSessionId = 'session-a', serviceName = 'api'): LogEntryDto => ({
   id, serviceSessionId, serviceName, stream: 'stdout', message: `line ${id}`,
@@ -15,6 +20,13 @@ describe('console log row memoization', () => {
   // Compile the actual row, so missing memo dependencies fail without copying the template.
   const source = readFileSync(new URL('../../views/ConsoleView.vue', import.meta.url), 'utf8');
   const { descriptor } = parse(source);
+  const findVirtualList = (node: any): any => {
+    if (node.type === 1 && node.tag === 'NVirtualList') return node;
+    for (const child of node.children ?? []) {
+      const found = findVirtualList(child);
+      if (found) return found;
+    }
+  };
   const findRow = (node: any): any => {
     if (node.type === 1 && node.props.some((p: any) => p.name === 'class' && p.value?.content.includes('terminal-log-row'))) return node;
     for (const child of node.children ?? []) {
@@ -23,7 +35,11 @@ describe('console log row memoization', () => {
     }
   };
   const row = findRow(descriptor.template!.ast);
-  const { code } = compileTemplate({ source: row.loc.source, filename: 'ConsoleView.vue', id: 'console-row-test', compilerOptions: { mode: 'function', prefixIdentifiers: true } });
+  const virtualList = findVirtualList(descriptor.template!.ast);
+  // The production row receives entry/index from NVirtualList's slot. Recreate
+  // that scope here so the row memo can still be exercised without mounting DOM.
+  const rowHarness = row.loc.source.replace('<div', '<div v-for="(entry, idx) in filteredLogs"');
+  const { code } = compileTemplate({ source: rowHarness, filename: 'ConsoleView.vue', id: 'console-row-test', compilerOptions: { mode: 'function', prefixIdentifiers: true } });
   const render = new Function('Vue', code)(Vue);
   const context = () => ({
     filteredLogs: [log('a'), log('b')], showLineNumbers: true, showTimestamps: true,
@@ -51,6 +67,17 @@ describe('console log row memoization', () => {
     renderer.render(vnode, root);
     return { ctx, rows: () => vnode.component!.subTree.children as Vue.VNode[], unmount: () => renderer.render(null, root) };
   };
+
+  it('mounts log rows through a resizable virtual list while retaining the filtered collection', () => {
+    expect(virtualList).toBeTruthy();
+    const props = virtualList.props.map((prop: any) => prop.type === 6
+      ? prop.name
+      : `${prop.name}:${prop.arg?.content ?? ''}:${prop.exp?.content ?? ''}`);
+    expect(props).toContain('item-resizable');
+    expect(props).toContain('bind:items:filteredLogs');
+    expect(props).toContain('key-field');
+    expect(row).toBeTruthy();
+  });
 
   it('reuses unchanged rows across status refreshes', async () => {
     const { ctx, rows, unmount } = mountRows();
@@ -141,5 +168,20 @@ describe('console project log counts', () => {
     expect([...counts.value]).toEqual([['project-b', 2]]);
     logs.value = [];
     expect(counts.value.size).toBe(0);
+  });
+});
+
+describe('console free-scroll snapshot', () => {
+  it('keeps rendering the frozen collection while live input changes', () => {
+    const frozen = [log('a'), log('b')];
+    const live = [...frozen, log('c')];
+    expect(resolveDisplayedLogs(live, frozen)).toBe(frozen);
+    expect(hasBufferedLogEntries(live, frozen)).toBe(true);
+  });
+
+  it('returns to the live collection and clears the buffered indicator', () => {
+    const live = [log('a'), log('b')];
+    expect(resolveDisplayedLogs(live, null)).toBe(live);
+    expect(hasBufferedLogEntries(live, null)).toBe(false);
   });
 });

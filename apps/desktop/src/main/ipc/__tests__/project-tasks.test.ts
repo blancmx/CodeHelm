@@ -1,3 +1,4 @@
+import { ipcMain } from 'electron';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Worker } from 'node:worker_threads';
 import fs from 'node:fs/promises';
@@ -40,7 +41,7 @@ describe('workspace discovery and import task integration', () => {
         : new Worker(path.resolve('packages/analyzer/dist/workspace-worker.js'), { workerData: input });
       workers.push(worker); return worker;
     });
-    registerProjectHandlers(db, analysis);
+    registerProjectHandlers(ipcMain.handle, db, analysis);
   });
 
   afterEach(async () => {
@@ -174,6 +175,19 @@ describe('workspace discovery and import task integration', () => {
     const result = await jobs.wait(jobs.startScan({ rootPath: root }).taskId);
     expect(result).toMatchObject({ status: 'failed', errorMessage: expect.stringContaining('超时') });
     expect(workers[0].threadId).toBe(-1);
+    expect(() => analysis.reserve('available')).not.toThrow();
+    analysis.release('available');
+  });
+
+  it('releases the native boundary when workspace Worker construction throws', async () => {
+    await jobs.close();
+    const close = vi.fn();
+    jobs = new ProjectTasks(analysis, async () => { throw new Error('unused'); }, () => 1000, () => {},
+      () => { throw new Error('worker construction failed'); }, 1000,
+      () => ({ ready: Promise.resolve('test'), close: async () => { close(); } }));
+    const result = await jobs.wait(jobs.startScan({ rootPath: root }).taskId);
+    expect(result).toMatchObject({ status: 'failed', errorMessage: 'worker construction failed' });
+    expect(close).toHaveBeenCalledOnce();
     expect(() => analysis.reserve('available')).not.toThrow();
     analysis.release('available');
   });

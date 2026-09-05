@@ -1,14 +1,14 @@
 <template>
   <div
     class="flex h-full w-full overflow-hidden transition-colors duration-200"
-    :class="themeStore.isDark ? 'bg-[#09090b]' : 'bg-[#fafafa]'"
+    :class="themeStore.isDark ? 'bg-[#0f0f12]' : 'bg-[#f4f4f5]'"
   >
     <!-- Sidebar with Smooth Right-to-Left Collapse Animation -->
     <aside
-      class="h-full border-r flex flex-col justify-between select-none flex-shrink-0 z-20 relative overflow-hidden sidebar-transition"
+      class="h-full flex flex-col justify-between select-none flex-shrink-0 z-20 relative overflow-hidden sidebar-transition"
       :class="[
         sidebarStore.isCollapsed ? 'w-[56px]' : 'w-[208px]',
-        themeStore.isDark ? 'bg-[#0f0f12] border-[#27272a]' : 'bg-[#f4f4f5] border-[#e4e4e7]',
+        themeStore.isDark ? 'bg-[#0f0f12]' : 'bg-[#f4f4f5]',
         sidebarStore.isCollapsed ? 'cursor-pointer' : ''
       ]"
       @click="handleSidebarBlankClick"
@@ -275,15 +275,13 @@
       </div>
     </aside>
 
-    <!-- Main Content Area with Smooth Page Transitions -->
+    <!-- Main Content Area: route changes mount directly; page-local controls own motion. -->
     <main
-      class="flex-1 h-full min-w-0 flex flex-col overflow-hidden transition-colors duration-200"
-      :class="themeStore.isDark ? 'bg-[#09090b]' : 'bg-[#fafafa]'"
+      class="flex-1 h-full min-w-0 flex flex-col overflow-hidden transition-all duration-200 rounded-tl-2xl border-t border-l shadow-2xs"
+      :class="themeStore.isDark ? 'bg-[#09090b] border-[#27272a]' : 'bg-[#fafafa] border-[#e4e4e7]'"
     >
       <router-view v-slot="{ Component, route }">
-        <transition name="page-fade-slide" mode="out-in">
-          <component :is="Component" :key="route.path" />
-        </transition>
+        <component :is="Component" :key="route.path" />
       </router-view>
     </main>
 
@@ -374,19 +372,4 @@ onUnmounted(() => {
   will-change: width;
 }
 
-.page-fade-slide-enter-active,
-.page-fade-slide-leave-active {
-  transition: opacity 200ms cubic-bezier(0.4, 0, 0.2, 1), transform 200ms cubic-bezier(0.4, 0, 0.2, 1);
-  will-change: opacity, transform;
-}
-
-.page-fade-slide-enter-from {
-  opacity: 0;
-  transform: translateY(6px);
-}
-
-.page-fade-slide-leave-to {
-  opacity: 0;
-  transform: translateY(-6px);
-}
 </style>

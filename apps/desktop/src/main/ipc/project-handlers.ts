@@ -1,4 +1,5 @@
-import { dialog, ipcMain } from 'electron';
+import type { RegisterIpcHandler } from './trusted-ipc.js';
+import { dialog } from 'electron';
 import type { Database as DatabaseInstance } from 'better-sqlite3';
 import {
   IpcChannels,
@@ -57,7 +58,7 @@ async function readDirectoryEntries(directoryPath: string): Promise<fs.Dirent[]>
   return entries;
 }
 
-export function registerProjectHandlers(db: DatabaseInstance, tasks: AnalysisTasks = getAnalysisTasks(db)) {
+export function registerProjectHandlers(handle: RegisterIpcHandler, db: DatabaseInstance, tasks: AnalysisTasks = getAnalysisTasks(db)) {
   const projectRepo = new ProjectRepository(db);
   const jobs = getProjectTasks(db, tasks);
   const owners = new WeakSet<Electron.WebContents>();
@@ -74,7 +75,7 @@ export function registerProjectHandlers(db: DatabaseInstance, tasks: AnalysisTas
     return state;
   };
 
-  ipcMain.handle(IpcChannels.PROJECTS_SELECT_DIRECTORY, async () => {
+  handle(IpcChannels.PROJECTS_SELECT_DIRECTORY, async () => {
     const result = await dialog.showOpenDialog({
       properties: ['openDirectory'],
       title: '选择项目或工作区根目录',
@@ -92,44 +93,44 @@ export function registerProjectHandlers(db: DatabaseInstance, tasks: AnalysisTas
     };
   });
 
-  ipcMain.handle(IpcChannels.PROJECTS_START_SCAN, (event, input) => {
+  handle(IpcChannels.PROJECTS_START_SCAN, (event, input) => {
     trackOwner(event);
     return jobs.startScan(input);
   });
-  ipcMain.handle(IpcChannels.PROJECTS_START_IMPORT, (event, input) => {
+  handle(IpcChannels.PROJECTS_START_IMPORT, (event, input) => {
     trackOwner(event);
     return jobs.startImport(input);
   });
-  ipcMain.handle(IpcChannels.PROJECTS_GET_TASK, (_event, taskId: string) => jobs.get(taskId));
-  ipcMain.handle(IpcChannels.PROJECTS_CANCEL_TASK, (_event, taskId: string) => jobs.cancel(taskId));
+  handle(IpcChannels.PROJECTS_GET_TASK, (_event, taskId: string) => jobs.get(taskId));
+  handle(IpcChannels.PROJECTS_CANCEL_TASK, (_event, taskId: string) => jobs.cancel(taskId));
 
   // Compatibility callers also use workers; partial failures must not masquerade as success.
-  ipcMain.handle(IpcChannels.PROJECTS_SCAN_WORKSPACE, async (event, rootPath: string, options?: { maxDepth?: number }) => {
+  handle(IpcChannels.PROJECTS_SCAN_WORKSPACE, async (event, rootPath: string, options?: { maxDepth?: number }) => {
     trackOwner(event);
     const { taskId } = jobs.startScan({ rootPath, maxDepth: options?.maxDepth ?? 2 });
     return (await finishLegacy(taskId)).discovered;
   });
-  ipcMain.handle(IpcChannels.PROJECTS_IMPORT, async (event, rawInput) => {
+  handle(IpcChannels.PROJECTS_IMPORT, async (event, rawInput) => {
     trackOwner(event);
     const input = ImportProjectInputSchema.parse(rawInput);
     const { taskId } = jobs.startImport({ projects: [input] });
     return (await finishLegacy(taskId)).results[0].project!;
   });
-  ipcMain.handle(IpcChannels.PROJECTS_BATCH_IMPORT, async (event, rawInput) => {
+  handle(IpcChannels.PROJECTS_BATCH_IMPORT, async (event, rawInput) => {
     trackOwner(event);
     const { taskId } = jobs.startImport(rawInput);
     return (await finishLegacy(taskId)).results.map((item) => item.project!);
   });
 
-  ipcMain.handle(IpcChannels.PROJECTS_LIST, async () => {
+  handle(IpcChannels.PROJECTS_LIST, async () => {
     return projectRepo.list();
   });
 
-  ipcMain.handle(IpcChannels.PROJECTS_GET, async (_event, id: string) => {
+  handle(IpcChannels.PROJECTS_GET, async (_event, id: string) => {
     return projectRepo.findById(id);
   });
 
-  ipcMain.handle(IpcChannels.PROJECTS_REMOVE, async (_event, id: string) => {
+  handle(IpcChannels.PROJECTS_REMOVE, async (_event, id: string) => {
     const project = projectRepo.findById(id);
     if (project) await jobs.stopForPath(project.rootPath);
     await tasks.cancelProject(id);
@@ -137,7 +138,7 @@ export function registerProjectHandlers(db: DatabaseInstance, tasks: AnalysisTas
     return { success: true };
   });
 
-  ipcMain.handle(IpcChannels.PROJECTS_UPDATE, async (_event, id: string, patch: any) => {
+  handle(IpcChannels.PROJECTS_UPDATE, async (_event, id: string, patch: any) => {
     const project = projectRepo.findById(id);
     if (patch.rootPath && project) {
       await jobs.stopForPath(project.rootPath);
@@ -238,14 +239,14 @@ export function registerProjectHandlers(db: DatabaseInstance, tasks: AnalysisTas
     }
   }
 
-  ipcMain.handle(IpcChannels.PROJECTS_GET_FILE_TREE, async (_event, rootPath: string, options?: { maxDepth?: number }) => {
+  handle(IpcChannels.PROJECTS_GET_FILE_TREE, async (_event, rootPath: string, options?: { maxDepth?: number }) => {
     const normRoot = normalizePath(rootPath);
     if (!fs.existsSync(normRoot)) return [];
     const maxDepth = normalizeFileTreeDepth(options?.maxDepth);
     return buildFileTree(normRoot, normRoot, 1, maxDepth, { nodes: 0 });
   });
 
-  ipcMain.handle(IpcChannels.PROJECTS_GET_README, async (_event, rootPath: string) => {
+  handle(IpcChannels.PROJECTS_GET_README, async (_event, rootPath: string) => {
     const normRoot = normalizePath(rootPath);
     if (!fs.existsSync(normRoot)) {
       return {

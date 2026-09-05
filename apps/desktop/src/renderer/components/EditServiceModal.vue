@@ -117,37 +117,44 @@
           <div
             v-for="(item, idx) in form.env"
             :key="idx"
-            class="flex items-center gap-2"
+            class="env-row"
           >
             <n-input
               v-model:value="item.key"
               placeholder="KEY (如 PORT / DB_URL)"
-              class="w-1/3 font-mono text-xs"
+              class="font-mono text-xs"
+              :input-props="{ 'aria-label': `环境变量 ${idx + 1} 名称` }"
               size="small"
             />
-            <div class="flex-1 relative flex items-center">
+            <div class="env-value">
               <n-input
                 v-model:value="item.value"
                 :type="item.isSecret && !item.showPlain ? 'password' : 'text'"
                 :placeholder="item.isRedacted ? '已保存的秘密（留空保留，输入新值替换）' : 'VALUE'"
                 class="w-full font-mono text-xs"
+                :input-props="{ 'aria-label': `${item.key || `环境变量 ${idx + 1}`} 的值` }"
                 size="small"
                 @update:value="item.isRedacted = false"
-              />
-              <button
-                v-if="item.isSecret"
-                class="absolute right-2 text-zinc-400 hover:text-zinc-200"
-                type="button"
-                @click="item.showPlain = !item.showPlain"
               >
-                <IconEye v-if="!item.showPlain" :size="12" />
-                <IconEyeOff v-else :size="12" />
-              </button>
+                <template v-if="item.isSecret" #suffix>
+                  <button
+                    class="env-visibility"
+                    type="button"
+                    :aria-label="item.showPlain ? '隐藏新输入的秘密' : '显示新输入的秘密'"
+                    :aria-pressed="!!item.showPlain"
+                    @click="item.showPlain = !item.showPlain"
+                  >
+                    <IconEye v-if="!item.showPlain" :size="14" />
+                    <IconEyeOff v-else :size="14" />
+                  </button>
+                </template>
+              </n-input>
             </div>
             <n-button
               size="tiny"
               quaternary
               type="error"
+              :aria-label="`删除环境变量 ${item.key || idx + 1}`"
               @click="removeEnvRow(idx)"
             >
               <template #icon>
@@ -384,3 +391,34 @@ function handleSave() {
   emit('save', result);
 }
 </script>
+
+<style scoped>
+/* Grid tracks keep Naive UI's full-width inputs from squeezing the value to zero. */
+.env-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.env-row > *,
+.env-value {
+  min-width: 0;
+}
+
+.env-visibility {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  color: inherit;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.env-visibility:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+</style>

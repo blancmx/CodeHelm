@@ -62,6 +62,8 @@ describe('auto-detected run profile', () => {
     expect(services.map((service) => service.name)).toEqual(['Web', 'API']);
     expect(services.map((service) => service.cwdRelative)).toEqual(['apps/web', 'apps/api']);
     expect(services[0].dependsOn).toEqual([services[1].id]);
+    expect(services[0].startTimeoutMs).toBeUndefined();
+    expect(services[1].startTimeoutMs).toBe(30_000);
   });
 
   it('refreshes detected ports while preserving manually edited services', () => {
@@ -86,6 +88,7 @@ describe('auto-detected run profile', () => {
       runProfileId: 'profile-1',
       port: service.type === 'backend' ? 3000 : 5180,
       source: service.type === 'frontend' ? 'manual' as const : 'detected' as const,
+      startTimeoutMs: service.type === 'frontend' ? 15_000 : service.startTimeoutMs,
     }));
     const refreshed = detected.map((service) => ({
       ...service,
@@ -95,6 +98,8 @@ describe('auto-detected run profile', () => {
     const merged = mergeDetectedServices(existing, refreshed);
     expect(merged.find((service) => service.type === 'backend')?.port).toBe(3001);
     expect(merged.find((service) => service.type === 'frontend')?.port).toBe(5180);
+    expect(merged.find((service) => service.type === 'frontend')?.startTimeoutMs).toBe(15_000);
+    expect(merged.find((service) => service.type === 'backend')?.startTimeoutMs).toBe(30_000);
     expect(merged.find((service) => service.type === 'frontend')?.dependsOn).toEqual([
       merged.find((service) => service.type === 'backend')?.id,
     ]);

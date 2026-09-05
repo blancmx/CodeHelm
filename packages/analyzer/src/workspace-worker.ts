@@ -6,6 +6,7 @@ const port = parentPort;
 let lastSent = 0;
 let latest = { type: 'progress', scannedDirectories: 0, foundProjects: 0 };
 void new WorkspaceScanner().scan(workerData.rootPath, {
+  rootSessionId: workerData.rootSessionId,
   maxDepth: workerData.maxDepth,
   onProgress(scannedDirectories, foundProjects) {
     latest = { type: 'progress', scannedDirectories, foundProjects };

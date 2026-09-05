@@ -1,0 +1,11 @@
+{
+  "name": "@codehelm/safe-fs",
+  "version": "0.1.0",
+  "private": true,
+  "main": "index.js",
+  "types": "index.d.ts",
+  "os": ["win32"],
+  "cpu": ["x64"],
+  "scripts": { "build": "node-gyp rebuild", "typecheck": "tsc --noEmit --allowJs false index.d.ts", "test": "node --test test/*.node-test.js", "clean": "rimraf build" },
+  "devDependencies": { "node-gyp": "^12.4.0", "rimraf": "^6.0.1", "typescript": "^5.7.3" }
+}

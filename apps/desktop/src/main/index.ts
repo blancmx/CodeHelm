@@ -1,4 +1,5 @@
-import { app, BrowserWindow, shell, Menu, ipcMain, dialog } from 'electron';
+import { createTrustedIpcRegistrar } from './ipc/trusted-ipc.js';
+import { app, BrowserWindow, shell, Menu, dialog } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
@@ -7,6 +8,7 @@ import type { Database as DatabaseInstance } from 'better-sqlite3';
 import { IpcChannels } from '@codehelm/contracts';
 import { registerAllIpcHandlers, stopAllRunnerSessions, closeLogStorage, closeAnalysisTasks } from './ipc/index.js';
 import { APP_NAME, WINDOWS_APP_ID, createWindowsAppDetails } from './windows-app-details.js';
+import { presentMainWindow } from './window-presentation.js';
 import {
   createTrustedDevRenderer,
   createTrustedFileRenderer,
@@ -90,11 +92,13 @@ process.on('unhandledRejection', (reason) => {
   console.error('[Main] Unhandled Rejection:', reason);
 });
 
+const handleTrustedIpc = createTrustedIpcRegistrar(() => ({ window: mainWindow, renderer: trustedRenderer }));
+
 function registerWindowIpcHandlers() {
-  ipcMain.handle(IpcChannels.WINDOW_MINIMIZE, () => {
+  handleTrustedIpc(IpcChannels.WINDOW_MINIMIZE, () => {
     mainWindow?.minimize();
   });
-  ipcMain.handle(IpcChannels.WINDOW_TOGGLE_MAXIMIZE, () => {
+  handleTrustedIpc(IpcChannels.WINDOW_TOGGLE_MAXIMIZE, () => {
     if (!mainWindow) return false;
     if (mainWindow.isMaximized()) {
       mainWindow.unmaximize();
@@ -104,10 +108,10 @@ function registerWindowIpcHandlers() {
       return true;
     }
   });
-  ipcMain.handle(IpcChannels.WINDOW_CLOSE, () => {
+  handleTrustedIpc(IpcChannels.WINDOW_CLOSE, () => {
     mainWindow?.close();
   });
-  ipcMain.handle(IpcChannels.WINDOW_IS_MAXIMIZED, () => {
+  handleTrustedIpc(IpcChannels.WINDOW_IS_MAXIMIZED, () => {
     return mainWindow?.isMaximized() ?? false;
   });
 }
@@ -115,13 +119,12 @@ function registerWindowIpcHandlers() {
 async function createWindow() {
   if (mainWindow && !mainWindow.isDestroyed()) {
     if (mainWindow.isMinimized()) mainWindow.restore();
-    mainWindow.show();
-    mainWindow.focus();
+    presentMainWindow(mainWindow);
     return;
   }
 
   console.log('[Main] Creating main browser window...');
-  const preloadPath = path.join(__dirname, '../preload/index.js');
+  const preloadPath = path.join(__dirname, '../preload/index.cjs');
   console.log('[Main] Preload path:', preloadPath);
 
   const iconPath = getAppIconPath();
@@ -150,7 +153,7 @@ async function createWindow() {
       preload: preloadPath,
       nodeIntegration: false,
       contextIsolation: true,
-      sandbox: false,
+      sandbox: true,
     },
   });
   trustedRenderer = null;
@@ -229,15 +232,9 @@ async function createWindow() {
     await loadLocalRenderer(mainWindow);
   }
 
-  // Force show and bring to front on Windows
-  mainWindow.show();
-  mainWindow.focus();
-  mainWindow.setAlwaysOnTop(true);
-  setTimeout(() => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.setAlwaysOnTop(false);
-    }
-  }, 400);
+  // Showing and focusing is sufficient here. Temporarily toggling always-on-top
+  // caused an unnecessary Windows compositor/z-order transition during startup.
+  presentMainWindow(mainWindow);
 }
 
 async function loadLocalRenderer(window: BrowserWindow): Promise<void> {
@@ -273,7 +270,7 @@ app.whenReady().then(async () => {
     if (isQuitting) { db.close(); db = null; return; }
     console.log('[Main] Verified startup backup:', opened.backup.manifestPath);
     if (opened.importedLegacy) console.log('[Main] Imported verified legacy snapshot into:', dbPath);
-    await registerAllIpcHandlers(db);
+    await registerAllIpcHandlers(db, handleTrustedIpc);
     registerWindowIpcHandlers();
     console.log('[Main] IPC handlers registered successfully.');
   } catch (dbErr) {

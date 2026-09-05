@@ -9,7 +9,37 @@ directories:
 files:
   - "dist/**/*"
   - "dist-electron/**/*"
-  - "node_modules/better-sqlite3/**/*"
+  # Production native dependencies are allowlisted. Do not ship node-gyp/MSVC
+  # intermediates, tests, sources, or foreign-platform prebuilds.
+  - "node_modules/better-sqlite3/package.json"
+  - "node_modules/better-sqlite3/LICENSE"
+  - "node_modules/better-sqlite3/lib/**/*"
+  - "node_modules/better-sqlite3/prebuilds/win32-x64.node"
+  - "node_modules/@codehelm/safe-fs/package.json"
+  - "node_modules/@codehelm/safe-fs/index.js"
+  - "node_modules/@codehelm/safe-fs/build/Release/codehelm_safe_fs.node"
+  # electron-builder also traverses production dependencies automatically;
+  # these exclusions keep that implicit traversal inside the runtime allowlist.
+  - "!node_modules/better-sqlite3/build/**/*"
+  - "!node_modules/better-sqlite3/deps/**/*"
+  - "!node_modules/better-sqlite3/src/**/*"
+  - "!node_modules/better-sqlite3/prebuilds/darwin-*.node"
+  - "!node_modules/better-sqlite3/prebuilds/linux-*.node"
+  - "!node_modules/better-sqlite3/prebuilds/linuxmusl-*.node"
+  - "!node_modules/better-sqlite3/prebuilds/win32-arm64.node"
+  - "!node_modules/better-sqlite3/binding.gyp"
+  - "!node_modules/better-sqlite3/README.md"
+  - "!node_modules/node-addon-api/**/*"
+  - "!node_modules/@codehelm/safe-fs/src/**/*"
+  - "!node_modules/@codehelm/safe-fs/test/**/*"
+  - "!node_modules/@codehelm/safe-fs/node_modules/**/*"
+  - "!node_modules/@codehelm/safe-fs/binding.gyp"
+  - "!node_modules/@codehelm/safe-fs/index.d.ts"
+  - "!node_modules/@codehelm/safe-fs/build/config.gypi"
+  - "!node_modules/@codehelm/safe-fs/build/node_gyp_bins/**/*"
+  - "!node_modules/@codehelm/safe-fs/build/Release/obj/**/*"
+  - "!node_modules/@codehelm/safe-fs/build/Release/*.{exp,iobj,ipdb,lib,pdb}"
+  - "!node_modules/@codehelm/safe-fs/build/*.{vcxproj,filters}"
   - "package.json"
 
 # Windows Shell must be able to read the relaunch icon outside app.asar.
@@ -38,6 +68,11 @@ win:
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
+  # Silent installs must not launch CodeHelm before callers can establish an
+  # isolated or managed user-data context.
+  runAfterFinish: false
+  # Upgrades and uninstalls preserve the user's local projects and settings.
+  deleteAppDataOnUninstall: false
   createDesktopShortcut: always
   createStartMenuShortcut: true
   shortcutName: CodeHelm
