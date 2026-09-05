@@ -3,12 +3,23 @@ import { app, BrowserWindow, shell, Menu, dialog } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
-import { openProtectedDatabase } from '@codehelm/database';
+import {
+  openProtectedDatabase,
+  startPeriodicDatabaseBackups,
+  DEFAULT_DATABASE_BACKUP_POLICY,
+  type DatabaseBackupMaintenanceResult,
+  type PeriodicDatabaseBackupController,
+} from '@codehelm/database';
 import type { Database as DatabaseInstance } from 'better-sqlite3';
 import { IpcChannels } from '@codehelm/contracts';
 import { registerAllIpcHandlers, stopAllRunnerSessions, closeLogStorage, closeAnalysisTasks } from './ipc/index.js';
 import { APP_NAME, WINDOWS_APP_ID, createWindowsAppDetails } from './windows-app-details.js';
 import { presentMainWindow } from './window-presentation.js';
+import {
+  createDatabaseBackupRetentionWarning,
+  createPeriodicDatabaseBackupWarning,
+  createStartupDatabaseErrorDialog,
+} from './database-backup-dialog.js';
 import {
   createTrustedDevRenderer,
   createTrustedFileRenderer,
@@ -44,6 +55,11 @@ app.setPath('sessionData', stableSessionDataPath);
 // Application state
 let mainWindow: BrowserWindow | null = null;
 let db: DatabaseInstance | null = null;
+let databaseBackupController: PeriodicDatabaseBackupController | null = null;
+let startupBackupMaintenance: DatabaseBackupMaintenanceResult | null = null;
+let databaseBackupWarningOpen = false;
+let databaseBackupFailureNotified = false;
+let databaseBackupRetentionNotified = false;
 let trustedRenderer: TrustedRenderer | null = null;
 let isQuitting = false;
 // The validation harness may request a native frame so Windows UI discovery
@@ -252,6 +268,38 @@ async function loadLocalRenderer(window: BrowserWindow): Promise<void> {
   await window.loadFile(targetPath);
 }
 
+async function showPeriodicBackupWarning(error: unknown, backupDirectory: string): Promise<void> {
+  if (databaseBackupWarningOpen || databaseBackupFailureNotified || isQuitting) return;
+  databaseBackupWarningOpen = true;
+  databaseBackupFailureNotified = true;
+  const options = createPeriodicDatabaseBackupWarning(error, backupDirectory);
+  try {
+    if (mainWindow && !mainWindow.isDestroyed()) await dialog.showMessageBox(mainWindow, options);
+    else await dialog.showMessageBox(options);
+  } finally { databaseBackupWarningOpen = false; }
+}
+
+async function showBackupRetentionWarning(
+  retainedBackups: number,
+  retainedBytes: number,
+  backupDirectory: string,
+): Promise<void> {
+  if (databaseBackupWarningOpen || databaseBackupRetentionNotified || isQuitting) return;
+  databaseBackupWarningOpen = true;
+  databaseBackupRetentionNotified = true;
+  const options = createDatabaseBackupRetentionWarning(
+    retainedBackups,
+    retainedBytes,
+    DEFAULT_DATABASE_BACKUP_POLICY.maxBackups,
+    DEFAULT_DATABASE_BACKUP_POLICY.maxTotalBytes,
+    backupDirectory,
+  );
+  try {
+    if (mainWindow && !mainWindow.isDestroyed()) await dialog.showMessageBox(mainWindow, options);
+    else await dialog.showMessageBox(options);
+  } finally { databaseBackupWarningOpen = false; }
+}
+
 app.whenReady().then(async () => {
   if (!gotTheLock) return;
   console.log('[Main] Electron app is ready.');
@@ -267,6 +315,7 @@ app.whenReady().then(async () => {
         : path.join(legacyUserDataPath, 'codehelm.sqlite'),
     });
     db = opened.db;
+    startupBackupMaintenance = opened.backup.maintenance;
     if (isQuitting) { db.close(); db = null; return; }
     console.log('[Main] Verified startup backup:', opened.backup.manifestPath);
     if (opened.importedLegacy) console.log('[Main] Imported verified legacy snapshot into:', dbPath);
@@ -278,16 +327,47 @@ app.whenReady().then(async () => {
     db?.close();
     db = null;
     // Fail closed before opening a renderer; missing IPC must never look like an empty project library.
-    await dialog.showMessageBox({
-      type: 'error', title: 'CodeHelm 数据库保护', message: '无法安全打开项目数据库',
-      detail: `${dbErr instanceof Error ? dbErr.message : '数据库初始化失败。'}\n\n数据库：${dbPath}\n备份目录：${backupDirectory}\n\n请保留上述文件。退出后检查磁盘空间和权限，或联系维护者核验备份；不要删除数据库或覆盖原文件。`,
-      buttons: ['退出应用'], defaultId: 0, cancelId: 0, noLink: true,
-    });
+    await dialog.showMessageBox(createStartupDatabaseErrorDialog(dbErr, dbPath, backupDirectory));
     app.quit();
     return;
   }
 
   await createWindow();
+  if (startupBackupMaintenance && !startupBackupMaintenance.limitsSatisfied) {
+    console.warn('[Main] Verified startup backups remain above retention limits:', startupBackupMaintenance);
+    await showBackupRetentionWarning(
+      startupBackupMaintenance.retainedBackups,
+      startupBackupMaintenance.retainedBytes,
+      backupDirectory,
+    );
+  }
+  if (isQuitting || !db) return;
+  databaseBackupController = startPeriodicDatabaseBackups({
+    source: db,
+    sourcePath: dbPath,
+    backupDirectory,
+    onSuccess: (backup) => {
+      databaseBackupFailureNotified = false;
+      console.log('[Main] Verified periodic database backup:', backup.manifestPath);
+      if (backup.maintenance.removedDirectories.length > 0) {
+        console.log('[Main] Pruned verified database backups:', backup.maintenance.removedDirectories.length);
+      }
+      if (backup.maintenance.limitsSatisfied) {
+        databaseBackupRetentionNotified = false;
+      } else {
+        console.warn('[Main] Verified backups remain above retention limits:', backup.maintenance);
+        void showBackupRetentionWarning(
+          backup.maintenance.retainedBackups,
+          backup.maintenance.retainedBytes,
+          backupDirectory,
+        );
+      }
+    },
+    onError: (error) => {
+      console.error('[Main] Periodic database backup failed:', error);
+      void showPeriodicBackupWarning(error, backupDirectory);
+    },
+  });
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -312,6 +392,8 @@ app.on('before-quit', (event) => {
     })
     .finally(async () => {
       try {
+        await databaseBackupController?.stop();
+        databaseBackupController = null;
         await closeAnalysisTasks();
         await closeLogStorage();
         db?.close();
