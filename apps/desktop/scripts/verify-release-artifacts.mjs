@@ -8,9 +8,30 @@ const { extractFile, listPackage } = electronBuilderRequire('@electron/asar');
 
 const resourcesDir = path.resolve(process.argv[2] ?? 'dist-release/win-unpacked/resources');
 const asarPath = path.join(resourcesDir, 'app.asar');
+const packagedNoticesPath = path.join(resourcesDir, 'THIRD_PARTY_NOTICES.txt');
+const sourceNoticesPath = path.resolve('THIRD_PARTY_NOTICES.txt');
 
 if (!fs.existsSync(asarPath) || !fs.statSync(asarPath).isFile()) {
   throw new Error(`Release ASAR not found: ${asarPath}`);
+}
+
+if (!fs.existsSync(sourceNoticesPath) || !fs.statSync(sourceNoticesPath).isFile()) {
+  throw new Error(`Source third-party notices not found: ${sourceNoticesPath}`);
+}
+
+if (!fs.existsSync(packagedNoticesPath) || !fs.statSync(packagedNoticesPath).isFile()) {
+  throw new Error(`Packaged third-party notices not found: ${packagedNoticesPath}`);
+}
+
+if (!fs.readFileSync(packagedNoticesPath).equals(fs.readFileSync(sourceNoticesPath))) {
+  throw new Error('Packaged third-party notices are stale or differ from the source notice file.');
+}
+
+for (const electronNoticeName of ['LICENSE.electron.txt', 'LICENSES.chromium.html']) {
+  const electronNoticePath = path.join(path.dirname(resourcesDir), electronNoticeName);
+  if (!fs.existsSync(electronNoticePath) || fs.statSync(electronNoticePath).size === 0) {
+    throw new Error(`Packaged Electron notice missing or empty: ${electronNoticePath}`);
+  }
 }
 
 const entries = listPackage(asarPath).map((entry) => entry.replaceAll('\\', '/').replace(/^\/+/, ''));

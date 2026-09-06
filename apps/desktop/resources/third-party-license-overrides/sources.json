@@ -1,0 +1,32 @@
+{
+  "@css-render/plugin-bem@0.15.14": {
+    "file": "css-render-0.15.14-LICENSE",
+    "sourceUrl": "https://raw.githubusercontent.com/07akioni/css-render/9345145da71707d1d05a99c1d3a6e89315ac0574/LICENSE",
+    "basis": "npm gitHead 9345145da71707d1d05a99c1d3a6e89315ac0574"
+  },
+  "@css-render/vue3-ssr@0.15.14": {
+    "file": "css-render-0.15.14-LICENSE",
+    "sourceUrl": "https://raw.githubusercontent.com/07akioni/css-render/9345145da71707d1d05a99c1d3a6e89315ac0574/LICENSE",
+    "basis": "npm gitHead 9345145da71707d1d05a99c1d3a6e89315ac0574"
+  },
+  "css-render@0.15.14": {
+    "file": "css-render-0.15.14-LICENSE",
+    "sourceUrl": "https://raw.githubusercontent.com/07akioni/css-render/9345145da71707d1d05a99c1d3a6e89315ac0574/LICENSE",
+    "basis": "npm gitHead 9345145da71707d1d05a99c1d3a6e89315ac0574"
+  },
+  "@nodable/entities@3.0.0": {
+    "file": "nodable-entities-3.0.0-LICENSE",
+    "sourceUrl": "https://raw.githubusercontent.com/nodable/val-parsers/d2070d76a8ba07e6c7fa142caeb51ffd756e47eb/LICENSE",
+    "basis": "npm gitHead d2070d76a8ba07e6c7fa142caeb51ffd756e47eb"
+  },
+  "@vue/devtools-api@6.6.4": {
+    "file": "vue-devtools-api-6.6.4-LICENSE",
+    "sourceUrl": "https://raw.githubusercontent.com/vuejs/vue-devtools/df6ab6bb7791a7a525a97990de73b3ea5e9a1941/LICENSE",
+    "basis": "npm gitHead df6ab6bb7791a7a525a97990de73b3ea5e9a1941"
+  },
+  "vdirs@0.1.8": {
+    "file": "vdirs-0.1.8-MIT-NOTICE.txt",
+    "sourceUrl": "https://registry.npmjs.org/vdirs/0.1.8",
+    "basis": "npm metadata declares MIT and author 07akioni; upstream tarball/repository omit LICENSE"
+  }
+}
