@@ -149,6 +149,8 @@
                   {{ recoveryLabels[service.recovery.outcome] }} · 核验于 {{ formatTime(service.recovery.checkedAt) }}
                 </p>
                 <p v-if="service.errorMessage" class="text-xs mt-1 text-rose-500 break-words">{{ service.errorMessage }}</p>
+                <p v-if="failureGuidance(service)" class="text-xs mt-2 break-words">处理建议：{{ failureGuidance(service) }}</p>
+                <router-link v-if="failureGuidance(service)" :to="{ path: `/projects/${session.projectId}`, query: { tab: 'environment' } }" class="inline-block mt-2 text-xs underline">检查此项目运行环境</router-link>
                 <p class="text-xs mt-1 text-zinc-500 font-sans">
                   结束时间：{{ service.stoppedAt ? formatTime(service.stoppedAt) : '未记录（不等于仍在运行）' }}
                   <span v-if="service.exitCode !== undefined"> · 退出码 {{ service.exitCode }}</span>
@@ -170,6 +172,7 @@ import { useProjectStore } from '../stores/projectStore.js';
 import { useThemeStore } from '../stores/themeStore.js';
 import { IconRefresh, IconChevronRight, IconArrowRight } from './icons/index.js';
 import { message } from '../utils/discrete.js';
+import { failureGuidance } from '../utils/failure-guidance.js';
 
 const runner = useRunnerStore();
 const projects = useProjectStore();

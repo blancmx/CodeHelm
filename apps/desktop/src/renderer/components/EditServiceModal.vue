@@ -150,6 +150,9 @@
                 </template>
               </n-input>
             </div>
+            <label class="text-xs inline-flex items-center gap-1 whitespace-nowrap">
+              <input v-model="item.required" type="checkbox" :aria-label="`${item.key || `环境变量 ${idx + 1}`} 必需`" />必需
+            </label>
             <n-button
               size="tiny"
               quaternary
@@ -242,6 +245,7 @@ interface FormEnvItem {
   key: string;
   value: string;
   isSecret: boolean;
+  required?: boolean;
   isRedacted?: boolean;
   showPlain?: boolean;
 }
@@ -296,6 +300,7 @@ watch(
           key: e.key,
           value: e.isRedacted ? '' : e.value,
           isSecret: !!e.isSecret,
+          required: !!e.required,
           isRedacted: !!e.isRedacted,
           showPlain: false,
         }));
@@ -351,6 +356,7 @@ function handleSave() {
       key: item.key.trim(),
       value: item.value,
       isSecret: item.isSecret,
+      required: !!item.required,
       ...(item.isRedacted ? { isRedacted: true } : {}),
     }));
 
@@ -396,7 +402,7 @@ function handleSave() {
 /* Grid tracks keep Naive UI's full-width inputs from squeezing the value to zero. */
 .env-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) auto auto;
   align-items: center;
   gap: 8px;
 }

@@ -5,3 +5,4 @@ export * from './dto/analysis.js';
 export * from './dto/profiles.js';
 export * from './dto/runner.js';
 export * from './dto/settings.js';
+export * from './dto/diagnostics.js';

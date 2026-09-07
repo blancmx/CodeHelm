@@ -30,6 +30,8 @@ export const IpcChannels = {
 
   // Runner
   RUNNER_GET_STATE: 'codehelm:runner:get-state',
+  RUNNER_PROBE_RUNTIME: 'codehelm:runner:probe-runtime',
+  RUNNER_DIAGNOSE: 'codehelm:runner:diagnose',
   RUNNER_CONFIRM_EXECUTION: 'codehelm:runner:confirm-execution',
   RUNNER_REUSE_EXECUTION_APPROVAL: 'codehelm:runner:reuse-execution-approval',
   RUNNER_START_SESSION: 'codehelm:runner:start-session',

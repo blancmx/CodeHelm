@@ -7,6 +7,7 @@ describe('IPC display errors', () => {
     [new Error('Error invoking remote method "codehelm:runner:start": Error: Execution confirmation cancelled.'), 'Execution confirmation cancelled.'],
     [new Error("Error invoking remote method 'codehelm:runner:start': Error: Error invoking remote method 'codehelm:profiles:save': Error: 数据库不可用"), '数据库不可用'],
     [new Error('磁盘空间不足：无法保存记录'), '磁盘空间不足：无法保存记录'],
+    [new Error("Error invoking remote method 'codehelm:runner:start-session': Error: CODEHELM_ENVIRONMENT_PREFLIGHT: 请检查运行环境。"), '请检查运行环境。'],
     ['Error: ordinary diagnostic', 'Error: ordinary diagnostic'],
     [new Error("Error invoking remote method 'other:api': Error: forbidden"), "Error invoking remote method 'other:api': Error: forbidden"],
     [new Error(''), '启动失败'],

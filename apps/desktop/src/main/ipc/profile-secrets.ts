@@ -103,7 +103,7 @@ export function protectProfileSecrets<T extends ProfileWithServices>(
       }
       changed = true;
       return {
-        key: entry.key,
+        key: entry.key, ...(entry.required === undefined ? {} : { required: entry.required }),
         value: encryptSecretValue(entry.value),
         isSecret: true,
       };
@@ -124,7 +124,7 @@ export function encryptProfileSecrets<T extends ProfileWithServices>(profile: T)
     env: service.env.map((entry) => (
       isSecretEntry(entry)
         ? {
-            key: entry.key,
+            key: entry.key, ...(entry.required === undefined ? {} : { required: entry.required }),
             value: encryptSecretValue(entry.value),
             isSecret: true,
           }
@@ -142,7 +142,7 @@ export function decryptProfileSecrets<T extends ProfileWithServices>(profile: T)
     env: service.env.map((entry) => (
       isSecretEntry(entry)
         ? {
-            key: entry.key,
+            key: entry.key, ...(entry.required === undefined ? {} : { required: entry.required }),
             value: decryptSecretValue(entry.value),
             isSecret: true,
           }
@@ -161,13 +161,13 @@ export function redactProfileSecrets(profile: RunProfile): RunProfileDto {
       ...service,
       env: service.env.map((entry) => isSecretEntry(entry)
         ? {
-            key: entry.key,
+            key: entry.key, ...(entry.required === undefined ? {} : { required: entry.required }),
             value: REDACTED_SECRET_VALUE,
             isSecret: true,
             isRedacted: true,
           }
         : {
-            key: entry.key,
+            key: entry.key, ...(entry.required === undefined ? {} : { required: entry.required }),
             value: entry.value,
             ...(entry.isSecret === undefined ? {} : { isSecret: false }),
           }),

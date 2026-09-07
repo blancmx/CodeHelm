@@ -47,6 +47,15 @@ function profile(): RunProfile {
 }
 
 describe('profile secret protection', () => {
+  it('preserves the required marker through encryption, redaction and decryption', () => {
+    const input = profile();
+    input.services[0].env[1].required = true;
+    const encrypted = encryptProfileSecrets(input);
+    expect(encrypted.services[0].env[1].required).toBe(true);
+    expect(redactProfileSecrets(encrypted).services[0].env[1]).toMatchObject({ required: true, value: '', isRedacted: true });
+    expect(decryptProfileSecrets(encrypted).services[0].env[1]).toMatchObject({ required: true, value: 'plain-token' });
+    expect(protectProfileSecrets(input).profile.services[0].env[1].required).toBe(true);
+  });
   it('encrypts secrets for storage and decrypts them only for main-process use', () => {
     const stored = encryptProfileSecrets(profile());
     const storedSecret = stored.services[0].env[1].value;

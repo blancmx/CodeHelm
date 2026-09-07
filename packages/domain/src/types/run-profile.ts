@@ -17,6 +17,7 @@ export interface ServiceEnvVar {
   key: string;
   value: string;
   isSecret?: boolean;
+  required?: boolean;
 }
 
 export interface ServiceConfig {

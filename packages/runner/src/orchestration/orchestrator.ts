@@ -407,7 +407,7 @@ export class Orchestrator {
     }
   }
 
-  async restartService(serviceSessionId: string): Promise<ServiceSession> {
+  async restartService(serviceSessionId: string, preflight?: (root: string, config: ServiceConfig, run: RunSession) => Promise<void>): Promise<ServiceSession> {
     this.assertCanStart();
     const run = [...this.activeSessions.values()].find(s => s.services.some(child => child.id === serviceSessionId));
     const previous = run?.services.find(s => s.id === serviceSessionId);
@@ -427,7 +427,17 @@ export class Orchestrator {
     };
     restart.task = Promise.resolve().then(async () => {
       ensureAllowed();
-      const child = await this.processManager.restartService(serviceSessionId, ensureAllowed);
+      const child = await this.processManager.restartService(serviceSessionId, async (snapshot, root) => {
+        ensureAllowed();
+        if (preflight) {
+          try { await preflight(root, snapshot, run); }
+          catch (error) {
+            previous.errorMessage = '重启前环境检查未通过，原服务已停止，未创建替代进程。请检查运行环境后重新启动方案。';
+            throw error;
+          }
+        }
+        ensureAllowed();
+      });
       if (this.persistenceError || restart.cancelled || this.cancelled.has(run.id) || this.shutdownRequested) {
         await this.processManager.stopService(child.id);
         ensureAllowed();

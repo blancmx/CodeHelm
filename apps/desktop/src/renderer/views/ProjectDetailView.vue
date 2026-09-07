@@ -650,6 +650,9 @@
         </n-tab-pane>
 
         <!-- Tab 4: 启动配置 (Run Profiles) -->
+        <n-tab-pane name="environment" tab="环境诊断" class="h-full overflow-y-auto">
+          <EnvironmentDiagnostics ref="diagnosticsPanel" :profile="editingProfile" :saved-profile="profiles.find(profile => profile.id === editingProfile?.id)" @install="handleLaunchClick('install')" @history="showDiagnosticHistory" />
+        </n-tab-pane>
         <n-tab-pane name="config" tab="启动配置" class="h-full overflow-y-auto">
           <div class="space-y-4 pt-2 pb-6">
             <div
@@ -791,7 +794,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
+import { ENVIRONMENT_PREFLIGHT_ERROR } from '@codehelm/contracts';
+import EnvironmentDiagnostics from '../components/EnvironmentDiagnostics.vue';
 import { useRoute, useRouter } from 'vue-router';
 import { message } from '../utils/discrete.js';
 import { setPageTitle } from '../utils/title.js';
@@ -851,6 +856,11 @@ watch(
 
 const activeMainTab = ref<string>(typeof route?.query?.tab === 'string' ? route.query.tab : 'overview');
 
+async function showDiagnosticHistory() {
+  activeMainTab.value = 'history';
+  await runnerStore.fetchState();
+}
+
 // Two-way sync with router query so each tab switch creates a distinct history step
 watch(activeMainTab, (newTab) => {
   const currentTabInQuery = typeof route.query.tab === 'string' ? route.query.tab : 'overview';
@@ -878,6 +888,7 @@ const latestSnapshot = ref<AnalysisSnapshotDto | null>(null);
 const readmeSummary = ref<ReadmeSummaryDto | null>(null);
 const profiles = ref<RunProfileDto[]>([]);
 const editingProfile = ref<RunProfileDto | null>(null);
+const diagnosticsPanel = ref<InstanceType<typeof EnvironmentDiagnostics> | null>(null);
 
 const analysis = useAnalysisTask(window.codehelm.analysis, () => props.id, (state) => {
   if (state.status === 'completed') {
@@ -1161,11 +1172,17 @@ async function handleLaunchClick(mode: RunnerExecutionMode = 'start') {
     isLaunching.value = true;
     const saved = await window.codehelm.profiles.save(JSON.parse(JSON.stringify(activeProfile.value)));
     editingProfile.value = saved;
+    profiles.value = profiles.value.map(profile => profile.id === saved.id ? saved : profile);
     await runnerStore.launchProfile(saved.id, mode, themeStore.isDark ? 'dark' : 'light');
     await loadData();
     message.success(mode === 'install' ? '依赖准备完毕，服务方案已成功启动！' : '服务方案已启动');
   } catch (err: any) {
-    if (err?.message?.includes('Execution confirmation cancelled')) {
+    if (err?.message?.includes(ENVIRONMENT_PREFLIGHT_ERROR)) {
+      message.warning(displayIpcError(err, '运行环境检查未通过'));
+      activeMainTab.value = 'environment';
+      await nextTick();
+      await diagnosticsPanel.value?.run();
+    } else if (err?.message?.includes('Execution confirmation cancelled')) {
       message.info('已取消启动');
     } else if (err?.message?.includes('Execution confirmation required')) {
       message.warning('执行内容已变化，请再次点击启动并核对最新方案。');

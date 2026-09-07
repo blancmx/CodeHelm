@@ -204,14 +204,14 @@ export class ProcessManager {
     this.processes.delete(serviceSessionId);
   }
 
-  async restartService(serviceSessionId: string, beforeRestart?: () => void): Promise<ServiceSession> {
+  async restartService(serviceSessionId: string, beforeRestart?: (config: ServiceConfig, projectRoot: string) => void | Promise<void>): Promise<ServiceSession> {
     const active = this.processes.get(serviceSessionId);
     if (!active) {
       throw new Error(`Active service session not found: ${serviceSessionId}`);
     }
 
     await this.stopService(serviceSessionId);
-    beforeRestart?.();
+    await beforeRestart?.(structuredClone(active.config), active.projectRoot);
     return this.startService(
       active.config,
       active.projectRoot,

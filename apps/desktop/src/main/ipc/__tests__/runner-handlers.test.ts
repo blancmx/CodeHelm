@@ -85,6 +85,7 @@ const harness = await vi.hoisted(async () => {
   const handlers = new Map<string, (...args: any[]) => Promise<unknown>>();
   const onLogs = vi.fn();
   const getActiveSessions = vi.fn((): unknown[] => []);
+  const preflight = vi.fn(async (_root: string, _profile: unknown, _phase: string, _signal: AbortSignal) => {});
 
   class MockOrchestrator {
     setSessionPersistence = vi.fn();
@@ -144,6 +145,7 @@ const harness = await vi.hoisted(async () => {
     handlers,
     onLogs,
     getActiveSessions,
+    preflight,
     MockOrchestrator,
     MockProfileRepository,
     MockProjectRepository,
@@ -178,6 +180,7 @@ vi.mock('../dependency-installer.js', () => ({
 vi.mock('../runtime-profile-constraints.js', () => ({
   applyRuntimeProfileConstraints: harness.applyConstraints,
 }));
+vi.mock('../environment-preflight.js', () => ({ assertEnvironmentReady: harness.preflight }));
 
 import { registerRunnerHandlers, stopAllRunnerSessions } from '../runner-handlers.js';
 
@@ -357,6 +360,83 @@ describe('runner IPC execution authorization', () => {
 
 describe('runner asynchronous approval boundaries', () => {
   afterEach(() => vi.restoreAllMocks());
+
+  it('blocks before opening confirmation when preflight finds a missing command', async () => {
+    harness.showConfirmation.mockClear();
+    harness.startSession.mockClear();
+    harness.preflight.mockRejectedValueOnce(new Error('CODEHELM_ENVIRONMENT_PREFLIGHT: missing command'));
+    await expect(handler(IpcChannels.RUNNER_CONFIRM_EXECUTION)(harness.event, { profileId: harness.profile.id, mode: 'start' })).rejects.toThrow('CODEHELM_ENVIRONMENT_PREFLIGHT');
+    expect(harness.showConfirmation).not.toHaveBeenCalled();
+    expect(harness.startSession).not.toHaveBeenCalled();
+  });
+
+  it('rechecks after approval and releases the execution slot on an environment failure', async () => {
+    const token = await handler(IpcChannels.RUNNER_CONFIRM_EXECUTION)(harness.event, { profileId: harness.profile.id, mode: 'start' });
+    harness.startSession.mockClear();
+    harness.preflight.mockRejectedValueOnce(new Error('CODEHELM_ENVIRONMENT_PREFLIGHT: command removed'));
+    await expect(handler(IpcChannels.RUNNER_START_SESSION)(harness.event, { profileId: harness.profile.id, approvalToken: token })).rejects.toThrow('CODEHELM_ENVIRONMENT_PREFLIGHT');
+    expect(harness.startSession).not.toHaveBeenCalled();
+    // Failure consumes the one-use token, but does not leave the profile stuck busy.
+    const next = await handler(IpcChannels.RUNNER_REUSE_EXECUTION_APPROVAL)(harness.event, { profileId: harness.profile.id, mode: 'start' });
+    await expect(handler(IpcChannels.RUNNER_START_SESSION)(harness.event, { profileId: harness.profile.id, approvalToken: next })).resolves.toMatchObject({ id: harness.session.id });
+  });
+
+  it('does not start if the reviewed script changes while preflight is running', async () => {
+    const previous = [...harness.profile.services[0].args];
+    const script = path.join(harness.projectRoot, 'preflight-script.js');
+    harness.profile.services[0].args = ['preflight-script.js'];
+    await fsp.writeFile(script, 'original');
+    try {
+      const token = await handler(IpcChannels.RUNNER_CONFIRM_EXECUTION)(harness.event, { profileId: harness.profile.id, mode: 'start' });
+      harness.startSession.mockClear();
+      harness.preflight.mockImplementationOnce(async () => { await fsp.writeFile(script, 'changed'); });
+      await expect(handler(IpcChannels.RUNNER_START_SESSION)(harness.event, { profileId: harness.profile.id, approvalToken: token })).rejects.toThrow('执行内容已变化');
+      expect(harness.startSession).not.toHaveBeenCalled();
+    } finally {
+      harness.profile.services[0].args = previous;
+      await fsp.unlink(script);
+    }
+  });
+
+  it('rechecks after the install phase even with no install plans, and prevents false startup success', async () => {
+    harness.createPlans.mockReturnValue([]);
+    const token = await handler(IpcChannels.RUNNER_CONFIRM_EXECUTION)(harness.event, { profileId: harness.profile.id, mode: 'install' });
+    harness.startSession.mockClear();
+    harness.preflight.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('CODEHELM_ENVIRONMENT_PREFLIGHT: still missing'));
+    await expect(handler(IpcChannels.RUNNER_INSTALL_AND_START)(harness.event, { profileId: harness.profile.id, approvalToken: token })).rejects.toThrow('CODEHELM_ENVIRONMENT_PREFLIGHT');
+    expect(harness.startSession).not.toHaveBeenCalled();
+    expect(harness.preflight.mock.calls.at(-1)?.[2]).toBe('start');
+  });
+
+  it('rejects configuration edits during post-install diagnostics', async () => {
+    harness.createPlans.mockReturnValue([]);
+    const previous = [...harness.profile.services[0].args];
+    const token = await handler(IpcChannels.RUNNER_CONFIRM_EXECUTION)(harness.event, { profileId: harness.profile.id, mode: 'install' });
+    harness.startSession.mockClear();
+    harness.preflight.mockResolvedValueOnce(undefined).mockImplementationOnce(async () => { harness.profile.services[0].args = ['changed']; });
+    try {
+      await expect(handler(IpcChannels.RUNNER_INSTALL_AND_START)(harness.event, { profileId: harness.profile.id, approvalToken: token })).rejects.toThrow('执行内容已变化');
+      expect(harness.startSession).not.toHaveBeenCalled();
+    } finally { harness.profile.services[0].args = previous; }
+  });
+
+  it('rejects script edits during post-install diagnostics', async () => {
+    harness.createPlans.mockReturnValue([]);
+    const previous = [...harness.profile.services[0].args];
+    const script = path.join(harness.projectRoot, 'post-install-preflight.js');
+    harness.profile.services[0].args = ['post-install-preflight.js'];
+    await fsp.writeFile(script, 'before-check');
+    try {
+      const token = await handler(IpcChannels.RUNNER_CONFIRM_EXECUTION)(harness.event, { profileId: harness.profile.id, mode: 'install' });
+      harness.startSession.mockClear();
+      harness.preflight.mockResolvedValueOnce(undefined).mockImplementationOnce(async () => { await fsp.writeFile(script, 'changed-during-check'); });
+      await expect(handler(IpcChannels.RUNNER_INSTALL_AND_START)(harness.event, { profileId: harness.profile.id, approvalToken: token })).rejects.toThrow('安装后的执行内容');
+      expect(harness.startSession).not.toHaveBeenCalled();
+    } finally {
+      harness.profile.services[0].args = previous;
+      await fsp.unlink(script);
+    }
+  });
 
   function pauseNextResolution() {
     let release!: () => void;

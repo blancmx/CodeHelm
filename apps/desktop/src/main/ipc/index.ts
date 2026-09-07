@@ -1,7 +1,9 @@
+import { registerRuntimeProbeHandlers } from './runtime-probe-handlers.js';
 import type { RegisterIpcHandler } from './trusted-ipc.js';
 import type { Database as DatabaseInstance } from 'better-sqlite3';
 import { registerProjectHandlers } from './project-handlers.js';
 import { registerProfileHandlers } from './profile-handlers.js';
+import { registerDiagnosticHandlers } from './diagnostic-handlers.js';
 import { registerAnalysisHandlers } from './analysis-handlers.js';
 import { registerRunnerHandlers } from './runner-handlers.js';
 import { registerSettingsHandlers } from './settings-handlers.js';
@@ -39,6 +41,8 @@ export async function registerAllIpcHandlers(db: DatabaseInstance, handle: Regis
   }), () => getAppSettings(db));
   registerProjectHandlers(handle, db);
   registerProfileHandlers(handle, db);
+  registerDiagnosticHandlers(handle, db);
+  registerRuntimeProbeHandlers(handle, db);
   registerAnalysisHandlers(handle, db);
   await registerRunnerHandlers(handle, db, logs);
   registerSettingsHandlers(handle, db, logs);

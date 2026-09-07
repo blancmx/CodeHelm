@@ -1,3 +1,4 @@
+import type { RuntimeFamily, RuntimeProbeDto } from './dto/diagnostics.js';
 import type {
   ImportProjectInput,
   BatchImportInput,
@@ -25,8 +26,10 @@ import type {
   RunnerStateDto,
   RunnerExecutionMode,
   ServiceStatusEventDto,
+  ServiceSessionDto,
 } from './dto/runner.js';
 import type { AppSettingsDto, LogStorageStatusDto, LogCleanupResultDto } from './dto/settings.js';
+import type { ProfileDiagnosticsDto } from './dto/diagnostics.js';
 
 export type Unsubscribe = () => void;
 
@@ -61,6 +64,8 @@ export interface CodeHelmApi {
     get(id: string): Promise<RunProfileDto | null>;
   };
   runner: {
+    probeRuntime(profileId: string, family: RuntimeFamily): Promise<RuntimeProbeDto | null>;
+    diagnose(profileId: string): Promise<ProfileDiagnosticsDto>;
     getState(): Promise<RunnerStateDto>;
     confirmExecution(profileId: string, mode: RunnerExecutionMode, theme?: 'dark' | 'light'): Promise<string>;
     reuseExecutionApproval(profileId: string, mode: RunnerExecutionMode): Promise<string>;
@@ -68,7 +73,7 @@ export interface CodeHelmApi {
     installAndStart(profileId: string, approvalToken: string): Promise<RunSessionDto>;
     stopSession(sessionId: string): Promise<void>;
     stopService(serviceSessionId: string): Promise<void>;
-    restartService(serviceSessionId: string): Promise<void>;
+    restartService(serviceSessionId: string): Promise<ServiceSessionDto>;
     onStatus(listener: (event: ServiceStatusEventDto) => void): Unsubscribe;
     onLogs(listener: (batch: LogBatchDto) => void): Unsubscribe;
   };

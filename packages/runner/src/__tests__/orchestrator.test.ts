@@ -59,6 +59,41 @@ describe('Orchestrator startup result', () => {
     expect(session.services[0].pid).toBeTypeOf('number');
   });
 
+  it('checks restart after stopping the old process and does not spawn after a blocker', async () => {
+    const runner = new Orchestrator();
+    runners.push(runner);
+    const session = await runner.startSession(process.cwd(), createProfile(createService()));
+    const old = session.services[0];
+    const preflight = vi.fn(async (root: string, config: ServiceConfig) => {
+      expect(root).toBe(process.cwd());
+      expect(config.executable).toBe(process.execPath);
+      expect(old.status).toBe('STOPPED');
+      throw new Error('fixture preflight blocker');
+    });
+    await expect(runner.restartService(old.id, preflight)).rejects.toThrow('fixture preflight blocker');
+    expect(preflight).toHaveBeenCalledOnce();
+    expect(session.services).toHaveLength(1);
+    expect(old.errorMessage).toContain('未创建替代进程');
+  });
+
+  it('honors a stop request arriving during asynchronous restart preflight', async () => {
+    const runner = new Orchestrator();
+    runners.push(runner);
+    const session = await runner.startSession(process.cwd(), createProfile(createService()));
+    let entered!: () => void;
+    const checking = new Promise<void>(resolve => { entered = resolve; });
+    let release!: () => void;
+    const hold = new Promise<void>(resolve => { release = resolve; });
+    const restarting = runner.restartService(session.services[0].id, async () => { entered(); await hold; });
+    const rejected = expect(restarting).rejects.toThrow('取消本次重启');
+    await checking;
+    const stopping = runner.stopSession(session.id);
+    release();
+    await stopping;
+    await rejected;
+    expect(session.services).toHaveLength(1);
+  });
+
   it('returns FAILED with the real spawn error when no service starts', async () => {
     const runner = new Orchestrator();
     runners.push(runner);

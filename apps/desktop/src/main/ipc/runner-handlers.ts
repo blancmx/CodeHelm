@@ -33,6 +33,7 @@ import { applyRuntimeProfileConstraints } from './runtime-profile-constraints.js
 import { decryptProfileSecrets, protectProfileSecrets } from './profile-secrets.js';
 import type { LogStorage } from './log-storage.js';
 import { recoverInterruptedSessions } from './session-recovery.js';
+import { assertEnvironmentReady } from './environment-preflight.js';
 
 const orchestrator = new Orchestrator();
 const activeInstallerProcesses = new Set<ChildProcess>();
@@ -348,6 +349,7 @@ export async function registerRunnerHandlers(handle: RegisterIpcHandler, db: Dat
     }
     requireNoActiveExecution(request.profileId);
     const { profile, project, plans, approvalContext } = await getExecutionContext(request.profileId, request.mode, signal);
+    await assertEnvironmentReady(project.rootPath, profile, request.mode === 'install' ? 'before_install' : 'start', signal);
     assertCurrentSnapshot(profile, project, signal);
     requireNoActiveExecution(request.profileId);
     const approved = await showExecutionConfirmation(owner, {
@@ -390,6 +392,15 @@ export async function registerRunnerHandlers(handle: RegisterIpcHandler, db: Dat
       const { profile, project, approvalContext } = await getExecutionContext(request.profileId, 'start', signal);
       assertCurrentSnapshot(profile, project, signal);
       executionApprovals.consume(approvalContext, request.approvalToken);
+
+      await assertEnvironmentReady(project.rootPath, profile, 'start', signal);
+      // Diagnostics yield to filesystem and configuration changes. Validate the
+      // reviewed inputs again before spawning, without minting another approval.
+      const rechecked = await createExecutionApprovalContext(profile, project.rootPath, 'start', [], { signal });
+      assertCurrentSnapshot(profile, project, signal);
+      if (rechecked.executionFingerprint !== approvalContext.executionFingerprint) {
+        throw new Error('Execution confirmation required: 执行内容已变化，请重新核对后启动。');
+      }
 
       const session = requireStartedSession(
         await orchestrator.startSession(project.rootPath, profile)
@@ -436,6 +447,13 @@ export async function registerRunnerHandlers(handle: RegisterIpcHandler, db: Dat
       assertCurrentSnapshot(profile, project, signal);
       executionApprovals.consume(approvalContext, request.approvalToken);
 
+      await assertEnvironmentReady(project.rootPath, profile, 'before_install', signal);
+      const installationRecheck = await createExecutionApprovalContext(profile, project.rootPath, 'install', plans, { signal });
+      assertCurrentSnapshot(profile, project, signal);
+      if (installationRecheck.executionFingerprint !== approvalContext.executionFingerprint) {
+        throw new Error('Execution confirmation required: 执行内容已变化，请重新核对后安装。');
+      }
+
       for (const plan of plans) {
         signal.throwIfAborted();
         await runDependencyPlan(plan);
@@ -444,6 +462,15 @@ export async function registerRunnerHandlers(handle: RegisterIpcHandler, db: Dat
         broadcastLog('CodeHelm Installer', '[Dependency] 所有缺失依赖已安装，准备拉起服务。\n');
       }
 
+      // Installation can create the runtime or command, but success is not
+      // evidence that the saved startup configuration is usable.
+      const installedInputs = await createExecutionApprovalContext(profile, project.rootPath, 'start', [], { signal });
+      await assertEnvironmentReady(project.rootPath, profile, 'start', signal);
+      const readyInputs = await createExecutionApprovalContext(profile, project.rootPath, 'start', [], { signal });
+      assertCurrentSnapshot(profile, project, signal);
+      if (installedInputs.executionFingerprint !== readyInputs.executionFingerprint) {
+        throw new Error('Execution confirmation required: 安装后的执行内容在检查期间发生变化，请重新核对后启动。');
+      }
       // Now start the session
       signal.throwIfAborted();
       if (runnerShutdownRequested) throw new Error('Runner shutdown in progress');
@@ -473,7 +500,15 @@ export async function registerRunnerHandlers(handle: RegisterIpcHandler, db: Dat
   });
 
   handle(IpcChannels.RUNNER_RESTART_SERVICE, async (_event, serviceSessionId: string) => {
-    const newSession = await orchestrator.restartService(serviceSessionId);
+    const newSession = await orchestrator.restartService(serviceSessionId, async (root, config, run) => {
+      // Use the active process snapshot and actual launch root, never a newly edited profile.
+      // Its own old port is released before checking; dependencies are already running.
+      await assertEnvironmentReady(root, {
+        id: run.runProfileId, projectId: run.projectId, name: 'restart', isDefault: false,
+        failurePolicy: 'continue', createdAt: run.startedAt, updatedAt: run.startedAt,
+        services: [{ ...config, dependsOn: [] }],
+      }, 'start', AbortSignal.timeout(8_000));
+    });
     if (newSession.status !== 'RUNNING') {
       throw new Error(newSession.errorMessage || `服务重启未完成：${newSession.status}`);
     }

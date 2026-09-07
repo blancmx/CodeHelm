@@ -1,6 +1,12 @@
 import yaml from 'yaml';
 import * as toml from 'smol-toml';
-import { XMLParser } from 'fast-xml-parser';
+import { XMLParser, XMLValidator } from 'fast-xml-parser';
+
+/** Strict, entity-free XML for bounded diagnostic manifests. */
+export function parseDiagnosticXml(content: string): unknown {
+  if (/<!DOCTYPE|<!ENTITY/i.test(content) || XMLValidator.validate(content) !== true) throw new Error('Invalid diagnostic XML');
+  return new XMLParser({ ignoreAttributes: false, parseTagValue: false, processEntities: false }).parse(content);
+}
 
 export function parseJson<T = unknown>(content: string): T | null {
   try {

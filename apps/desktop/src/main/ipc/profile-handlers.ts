@@ -33,10 +33,10 @@ export function registerProfileHandlers(handle: RegisterIpcHandler, db: Database
               if (previous?.isSecret === true) {
                 throw new Error('不能取消现有秘密环境变量的保护，请删除该变量或设置新的秘密值。');
               }
-              return { key: entry.key, value: entry.value, isSecret: entry.isSecret };
+              return { key: entry.key, ...(entry.required === undefined ? {} : { required: entry.required }), value: entry.value, isSecret: entry.isSecret };
             }
             if (!entry.isRedacted) {
-              return { key: entry.key, value: entry.value, isSecret: true };
+              return { key: entry.key, ...(entry.required === undefined ? {} : { required: entry.required }), value: entry.value, isSecret: true };
             }
 
             const previous = existingService?.env.find((candidate) => candidate.key === entry.key);
@@ -44,7 +44,7 @@ export function registerProfileHandlers(handle: RegisterIpcHandler, db: Database
               throw new Error('无法保留不存在的秘密环境变量，请重新设置该值。');
             }
             return {
-              key: entry.key,
+              key: entry.key, ...(entry.required === undefined ? {} : { required: entry.required }),
               value: decryptSecretValue(previous.value),
               isSecret: true,
             };

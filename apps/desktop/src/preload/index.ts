@@ -46,6 +46,8 @@ const api: CodeHelmApi = {
     get: (id) => ipcRenderer.invoke(IpcChannels.PROFILES_GET, id),
   },
   runner: {
+    probeRuntime: (profileId, family) => ipcRenderer.invoke(IpcChannels.RUNNER_PROBE_RUNTIME, { profileId, family }),
+    diagnose: (profileId) => ipcRenderer.invoke(IpcChannels.RUNNER_DIAGNOSE, { profileId }),
     getState: () => ipcRenderer.invoke(IpcChannels.RUNNER_GET_STATE),
     confirmExecution: (profileId, mode, theme) =>
       ipcRenderer.invoke(

@@ -1263,6 +1263,12 @@ export function setupBrowserMock() {
     },
 
     runner: {
+      async probeRuntime() {
+        throw new Error('请在 CodeHelm 桌面应用中检查运行时版本。');
+      },
+      async diagnose() {
+        throw new Error('浏览器预览不支持本机环境诊断，请在 CodeHelm 桌面应用中检查。');
+      },
       async getState() {
         throw new Error('浏览器演示不提供真实进程状态或持久化运行历史，请在桌面端查看。');
       },
@@ -1431,19 +1437,8 @@ export function setupBrowserMock() {
         }
       },
 
-      async restartService(serviceSessionId: string) {
-        statusListeners.forEach((fn) =>
-          fn({
-            projectId: generateUuid(),
-            runSessionId: '',
-            serviceSessionId,
-            serviceConfigId: 'srv-backend',
-            serviceName: 'Backend API',
-            status: 'RUNNING',
-            pid: 18499,
-            port: 8000,
-          })
-        );
+      async restartService() {
+        throw new Error('浏览器预览不提供真实服务重启，请在桌面端操作。');
       },
 
       onStatus(listener) {
