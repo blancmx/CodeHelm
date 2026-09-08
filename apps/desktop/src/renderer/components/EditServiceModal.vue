@@ -227,8 +227,8 @@ const isEditing = computed(() => Boolean(props.serviceData?.id));
 const typeOptions = [
   { label: '前端服务 (Frontend)', value: 'frontend' },
   { label: '后端服务 (Backend)', value: 'backend' },
-  { label: '数据库/存储 (Database)', value: 'database' },
-  { label: '自定义进程 (Custom)', value: 'custom' },
+  { label: '辅助服务（数据库/存储）', value: 'auxiliary' },
+  { label: '自定义进程 / 工具', value: 'tool' },
 ];
 
 const healthCheckOptions = [
@@ -254,7 +254,7 @@ const form = reactive({
   id: '',
   runProfileId: '',
   name: '',
-  type: 'custom' as any,
+  type: 'tool' as ServiceConfigDto['type'],
   executable: '',
   args: [] as string[],
   cwdRelative: '',
@@ -312,7 +312,7 @@ watch(
       form.id = generateId();
       form.runProfileId = '';
       form.name = '';
-      form.type = 'custom';
+      form.type = 'tool';
       form.executable = '';
       form.args = [];
       form.cwdRelative = '';

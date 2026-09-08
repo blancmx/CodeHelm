@@ -8,7 +8,7 @@ import { createDatabase, DATABASE_SCHEMA_VERSION } from './db.js';
 const CORE_TABLES = ['projects', 'run_profiles', 'service_configs', 'app_settings'] as const;
 const MEBIBYTE = 1024 * 1024;
 const GIBIBYTE = 1024 * MEBIBYTE;
-export type BackupReason = 'before-startup' | 'legacy-import' | 'first-startup' | 'periodic';
+export type BackupReason = 'before-startup' | 'legacy-import' | 'first-startup' | 'periodic' | 'manual' | 'before-restore';
 
 export interface DatabaseBackupPolicy {
   intervalMs: number;
@@ -70,7 +70,7 @@ function fileStat(file: string): fs.Stats | undefined {
   }
 }
 
-function verifyDatabase(db: DatabaseInstance): Record<string, number> {
+export function verifyDatabase(db: DatabaseInstance): Record<string, number> {
   const integrity = db.pragma('integrity_check') as Array<{ integrity_check: string }>;
   if (integrity.length !== 1 || integrity[0].integrity_check !== 'ok') {
     throw new Error('数据库完整性检查未通过。');
@@ -88,7 +88,7 @@ function verifyDatabase(db: DatabaseInstance): Record<string, number> {
   ]));
 }
 
-async function hashFile(file: string): Promise<string> {
+export async function hashFile(file: string): Promise<string> {
   const hash = createHash('sha256');
   for await (const chunk of fs.createReadStream(file)) hash.update(chunk);
   return hash.digest('hex');
@@ -122,6 +122,7 @@ interface VerifiedBackupEntry {
   createdAtMs: number;
   bytes: number;
   sha256: string;
+  pinned: boolean;
 }
 
 function readVerifiedBackupEntry(directoryPath: string): VerifiedBackupEntry | undefined {
@@ -143,7 +144,7 @@ function readVerifiedBackupEntry(directoryPath: string): VerifiedBackupEntry | u
     || !/^[a-f0-9]{64}$/i.test(manifest.sha256) || !Number.isFinite(createdAtMs)) return undefined;
   return {
     directoryPath, databasePath, manifestPath, createdAtMs,
-    bytes: databaseStat.size, sha256: manifest.sha256.toLowerCase(),
+    bytes: databaseStat.size, sha256: manifest.sha256.toLowerCase(), pinned: manifest.pinned === true || manifest.reason === 'before-restore',
   };
 }
 
@@ -178,6 +179,7 @@ async function maintainVerifiedBackups(
     if (retainedBackups <= policy.minRetainedBackups) break;
     if (retainedBackups <= policy.maxBackups && retainedBytes <= policy.maxTotalBytes) break;
     if (path.resolve(entry.directoryPath) === path.resolve(protectedDirectory)) continue;
+    if (entry.pinned) continue;
     if (await hashFile(entry.databasePath) !== entry.sha256) {
       skippedDirectories.push(path.basename(entry.directoryPath));
       retainedBackups -= 1;
@@ -207,6 +209,7 @@ export interface CreateVerifiedDatabaseBackupOptions {
   reason: BackupReason;
   policy?: Partial<DatabaseBackupPolicy>;
   getAvailableBytes?: (directory: string) => Promise<bigint>;
+  appVersion?: string;
 }
 
 /** Publishes only complete, checked snapshots; pending artifacts are never restore candidates. */
@@ -260,6 +263,7 @@ export async function createVerifiedDatabaseBackup(
       formatVersion: 1, status: 'verified', createdAt, reason, sourcePath,
       databaseFile: 'codehelm.sqlite', bytes: fs.statSync(candidatePath).size,
       sha256, schemaVersion, integrityCheck: 'ok', foreignKeyViolations: 0, counts,
+      appVersion: options.appVersion ?? 'unknown', pinned: reason === 'before-restore',
     }, null, 2) + '\n');
     await manifest.sync();
   } finally { await manifest.close(); }
@@ -277,6 +281,7 @@ export interface PeriodicDatabaseBackupController {
 }
 
 export interface PeriodicDatabaseBackupOptions extends Omit<CreateVerifiedDatabaseBackupOptions, 'reason'> {
+  getPolicy?: () => Partial<DatabaseBackupPolicy>;
   onSuccess?: (backup: VerifiedDatabaseBackup) => void;
   onError?: (error: unknown) => void;
 }
@@ -288,7 +293,7 @@ export function startPeriodicDatabaseBackups(options: PeriodicDatabaseBackupOpti
   const runNow = (): Promise<VerifiedDatabaseBackup | undefined> => {
     if (stopped) return Promise.resolve(undefined);
     if (active) return active;
-    active = createVerifiedDatabaseBackup({ ...options, policy, reason: 'periodic' })
+    active = createVerifiedDatabaseBackup({ ...options, policy: options.getPolicy?.() ?? policy, reason: 'periodic' })
       .then((backup) => {
         options.onSuccess?.(backup);
         return backup;
@@ -313,6 +318,7 @@ export function startPeriodicDatabaseBackups(options: PeriodicDatabaseBackupOpti
 }
 
 export interface ProtectedDatabaseOptions {
+  appVersion?: string;
   databasePath: string;
   backupDirectory?: string;
   legacyDatabasePath?: string;
@@ -354,7 +360,7 @@ export async function openProtectedDatabase(options: ProtectedDatabaseOptions): 
       verifyDatabase(source);
       stage = 'backup';
       backup = await createVerifiedDatabaseBackup({
-        source, sourcePath, backupDirectory,
+        source, sourcePath, backupDirectory,appVersion:options.appVersion,
         reason: importedLegacy ? 'legacy-import' : 'before-startup',
         policy: options.backupPolicy,
         getAvailableBytes: options.getAvailableBytes,
@@ -376,7 +382,7 @@ export async function openProtectedDatabase(options: ProtectedDatabaseOptions): 
       db = createDatabase(databasePath, { fileMustExist: true });
       stage = 'backup';
       backup = await createVerifiedDatabaseBackup({
-        source: db, sourcePath: databasePath, backupDirectory, reason: 'first-startup',
+        source: db, sourcePath: databasePath, backupDirectory, reason: 'first-startup',appVersion:options.appVersion,
         policy: options.backupPolicy,
         getAvailableBytes: options.getAvailableBytes,
       });

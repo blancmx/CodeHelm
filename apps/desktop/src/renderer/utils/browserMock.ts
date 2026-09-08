@@ -665,6 +665,7 @@ export function setupBrowserMock() {
 
   const mockApi: CodeHelmApi = {
     projects: {
+      async workspaces() { return []; },
       async startScan() { throw new Error('浏览器预览不执行本地扫描，请使用 CodeHelm 桌面端'); },
       async startImport() { throw new Error('浏览器预览不执行本地导入，请使用 CodeHelm 桌面端'); },
       async getTask() { return null; },
@@ -1060,6 +1061,8 @@ export function setupBrowserMock() {
     },
 
     analysis: {
+      async review() { throw new Error('请在桌面端查看分析差异'); },
+      async apply() { throw new Error('请在桌面端应用分析建议'); },
       async start() {
         throw new Error('浏览器预览不执行本地扫描，请在 CodeHelm 桌面端分析项目');
       },
@@ -1113,6 +1116,8 @@ export function setupBrowserMock() {
     },
 
     profiles: {
+      async copy() { throw new Error('请在桌面应用中管理运行方案。'); },
+      async remove() { throw new Error('请在桌面应用中管理运行方案。'); },
       async save(input) {
         if (input.id) {
           mockExecutionApprovals.delete(executionApprovalKey(input.id, 'start'));
@@ -1263,6 +1268,8 @@ export function setupBrowserMock() {
     },
 
     runner: {
+      async queryHistory() { return { sessions: [] }; },
+      async queryLogs() { throw new Error('请在桌面应用中读取持久化日志。'); },
       async probeRuntime() {
         throw new Error('请在 CodeHelm 桌面应用中检查运行时版本。');
       },
@@ -1452,6 +1459,15 @@ export function setupBrowserMock() {
       },
     },
 
+    backups: {
+      async list(){return {entries:[],policy:{maxBackups:20,maxTotalMb:2048},directory:'',notice:'浏览器预览不提供数据库备份。'};},
+      async create(){throw new Error('请在桌面应用中操作');},
+      async pin(){throw new Error('请在桌面应用中操作');},
+      async setPolicy(){throw new Error('请在桌面应用中操作');},
+      async prepare(){throw new Error('请在桌面应用中操作');},
+      async restore(){throw new Error('请在桌面应用中操作');},
+      async openDirectory(){throw new Error('请在桌面应用中操作');},
+    },
     settings: {
       async get(): Promise<AppSettingsDto> {
         try {

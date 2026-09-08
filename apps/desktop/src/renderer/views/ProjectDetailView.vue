@@ -179,6 +179,7 @@
 
     <!-- Main Tabs -->
     <div class="flex-1 overflow-hidden pt-3 flex flex-col">
+      <ProfileSelector :project-id="props.id" :profiles="profiles" :selected-id="editingProfile?.id" :dirty="profileDirty" :running="!!effectiveRun" @select="selectProfile" @changed="reloadProfiles" />
       <n-tabs type="line" animated v-model:value="activeMainTab" class="h-full flex flex-col">
         <!-- Tab 1: 概览 (Overview) -->
         <n-tab-pane name="overview" tab="项目概览" class="h-full overflow-y-auto">
@@ -450,9 +451,10 @@
 
         <!-- Tab 3: 服务与控制 (Service Control) -->
         <n-tab-pane name="services" tab="服务控制" class="h-full overflow-y-auto">
+          <p v-if="effectiveRun" class="text-xs py-2 text-zinc-500">本次会话配置快照：{{ effectiveRun.profileName }} · {{ effectiveRun.profileUpdatedAt }}。保存的修改将在下次启动使用。</p>
           <div class="space-y-4 pt-2 pb-6">
             <div
-              v-if="!activeProfile || activeProfile.services.length === 0"
+              v-if="!serviceProfile || serviceProfile.services.length === 0"
               class="border rounded-xl p-10 text-center text-xs"
               :class="themeStore.isDark ? 'bg-[#121216] border-[#27272a] text-zinc-400' : 'bg-white border-zinc-200 text-zinc-500 shadow-sm'"
             >
@@ -530,24 +532,24 @@
                 >
                   <div class="flex items-center gap-3">
                     <h3 class="text-sm font-bold" :class="themeStore.isDark ? 'text-white' : 'text-zinc-950'">
-                      {{ activeProfile.name }}
+                      {{ serviceProfile.name }}
                     </h3>
                     <span class="text-xs" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
-                      {{ activeProfile.services.length }} 个受控服务
+                      {{ serviceProfile.services.length }} 个受控服务
                     </span>
                   </div>
                   <span
                     class="text-xs border px-2.5 py-0.5 rounded-full font-medium"
                     :class="themeStore.isDark ? 'bg-[#18181b] text-zinc-300 border-[#27272a]' : 'bg-zinc-100 text-zinc-800 border-zinc-200'"
                   >
-                    失败策略: {{ failurePolicyLabel(activeProfile.failurePolicy) }}
+                    失败策略: {{ failurePolicyLabel(serviceProfile.failurePolicy) }}
                   </span>
                 </div>
 
                 <!-- Service List -->
                 <div class="space-y-3">
                   <div
-                    v-for="service in activeProfile.services"
+                    v-for="service in serviceProfile.services"
                     :key="service.id"
                     class="border rounded-xl p-4 flex items-center justify-between transition-all"
                     :class="themeStore.isDark
@@ -654,6 +656,7 @@
           <EnvironmentDiagnostics ref="diagnosticsPanel" :profile="editingProfile" :saved-profile="profiles.find(profile => profile.id === editingProfile?.id)" @install="handleLaunchClick('install')" @history="showDiagnosticHistory" />
         </n-tab-pane>
         <n-tab-pane name="config" tab="启动配置" class="h-full overflow-y-auto">
+          <AnalysisChanges :project-id="props.id" :snapshot-id="latestSnapshot?.id" :dirty="JSON.stringify(editingProfile) !== JSON.stringify(profiles.find(item => item.id === editingProfile?.id) ?? null)" @applied="loadData" />
           <div class="space-y-4 pt-2 pb-6">
             <div
               class="border rounded-xl p-5 transition-all"
@@ -683,6 +686,14 @@
               </div>
 
               <!-- Services config list -->
+              <div v-if="editingProfile" class="grid grid-cols-2 gap-3 mt-4">
+                <label class="text-xs">方案名称（修改后保存）<n-input v-model:value="editingProfile.name" :input-props="{ 'aria-label': '编辑方案名称' }" :maxlength="100" /></label>
+                <label class="text-xs">失败处理策略<n-select v-model:value="editingProfile.failurePolicy" :options="failureOptions" /></label>
+                <n-checkbox v-model:checked="editingProfile.isDefault">设为此项目默认方案</n-checkbox>
+              </div>
+              <div v-if="profileErrors.length" role="alert" class="mt-3 text-xs text-rose-500">
+                <p v-for="error in profileErrors" :key="error">{{ error }}</p>
+              </div>
               <div class="space-y-3 mt-4" v-if="activeProfile">
                 <div
                   v-for="service in activeProfile.services"
@@ -751,7 +762,7 @@
                 class="flex justify-end pt-4 mt-4 border-t transition-colors"
                 :class="themeStore.isDark ? 'border-[#20202d]' : 'border-zinc-100'"
               >
-                <n-button type="primary" size="small" @click="handleSaveProfile">
+                <n-button type="primary" size="small" :disabled="!editingProfile || !!profileErrors.length" @click="handleSaveProfile">
                   保存方案修改
                 </n-button>
               </div>
@@ -796,6 +807,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import { ENVIRONMENT_PREFLIGHT_ERROR } from '@codehelm/contracts';
+import AnalysisChanges from '../components/AnalysisChanges.vue';
+import ProfileSelector from '../components/ProfileSelector.vue';
+import { validateProfileServices } from '@codehelm/domain';
 import EnvironmentDiagnostics from '../components/EnvironmentDiagnostics.vue';
 import { useRoute, useRouter } from 'vue-router';
 import { message } from '../utils/discrete.js';
@@ -927,6 +941,7 @@ watch(
 );
 
 async function loadData() {
+  await runnerStore.fetchState();
   await projectStore.loadProjectDetail(props.id);
 
   if (projectStore.currentProject?.rootPath && window.codehelm?.projects?.getReadmeSummary) {
@@ -942,12 +957,26 @@ async function loadData() {
   }
 
   if (window.codehelm?.profiles) {
-    profiles.value = await window.codehelm.profiles.list(props.id);
-    if (profiles.value.length > 0) {
-      editingProfile.value = JSON.parse(JSON.stringify(profiles.value[0]));
-    }
+    await reloadProfiles(editingProfile.value?.id);
   }
 }
+
+function selectProfile(id: string) {
+  editingProfile.value = JSON.parse(JSON.stringify(profiles.value.find(profile => profile.id === id) ?? null));
+}
+async function reloadProfiles(id?: string) {
+  profiles.value = await window.codehelm.profiles.list(props.id);
+  selectProfile(profiles.value.find(profile => profile.id === id)?.id ?? profiles.value.find(profile => profile.isDefault)?.id ?? profiles.value[0]?.id ?? '');
+}
+const profileDirty = computed(() => JSON.stringify(editingProfile.value) !== JSON.stringify(profiles.value.find(profile => profile.id === editingProfile.value?.id) ?? null));
+const profileErrors = computed(() => editingProfile.value ? validateProfileServices(editingProfile.value.services) : []);
+const failureOptions = [
+  { label: '继续启动其他服务', value: 'continue' },
+  { label: '阻止依赖失败服务的后续服务', value: 'block_dependents' },
+  { label: '停止本次已启动的全部服务', value: 'rollback_all' },
+];
+const effectiveRun = computed(() => runnerStore.activeSessions.find(run => run.runProfileId === editingProfile.value?.id));
+const serviceProfile = computed(() => effectiveRun.value?.effectiveProfile ?? editingProfile.value);
 
 async function refreshLegacyAnalysis() {
   const [major = 0, minor = 0] = (latestSnapshot.value?.analyzerVersion ?? '0.0')
@@ -1022,17 +1051,17 @@ const allDetectedTechs = computed<DetectedTechnologyDto[]>(() => {
 });
 
 const isAnyServiceRunning = computed(() => {
-  if (!activeProfile.value?.services) return false;
-  return activeProfile.value.services.some((s) => {
+  if (!serviceProfile.value?.services) return false;
+  return serviceProfile.value.services.some((s) => {
     const st = runnerStore.serviceStatuses.get(s.id);
     return st && (st.status === 'RUNNING' || st.status === 'STARTING');
   });
 });
 
 const runningServicesWithPort = computed(() => {
-  if (!activeProfile.value?.services) return [];
+  if (!serviceProfile.value?.services) return [];
   const res: { name: string; port: number; type: string; url: string; label: string }[] = [];
-  for (const s of activeProfile.value.services) {
+  for (const s of serviceProfile.value.services) {
     const st = runnerStore.serviceStatuses.get(s.id);
     if (st && (st.status === 'RUNNING' || st.status === 'STARTING') && (st.port || s.port)) {
       const port = st.port || s.port!;
@@ -1072,7 +1101,7 @@ function handleQuickAccessSelect(key: string) {
 }
 
 const activeEndpointsList = computed(() => {
-  if (!activeProfile.value?.services) return [];
+  if (!serviceProfile.value?.services) return [];
   const list: Array<{
     name: string;
     url: string;
@@ -1081,7 +1110,7 @@ const activeEndpointsList = computed(() => {
     isPrimary: boolean;
   }> = [];
 
-  for (const s of activeProfile.value.services) {
+  for (const s of serviceProfile.value.services) {
     const st = runnerStore.serviceStatuses.get(s.id);
     if (st && (st.status === 'RUNNING' || st.status === 'STARTING') && (st.port || s.port)) {
       const port = st.port || s.port!;

@@ -8,7 +8,7 @@ function fixture() {
   let projectId = 'project';
   const state: AnalysisTaskDto = { projectId, taskId: 'task', status: 'running', scannedFiles: 100, percentage: 20, stage: '扫描中' };
   const off = vi.fn();
-  const api: CodeHelmApi['analysis'] = {
+  const api: Pick<CodeHelmApi['analysis'], 'start' | 'cancel' | 'getTask' | 'getLatest' | 'onProgress'> = {
     start: vi.fn(async () => ({ taskId: 'task' })),
     cancel: vi.fn(async () => ({ cancelled: true })),
     getTask: vi.fn(async () => ({ ...state })),

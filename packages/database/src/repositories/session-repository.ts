@@ -9,10 +9,10 @@ export class SessionRepository {
   /** One transaction per lifecycle snapshot; never store environment or command arguments. */
   save(session: RunSession): void {
     this.db.transaction(() => {
-      this.db.prepare(`INSERT INTO run_sessions (id,project_id,run_profile_id,status,started_at,stopped_at)
-        VALUES (@id,@projectId,@runProfileId,@status,@startedAt,@stoppedAt)
+      this.db.prepare(`INSERT INTO run_sessions (id,project_id,run_profile_id,status,started_at,stopped_at,profile_name,profile_updated_at)
+        VALUES (@id,@projectId,@runProfileId,@status,@startedAt,@stoppedAt,@profileName,@profileUpdatedAt)
         ON CONFLICT(id) DO UPDATE SET status=excluded.status, stopped_at=excluded.stopped_at`)
-        .run({ ...session, stoppedAt: session.stoppedAt ?? null });
+        .run({ ...session, stoppedAt: session.stoppedAt ?? null, profileName: session.profileName ?? null, profileUpdatedAt: session.profileUpdatedAt ?? null });
       const saveService = this.db.prepare(`INSERT INTO service_sessions
         (id,run_session_id,service_config_id,service_name,service_type,status,pid,fingerprint_json,
          recovery_json,port,exit_code,exit_signal,error_message,started_at,stopped_at)
@@ -37,12 +37,15 @@ export class SessionRepository {
     })();
   }
 
-  findById(id: string): RunSession | undefined {
+  findById(id: string, serviceLimit?: number): RunSession | undefined {
     const row = this.db.prepare('SELECT * FROM run_sessions WHERE id = ?').get(id) as Row | undefined;
     if (!row) return undefined;
-    const services = this.db.prepare('SELECT * FROM service_sessions WHERE run_session_id = ? ORDER BY started_at,id').all(id) as Row[];
+    const services = this.db.prepare('SELECT * FROM service_sessions WHERE run_session_id = ? ORDER BY started_at,id LIMIT ?').all(id,serviceLimit === undefined ? -1 : Math.max(1,Math.min(200,Math.trunc(serviceLimit)))) as Row[];
+    const count = serviceLimit === undefined ? undefined : (this.db.prepare('SELECT count(*) AS count FROM service_sessions WHERE run_session_id=?').get(id) as {count:number}).count;
     return {
       id: row.id, projectId: row.project_id, runProfileId: row.run_profile_id,
+      profileName: row.profile_name ?? undefined, profileUpdatedAt: row.profile_updated_at ?? undefined,
+      ...(count === undefined ? {} : { serviceCount: count, servicesTruncated: count > services.length }),
       status: row.status, startedAt: row.started_at, stoppedAt: row.stopped_at ?? undefined,
       services: services.map((s): ServiceSession => ({
         id: s.id, runSessionId: s.run_session_id, serviceConfigId: s.service_config_id,
@@ -61,6 +64,23 @@ export class SessionRepository {
     const rows = this.db.prepare('SELECT id FROM run_sessions ORDER BY started_at DESC,id DESC LIMIT ?')
       .all(Math.max(1, Math.min(100, Math.trunc(limit)))) as { id: string }[];
     return rows.map(({ id }) => this.findById(id)!);
+  }
+
+  query(input: { projectId?: string; profileName?: string; serviceName?: string; status?: string; from?: string; to?: string; cursor?: { startedAt: string; id: string }; limit: number }) {
+    const where: string[] = [], values: (string | number)[] = [];
+    const add = (condition: string, value: string) => { where.push(condition); values.push(value); };
+    if (input.projectId) add('r.project_id=?', input.projectId);
+    if (input.profileName) add("instr(lower(COALESCE(r.profile_name,'')),lower(?))>0", input.profileName);
+    if (input.serviceName) add('EXISTS (SELECT 1 FROM service_sessions s WHERE s.run_session_id=r.id AND instr(lower(s.service_name),lower(?))>0)', input.serviceName);
+    if (input.status) add('r.status=?', input.status);
+    if (input.from) add('r.started_at>=?', input.from);
+    if (input.to) add('r.started_at<=?', input.to);
+    if (input.cursor) { where.push('(r.started_at<? OR (r.started_at=? AND r.id<?))'); values.push(input.cursor.startedAt,input.cursor.startedAt,input.cursor.id); }
+    const limit = Math.max(1, Math.min(50, Math.trunc(input.limit)));
+    const rows = this.db.prepare(`SELECT r.id,r.started_at FROM run_sessions r ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY r.started_at DESC,r.id DESC LIMIT ?`)
+      .all(...values,limit+1) as { id: string; started_at: string }[];
+    const page = rows.slice(0,limit), last = page.at(-1);
+    return { sessions: page.map(row => this.findById(row.id,200)!), nextCursor: rows.length > limit && last ? { id: last.id, startedAt: last.started_at } : undefined };
   }
 
   listUnfinished(): RunSession[] {

@@ -6,6 +6,7 @@ import {
   DEFAULT_MAX_LOG_BUFFER_BYTES,
   DEFAULT_MAX_LOG_BUFFER_ENTRIES,
   DEFAULT_MAX_LOG_ENTRY_BYTES,
+  LOG_TRUNCATION_MARKER,
   truncateUtf8,
   utf8ByteLength,
 } from '@codehelm/domain';
@@ -99,6 +100,7 @@ export const useRunnerStore = defineStore('runner', () => {
   const currentSession = ref<RunSessionDto | null>(null);
   const serviceStatuses = ref<Map<string, RunnerServiceStatus>>(new Map());
   const logs = ref<LogEntryDto[]>([]);
+  const droppedLogEntries = ref(0), truncatedLogEntries = ref(0);
   const isListening = ref(false);
   const activeSessions = ref<RunSessionDto[]>([]);
   const history = ref<RunSessionDto[]>([]);
@@ -221,7 +223,10 @@ export const useRunnerStore = defineStore('runner', () => {
     });
 
     window.codehelm.runner.onLogs((batch) => {
-      logs.value = appendBoundedLogs(logs.value, batch.entries);
+      const retained = appendBoundedLogs(logs.value, batch.entries);
+      droppedLogEntries.value += Math.max(0, logs.value.length + batch.entries.length - retained.length);
+      truncatedLogEntries.value += batch.entries.filter(entry => entry.message.includes(LOG_TRUNCATION_MARKER) || utf8ByteLength(entry.message)>DEFAULT_MAX_LOG_ENTRY_BYTES).length;
+      logs.value = retained;
     });
     void fetchState();
   }
@@ -298,6 +303,7 @@ export const useRunnerStore = defineStore('runner', () => {
     runningCount,
     getProjectState,
     logs,
+    droppedLogEntries, truncatedLogEntries,
     setupListeners,
     confirmExecution,
     launchProfile,

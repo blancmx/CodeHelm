@@ -18,6 +18,7 @@ export default defineConfig({
           'analysis-worker': 'src/main/analysis-worker.ts',
           'analysis-boundary-worker': 'src/main/analysis-boundary-worker.ts',
           'workspace-worker': 'src/main/workspace-worker.ts',
+          'history-log-worker': 'src/main/history-log-worker.ts',
         },
         onstart(options) {
           options.startup();

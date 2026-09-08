@@ -19,7 +19,7 @@ import { JavaDetector } from '../detectors/java-detector.js';
 import { GoDetector } from '../detectors/go-detector.js';
 import { RustDetector } from '../detectors/rust-detector.js';
 import { DatabaseDetector } from '../detectors/database-detector.js';
-import { parseJson } from '../parsers/index.js';
+import { parseJson, parseToml, parseYaml, parseDiagnosticXml } from '../parsers/index.js';
 import type { AnalysisContext, AnalysisProgressCallback, Detector, ProjectAnalyzer } from '../types.js';
 import {
   DEFAULT_MAX_ANALYZER_FILE_BYTES,
@@ -152,6 +152,7 @@ export class AnalyzerEngine implements ProjectAnalyzer {
     const normalizedRoot = normalizePath(projectRoot);
     let scannedFiles = 0;
     let boundaryFailure: Error | undefined;
+    let incompleteRead = false;
     const rememberBoundaryFailure = (error: unknown) => {
       if (isPathBoundaryError(error)) boundaryFailure = error instanceof Error ? error : new Error(String(error));
     };
@@ -226,10 +227,28 @@ export class AnalyzerEngine implements ProjectAnalyzer {
         try {
           return await readPromise;
         } catch (error) {
+          incompleteRead = true;
           readCache.delete(cacheKey);
           throw error;
         }
       };
+
+      // Desktop analyses must not publish a successful replacement after a malformed
+      // supported manifest was silently ignored by a permissive detector parser.
+      if (this.options.failOnLimit) {
+        for (const file of discoveryContext.manifests) {
+          const name = path.basename(file).toLowerCase();
+          if (!['package.json', 'pyproject.toml', 'cargo.toml', 'pipfile', 'pom.xml'].includes(name)) continue;
+          const content = await readFile(file);
+          let parsed: unknown;
+          try { parsed = name.endsWith('.json') ? parseJson(content) : name === 'pom.xml' ? parseDiagnosticXml(content) : parseToml(content); }
+          catch { throw new Error('清单无法解析，未替换原分析结果'); }
+          if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('清单无法解析，未替换原分析结果');
+        }
+        for (const file of discoveryContext.manifests.filter(file => path.basename(file) === 'pnpm-workspace.yaml')) {
+          if (!parseYaml(await readFile(file))) throw new Error('工作区配置无法解析，未替换原分析结果');
+        }
+      }
 
       const rootSessionId = this.options.rootSessionId;
       const analysisContext: AnalysisContext = {
@@ -289,6 +308,7 @@ export class AnalyzerEngine implements ProjectAnalyzer {
           } catch (err) {
             if (isAnalysisCancelled(err, controller.signal)) throw err;
             rememberBoundaryFailure(err);
+            if (this.options.failOnLimit) throw new Error('技术栈解析未完成，原分析结果保留', { cause: err });
             console.warn(`Detector ${detector.id} warning in ${mod.relativePath}:`, err);
           }
           throwBoundaryFailure();
@@ -300,6 +320,7 @@ export class AnalyzerEngine implements ProjectAnalyzer {
       }
 
       throwIfAnalysisCancelled(controller.signal);
+      if (this.options.failOnLimit && incompleteRead) throw new Error('部分文件未能读取，原分析结果保留');
       report(100, '分析完成');
 
       return {

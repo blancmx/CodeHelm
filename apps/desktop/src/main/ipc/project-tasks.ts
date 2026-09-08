@@ -2,7 +2,7 @@ import { Worker } from 'node:worker_threads';
 import path from 'node:path';
 import { generateId, normalizePath } from '@codehelm/shared';
 import { BatchImportInputSchema, WorkspaceScanInputSchema } from '@codehelm/contracts';
-import type { ImportProjectInput, ProjectDto, ProjectTaskDto, ProjectTaskProgressDto, WorkspaceScanInput } from '@codehelm/contracts';
+import type { ImportProjectInput, ProjectDto, ProjectTaskDto, ProjectTaskProgressDto, WorkspaceScanInput, WorkspaceInventory } from '@codehelm/contracts';
 import type { AnalysisTasks } from './analysis-tasks.js';
 import type { AnalysisBoundaryFactory } from './analysis-tasks.js';
 
@@ -17,6 +17,7 @@ interface Task {
   inputs: ImportProjectInput[];
   controller: AbortController;
   analysisId?: string;
+  inventory?: WorkspaceInventory;
   done: Promise<ProjectTaskDto>;
   resolve: (state: ProjectTaskDto) => void;
 }
@@ -35,6 +36,7 @@ export class ProjectTasks {
     private readonly createWorker = defaultWorker,
     private readonly scanTimeoutMs = 120_000,
     private readonly createBoundary: AnalysisBoundaryFactory = noBoundary,
+    private readonly saveScan?: (input: WorkspaceScanInput, inventory: WorkspaceInventory, discovered: ProjectTaskDto['discovered']) => void,
   ) {
     this.unsubscribe = analysis.subscribe((state) => {
       const task = this.active;
@@ -181,6 +183,7 @@ export class ProjectTasks {
             task.state.stage = '正在发现工作区项目…';
             this.emit(task);
           } else if (message.type === 'result') {
+            task.inventory = message.inventory;
             task.state.discovered = message.discovered;
             task.state.foundProjects = message.discovered.length;
             void finish();
@@ -211,6 +214,7 @@ export class ProjectTasks {
     if (boundaryError !== undefined) {
       throw new Error(`无法释放工作区安全边界：${String(boundaryError)}`, { cause: boundaryError });
     }
+    if (!task.controller.signal.aborted && input.remember && task.inventory) this.saveScan?.(input, task.inventory, task.state.discovered);
   }
 
   private async importProjects(task: Task): Promise<void> {

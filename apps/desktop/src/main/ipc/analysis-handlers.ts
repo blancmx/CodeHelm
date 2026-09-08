@@ -1,3 +1,4 @@
+import { registerAnalysisReview } from './analysis-review.js';
 import type { RegisterIpcHandler } from './trusted-ipc.js';
 import type { Database as DatabaseInstance } from 'better-sqlite3';
 import { IpcChannels } from '@codehelm/contracts';
@@ -7,6 +8,7 @@ import { getAnalysisTasks } from './analysis-service.js';
 import type { AnalysisTasks } from './analysis-tasks.js';
 
 export function registerAnalysisHandlers(handle: RegisterIpcHandler, db: DatabaseInstance, tasks: AnalysisTasks = getAnalysisTasks(db)) {
+  registerAnalysisReview(handle, db);
   const analysisRepo = new AnalysisRepository(db);
   const projectRepo = new ProjectRepository(db);
   const owners = new WeakSet<Electron.WebContents>();

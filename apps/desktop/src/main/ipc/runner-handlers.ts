@@ -39,6 +39,13 @@ const orchestrator = new Orchestrator();
 const activeInstallerProcesses = new Set<ChildProcess>();
 const activeExecutionReads = new Set<AbortController>();
 let runnerShutdownRequested = false;
+const busyProfiles = new Map<string, number>();
+
+export function assertProfileRemovable(id: string): void {
+  if (busyProfiles.has(id) || orchestrator.getActiveSessions().some(run => run.runProfileId === id)) {
+    throw new Error('方案正在执行或等待确认，请先停止运行或取消执行请求。');
+  }
+}
 
 export async function stopAllRunnerSessions(): Promise<void> {
   runnerShutdownRequested = true;
@@ -60,7 +67,7 @@ export async function stopAllRunnerSessions(): Promise<void> {
         child.kill('SIGKILL');
       }
     } finally {
-      activeInstallerProcesses.delete(child);
+      if(child.exitCode!==null||child.signalCode!==null) activeInstallerProcesses.delete(child);
     }
   });
 
@@ -68,6 +75,12 @@ export async function stopAllRunnerSessions(): Promise<void> {
     orchestrator.stopAll(),
     ...installerStops,
   ]);
+}
+
+export function assertRunnerStopped():void {
+  if(orchestrator.getActiveSessions().length || [...activeInstallerProcesses].some(child=>child.exitCode===null&&child.signalCode===null)) {
+    throw new Error('仍有受管进程未停止，已拒绝恢复。');
+  }
 }
 
 function requireStartedSession(session: Awaited<ReturnType<Orchestrator['startSession']>>) {
@@ -306,10 +319,14 @@ export async function registerRunnerHandlers(handle: RegisterIpcHandler, db: Dat
       }
       if (runnerShutdownRequested) throw new Error('Runner shutdown in progress');
       if (pendingRequests.has(event.sender.id)) throw new Error('已有执行请求，请先完成或取消。');
+      const profileId = typeof request === 'object' && request !== null && 'profileId' in request && typeof request.profileId === 'string'
+        ? request.profileId : channel === IpcChannels.RUNNER_RESTART_SERVICE && typeof request === 'string'
+          ? orchestrator.getRestartContext(request).run.runProfileId : undefined;
       const controller = new AbortController();
       const cancel = () => controller.abort(new Error('执行请求已取消。'));
       pendingRequests.add(event.sender.id);
       activeExecutionReads.add(controller);
+      if (profileId) busyProfiles.set(profileId, (busyProfiles.get(profileId) ?? 0) + 1);
       owner.once('closed', cancel);
       event.sender.on('did-start-navigation', cancel);
       event.sender.once('render-process-gone', cancel);
@@ -320,6 +337,10 @@ export async function registerRunnerHandlers(handle: RegisterIpcHandler, db: Dat
         event.sender.removeListener('render-process-gone', cancel);
         activeExecutionReads.delete(controller);
         pendingRequests.delete(event.sender.id);
+        if (profileId) {
+          const count = (busyProfiles.get(profileId) ?? 1) - 1;
+          if (count) busyProfiles.set(profileId, count); else busyProfiles.delete(profileId);
+        }
       }
     });
   }
@@ -499,7 +520,24 @@ export async function registerRunnerHandlers(handle: RegisterIpcHandler, db: Dat
     return { success: true };
   });
 
-  handle(IpcChannels.RUNNER_RESTART_SERVICE, async (_event, serviceSessionId: string) => {
+  handleExecutionRequest(IpcChannels.RUNNER_RESTART_SERVICE, async (event, rawId, signal) => {
+    if (typeof rawId !== 'string') throw new Error('无效服务标识。');
+    const serviceSessionId = rawId;
+    const { run, config, root, affected } = orchestrator.getRestartContext(serviceSessionId);
+    if (!profileRepo.findById(run.runProfileId)) throw new Error('此方案已删除，请创建新方案后启动。');
+    const reviewProfile = { id: run.runProfileId, projectId: run.projectId, name: `${run.profileName ?? '运行方案'} · 单服务重启`,
+      description: `仅重启 ${config.name}，使用本次会话的原配置。${affected.length ? `依赖此服务的 ${affected.join('、')} 可能短暂不可用，需要自行确认恢复。` : '没有直接依赖此服务的服务。'} 其他服务不会联动重启。`,
+      isDefault: false, failurePolicy: 'continue' as const, createdAt: run.startedAt, updatedAt: run.startedAt,
+      services: [{ ...config, dependsOn: [] }] };
+    const reviewed = await createExecutionApprovalContext(reviewProfile, root, 'start', [], { signal });
+    const owner = BrowserWindow.fromWebContents(event.sender)!;
+    if (!await showExecutionConfirmation(owner, { profile: reviewProfile, projectRoot: root, plans: [], mode: 'start' })) throw new Error('Execution confirmation cancelled.');
+    const checkReviewed = async () => {
+      signal.throwIfAborted();
+      const checked = await createExecutionApprovalContext(reviewProfile, root, 'start', [], { signal });
+      if (checked.executionFingerprint !== reviewed.executionFingerprint) throw new Error('执行文件已变化，请重新确认单服务重启。');
+    };
+    await checkReviewed();
     const newSession = await orchestrator.restartService(serviceSessionId, async (root, config, run) => {
       // Use the active process snapshot and actual launch root, never a newly edited profile.
       // Its own old port is released before checking; dependencies are already running.
@@ -507,7 +545,8 @@ export async function registerRunnerHandlers(handle: RegisterIpcHandler, db: Dat
         id: run.runProfileId, projectId: run.projectId, name: 'restart', isDefault: false,
         failurePolicy: 'continue', createdAt: run.startedAt, updatedAt: run.startedAt,
         services: [{ ...config, dependsOn: [] }],
-      }, 'start', AbortSignal.timeout(8_000));
+      }, 'start', signal);
+      await checkReviewed();
     });
     if (newSession.status !== 'RUNNING') {
       throw new Error(newSession.errorMessage || `服务重启未完成：${newSession.status}`);

@@ -99,6 +99,7 @@ const harness = await vi.hoisted(async () => {
     stopSession = vi.fn();
     stopService = vi.fn();
     restartService = restartService;
+    getRestartContext = () => ({ run: session, config: profile.services[0], root: project.rootPath, affected: [] });
   }
 
   class MockProfileRepository {
@@ -231,7 +232,7 @@ describe('runner IPC execution authorization', () => {
 
   it.each(['DEGRADED', 'FAILED', 'STOPPED'])('rejects a %s restart instead of returning success', async status => {
     harness.restartService.mockResolvedValueOnce({ status, errorMessage: 'restart not ready' });
-    await expect(handler(IpcChannels.RUNNER_RESTART_SERVICE)({}, 'old-child')).rejects.toThrow('restart not ready');
+    await expect(handler(IpcChannels.RUNNER_RESTART_SERVICE)(harness.event, 'old-child')).rejects.toThrow('restart not ready');
   });
 
   it('exposes a detached live/history snapshot and blocks execution when a historical process is unresolved', async () => {

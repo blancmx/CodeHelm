@@ -79,6 +79,7 @@ export class Orchestrator {
   }
 
   async startSession(projectRoot: string, profile: RunProfile): Promise<RunSession> {
+    profile = structuredClone(profile);
     this.assertCanStart();
     const existingSession = [...this.activeSessions.values()].find((session) =>
       session.projectId === profile.projectId
@@ -114,6 +115,11 @@ export class Orchestrator {
       id: runSessionId,
       projectId: profile.projectId,
       runProfileId: profile.id,
+      profileName: profile.name,
+      profileUpdatedAt: profile.updatedAt,
+      effectiveProfile: { ...structuredClone(profile), services: profile.services.map(service => ({
+        ...structuredClone(service), env: service.env.map(entry => ({ ...entry, value: '', isRedacted: true })),
+      })) },
       status: 'STARTING',
       services: [],
       startedAt: new Date().toISOString(),
@@ -407,6 +413,29 @@ export class Orchestrator {
     }
   }
 
+  getRestartContext(serviceSessionId: string) {
+    this.assertCanStart();
+    const run = [...this.activeSessions.values()].find(s => s.services.some(child => child.id === serviceSessionId));
+    const previous = run?.services.find(s => s.id === serviceSessionId);
+    const config = this.processManager.getServiceConfig(serviceSessionId);
+    const root = this.processManager.getProjectRoot(serviceSessionId);
+    if (!run || !previous || !config || root === undefined) throw new Error('历史或已结束的服务不能直接重启。');
+    if (this.startupTasks.has(run.id) || this.stopTasks.has(run.id) || this.cancelled.has(run.id)
+      || run.services.filter(s => s.serviceConfigId === config.id).at(-1)?.id !== serviceSessionId) {
+      throw new Error('会话正在启动、停止或已有替代服务，请刷新后重试。');
+    }
+    this.assertDependenciesReady(run, config);
+    const affected = run.services.filter(s => this.processManager.getServiceConfig(s.id)?.dependsOn.includes(config.id)).map(s => s.serviceName);
+    return { run, config, root, affected: [...new Set(affected)] };
+  }
+
+  private assertDependenciesReady(run: RunSession, config: ServiceConfig): void {
+    for (const dependency of config.dependsOn) {
+      const latest = run.services.filter(s => s.serviceConfigId === dependency).at(-1);
+      if (!latest || latest.status !== 'RUNNING') throw new Error(`依赖 ${latest?.serviceName ?? dependency} 尚未就绪，不能重启此服务。`);
+    }
+  }
+
   async restartService(serviceSessionId: string, preflight?: (root: string, config: ServiceConfig, run: RunSession) => Promise<void>): Promise<ServiceSession> {
     this.assertCanStart();
     const run = [...this.activeSessions.values()].find(s => s.services.some(child => child.id === serviceSessionId));
@@ -415,6 +444,7 @@ export class Orchestrator {
     const key = `${run.id}:${previous.serviceConfigId}`;
     const pending = this.restarts.get(key);
     if (pending) return pending.task;
+    this.getRestartContext(serviceSessionId);
     const config = this.processManager.getServiceConfig(serviceSessionId);
     if (!config) throw new Error(`Active service session not found: ${serviceSessionId}`);
     if (this.startupTasks.has(run.id) || this.stopTasks.has(run.id) || this.cancelled.has(run.id)) {
@@ -424,6 +454,7 @@ export class Orchestrator {
     const ensureAllowed = () => {
       this.assertCanStart();
       if (restart.cancelled || this.cancelled.has(run.id)) throw new Error('停止请求已取消本次重启。');
+      this.assertDependenciesReady(run, config);
     };
     restart.task = Promise.resolve().then(async () => {
       ensureAllowed();

@@ -127,6 +127,11 @@ export class AnalysisRepository {
     return row ? this.findById(row.id) : null;
   }
 
+  findPreviousByProjectId(projectId: string, latestId: string): AnalysisSnapshot | null {
+    const row = this.db.prepare('SELECT id FROM analysis_snapshots WHERE project_id = ? AND id != ? ORDER BY started_at DESC, rowid DESC LIMIT 1').get(projectId, latestId) as { id: string } | undefined;
+    return row ? this.findById(row.id) : null;
+  }
+
   private findModulesBySnapshotId(snapshotId: string): ProjectModule[] {
     const stmt = this.db.prepare('SELECT * FROM modules WHERE snapshot_id = ?');
     const rows = stmt.all(snapshotId) as ModuleRow[];

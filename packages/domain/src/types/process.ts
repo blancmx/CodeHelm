@@ -46,6 +46,12 @@ export interface RunSession {
   id: string;
   projectId: string;
   runProfileId: string;
+  profileName?: string;
+  profileUpdatedAt?: string;
+  serviceCount?: number;
+  servicesTruncated?: boolean;
+  /** Memory-only display snapshot; all environment values are omitted. */
+  effectiveProfile?: import('./run-profile.js').RunProfile;
   status: RunSessionStatus;
   services: ServiceSession[];
   startedAt: string;

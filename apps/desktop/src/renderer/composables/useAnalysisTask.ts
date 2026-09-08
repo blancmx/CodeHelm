@@ -4,7 +4,7 @@ import type { AnalysisTaskDto, CodeHelmApi } from '@codehelm/contracts';
 const terminal = (state: AnalysisTaskDto) => ['completed', 'failed', 'cancelled'].includes(state.status);
 
 export function useAnalysisTask(
-  api: CodeHelmApi['analysis'],
+  api: Pick<CodeHelmApi['analysis'], 'start' | 'cancel' | 'getTask' | 'getLatest' | 'onProgress'>,
   projectId: () => string,
   onFinished: (state: AnalysisTaskDto) => void,
   onError: (error: unknown) => void,

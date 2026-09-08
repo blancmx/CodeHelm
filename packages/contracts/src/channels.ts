@@ -1,4 +1,9 @@
 export const IpcChannels = {
+  BACKUPS_LIST:'backups:list', BACKUPS_CREATE:'backups:create', BACKUPS_PIN:'backups:pin',
+  BACKUPS_POLICY:'backups:policy', BACKUPS_PREPARE:'backups:prepare', BACKUPS_RESTORE:'backups:restore', BACKUPS_OPEN:'backups:open',
+  PROJECTS_WORKSPACES: 'projects:workspaces',
+  ANALYSIS_REVIEW: 'analysis:review',
+  ANALYSIS_APPLY: 'analysis:apply',
   // Projects
   PROJECTS_SELECT_DIRECTORY: 'codehelm:projects:select-directory',
   PROJECTS_IMPORT: 'codehelm:projects:import',
@@ -27,6 +32,10 @@ export const IpcChannels = {
   PROFILES_SAVE: 'codehelm:profiles:save',
   PROFILES_LIST: 'codehelm:profiles:list',
   PROFILES_GET: 'codehelm:profiles:get',
+  PROFILES_COPY: 'codehelm:profiles:copy',
+  PROFILES_REMOVE: 'codehelm:profiles:remove',
+  HISTORY_QUERY: 'codehelm:history:query',
+  HISTORY_LOGS: 'codehelm:history:logs',
 
   // Runner
   RUNNER_GET_STATE: 'codehelm:runner:get-state',

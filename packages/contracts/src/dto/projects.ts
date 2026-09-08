@@ -17,6 +17,9 @@ export type BatchImportInput = z.infer<typeof BatchImportInputSchema>;
 export const WorkspaceScanInputSchema = z.object({
   rootPath: z.string().min(1).max(32768),
   maxDepth: z.number().int().min(0).max(4).default(2),
+  excludeDirs: z.array(z.string().min(1).max(100).regex(/^[^/\\]+$/)).max(50).optional(),
+  ignoredPaths: z.array(z.string().min(1).max(32768)).max(500).optional(),
+  remember: z.boolean().optional(),
 }).strict();
 export type WorkspaceScanInput = z.infer<typeof WorkspaceScanInputSchema>;
 
@@ -125,3 +128,25 @@ export const ReadmeSummaryDtoSchema = z.object({
   rawExcerpt: z.string().optional(),
 });
 export type ReadmeSummaryDto = z.infer<typeof ReadmeSummaryDtoSchema>;
+
+export interface WorkspaceInventory {
+  files: Record<string, string>;
+  directories: string[];
+  issues: string[];
+}
+export interface WorkspaceEntry {
+  relativePath: string;
+  projectId?: string;
+  status: 'new' | 'managed' | 'changed' | 'unavailable' | 'unknown';
+  changedFiles: string[];
+}
+export interface SavedWorkspace {
+  rootPath: string;
+  maxDepth: number;
+  excludeDirs: string[];
+  ignoredPaths: string[];
+  lastSuccessAt?: string;
+  checkedAt?: string;
+  entries: WorkspaceEntry[];
+  issues: string[];
+}

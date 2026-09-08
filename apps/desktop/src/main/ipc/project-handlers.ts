@@ -1,3 +1,4 @@
+import { WorkspaceHistory } from './workspace-history.js';
 import type { RegisterIpcHandler } from './trusted-ipc.js';
 import { dialog } from 'electron';
 import type { Database as DatabaseInstance } from 'better-sqlite3';
@@ -60,6 +61,7 @@ async function readDirectoryEntries(directoryPath: string): Promise<fs.Dirent[]>
 
 export function registerProjectHandlers(handle: RegisterIpcHandler, db: DatabaseInstance, tasks: AnalysisTasks = getAnalysisTasks(db)) {
   const projectRepo = new ProjectRepository(db);
+  handle(IpcChannels.PROJECTS_WORKSPACES, () => new WorkspaceHistory(db).list());
   const jobs = getProjectTasks(db, tasks);
   const owners = new WeakSet<Electron.WebContents>();
   const trackOwner = (event: Electron.IpcMainInvokeEvent) => {

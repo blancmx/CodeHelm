@@ -240,6 +240,10 @@ export class ProcessManager {
     return config ? structuredClone(config) : undefined;
   }
 
+  getProjectRoot(serviceSessionId: string): string | undefined {
+    return this.processes.get(serviceSessionId)?.projectRoot;
+  }
+
   getActiveCount(): number {
     return this.processes.size;
   }

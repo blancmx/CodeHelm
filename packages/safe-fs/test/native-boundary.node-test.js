@@ -8,6 +8,22 @@ const test = require('node:test');
 const { Worker } = require('node:worker_threads');
 const safeFs = require('..');
 
+test('shared log reads permit append and rotation while retaining the original non-reparse handle', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'codehelm-shared-log-'));
+  assert.equal(path.dirname(root), path.resolve(os.tmpdir()));
+  const file = path.join(root, 'service.log');
+  fs.writeFileSync(file, 'first\n');
+  const session = safeFs.openLogRoot(root, 32);
+  try {
+    fs.appendFileSync(file, 'second\n');
+    assert.equal(safeFs.readFile(session, 'service.log', 4096).toString(), 'first\nsecond\n');
+    fs.renameSync(file, path.join(root, 'rotated.log'));
+    fs.writeFileSync(file, 'replacement\n');
+    assert.equal(safeFs.readFile(session, 'service.log', 4096).toString(), 'first\nsecond\n');
+    assert.throws(() => safeFs.readFile(session, '../outside', 4096));
+  } finally { safeFs.closeRoot(session); fs.rmSync(root, { recursive: true, force: true }); }
+});
+
 function readFromWorker(sessionId, relativePath) {
   const modulePath = require.resolve('..');
   return new Promise((resolve, reject) => {
@@ -62,6 +78,7 @@ test('rejects files with multiple hard links', () => {
   fs.linkSync(outside, path.join(root, 'inside.txt'));
   try {
     assert.throws(() => safeFs.openRoot(root, 32), (error) => error.code === 'CODEHELM_PATH_BOUNDARY');
+    assert.throws(() => safeFs.openLogRoot(root, 32), (error) => error.code === 'CODEHELM_PATH_BOUNDARY');
   } finally {
     fs.rmSync(fixtureParent, { recursive: true, force: true });
   }

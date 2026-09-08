@@ -48,11 +48,11 @@ export type ServiceConfigDto = z.infer<typeof ServiceConfigDtoSchema>;
 export const SaveRunProfileInputSchema = z.object({
   id: z.string().uuid().optional(),
   projectId: z.string().uuid(),
-  name: z.string().min(1, 'Profile name required'),
+  name: z.string().trim().min(1, 'Profile name required').max(100),
   description: z.string().optional(),
   isDefault: z.boolean().default(true),
   failurePolicy: z.enum(['continue', 'block_dependents', 'rollback_all']),
-  services: z.array(ServiceConfigDtoSchema),
+  services: z.array(ServiceConfigDtoSchema).max(100),
   userConfirmedAt: z.string().optional(),
 });
 export type SaveRunProfileInput = z.infer<typeof SaveRunProfileInputSchema>;

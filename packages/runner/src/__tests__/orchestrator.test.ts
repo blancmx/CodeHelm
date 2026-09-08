@@ -59,6 +59,43 @@ describe('Orchestrator startup result', () => {
     expect(session.services[0].pid).toBeTypeOf('number');
   });
 
+  it('keeps the original effective config when the caller edits a running profile', async () => {
+    const runner = new Orchestrator(); runners.push(runner);
+    const profile = createProfile(createService({ env: [{ key: 'TOKEN', value: 'private-fixture', isSecret: true }] }));
+    const run = await runner.startSession(process.cwd(), profile);
+    profile.name = 'Changed'; profile.services[0].args = ['new.js'];
+    expect(run.profileName).toBe('Test profile');
+    expect(run.effectiveProfile?.services[0].args).not.toEqual(['new.js']);
+    expect(JSON.stringify(run.effectiveProfile)).not.toContain('private-fixture');
+    expect(runner.getRestartContext(run.services[0].id).config.args).not.toEqual(['new.js']);
+  });
+
+  it('rejects restart when a dependency is stopped and leaves unrelated processes alone', async () => {
+    const runner = new Orchestrator(); runners.push(runner);
+    const profile = createProfile(createService({ id: 'db' }));
+    profile.services.push(createService({ id: 'api', dependsOn: ['db'] }), createService({ id: 'other' }));
+    const run = await runner.startSession(process.cwd(), profile);
+    const db = run.services.find(s => s.serviceConfigId === 'db')!;
+    const api = run.services.find(s => s.serviceConfigId === 'api')!;
+    const other = run.services.find(s => s.serviceConfigId === 'other')!;
+    const otherPid = other.pid, apiPid = api.pid;
+    await runner.stopService(db.id);
+    await expect(runner.restartService(api.id)).rejects.toThrow('尚未就绪');
+    expect(api.pid).toBe(apiPid); expect(api.status).toBe('RUNNING');
+    expect(other.pid).toBe(otherPid); expect(other.status).toBe('RUNNING');
+  });
+
+  it('checks dependency readiness again after an asynchronous restart preflight', async () => {
+    const runner = new Orchestrator(); runners.push(runner);
+    const profile = createProfile(createService({ id: 'db' }));
+    profile.services.push(createService({ id: 'api', dependsOn: ['db'] }));
+    const run = await runner.startSession(process.cwd(), profile);
+    const db = run.services.find(s => s.serviceConfigId === 'db')!;
+    const api = run.services.find(s => s.serviceConfigId === 'api')!;
+    await expect(runner.restartService(api.id, async () => { await runner.stopService(db.id); })).rejects.toThrow('尚未就绪');
+    expect(run.services).toHaveLength(2);
+  });
+
   it('checks restart after stopping the old process and does not spawn after a blocker', async () => {
     const runner = new Orchestrator();
     runners.push(runner);

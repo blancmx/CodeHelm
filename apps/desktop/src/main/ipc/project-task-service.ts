@@ -1,3 +1,4 @@
+import { WorkspaceHistory } from './workspace-history.js';
 import { BrowserWindow } from 'electron';
 import type { Database as DatabaseInstance } from 'better-sqlite3';
 import fs from 'node:fs/promises';
@@ -32,7 +33,7 @@ export function getProjectTasks(db: DatabaseInstance, analysis: AnalysisTasks = 
     for (const window of BrowserWindow.getAllWindows()) {
       if (!window.isDestroyed() && !window.webContents.isDestroyed()) window.webContents.send(IpcChannels.PROJECTS_ON_TASK_PROGRESS, state);
     }
-  }, createWorker, 120_000, createWorker ? (() => ({ ready: Promise.resolve(undefined), async close() {} })) : createNativeAnalysisBoundary);
+  }, createWorker, 120_000, createWorker ? (() => ({ ready: Promise.resolve(undefined), async close() {} })) : createNativeAnalysisBoundary, (input, inventory, discovered) => new WorkspaceHistory(db).save(input, inventory, discovered));
   services.set(db, tasks);
   return tasks;
 }

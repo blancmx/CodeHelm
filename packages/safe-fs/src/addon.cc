@@ -15,6 +15,7 @@ using UniqueHandle = std::unique_ptr<void, HandleCloser>;
 struct FindCloser { void operator()(void* value) const { if (value && value != INVALID_HANDLE_VALUE) FindClose(value); } };
 using UniqueFind = std::unique_ptr<void, FindCloser>;
 struct Session {
+  bool sharedLogRead = false;
   std::wstring root;
   std::unordered_map<std::wstring, UniqueHandle> directories;
   std::unordered_map<std::wstring, UniqueHandle> files;
@@ -72,8 +73,8 @@ UniqueHandle OpenDirectory(const std::wstring& path) {
     throw std::runtime_error("Project path contains a directory reparse point");
   return handle;
 }
-UniqueHandle OpenRegularFile(const std::wstring& path) {
-  HANDLE raw = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING,
+UniqueHandle OpenRegularFile(const std::wstring& path, bool sharedLogRead = false) {
+  HANDLE raw = CreateFileW(path.c_str(), GENERIC_READ, sharedLogRead ? FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE : FILE_SHARE_READ, nullptr, OPEN_EXISTING,
     FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_SEQUENTIAL_SCAN, nullptr);
   if (raw == INVALID_HANDLE_VALUE) throw WinError("Cannot lock project file");
   UniqueHandle handle(raw);
@@ -119,7 +120,7 @@ void LockPythonVirtualEnvironment(const std::shared_ptr<Session>& session, const
     if ((attributes & FILE_ATTRIBUTE_DIRECTORY) || (attributes & FILE_ATTRIBUTE_REPARSE_POINT))
       throw std::runtime_error("Python virtual environment executable is not a regular file");
     if (session->files.size() >= maxEntries) throw std::runtime_error("Project file count exceeds security lock limit");
-    session->files.emplace(child, OpenRegularFile(absolute));
+    session->files.emplace(child, OpenRegularFile(absolute, session->sharedLogRead));
   };
 
   if (!lockDirectory(relative)) return;
@@ -157,7 +158,7 @@ void LockTree(const std::shared_ptr<Session>& session, const std::wstring& relat
       LockTree(session, child, maxEntries);
     } else {
       if (session->files.size() >= maxEntries) throw std::runtime_error("Project file count exceeds security lock limit");
-      session->files.emplace(child, OpenRegularFile(session->root + L"\\" + child));
+      session->files.emplace(child, OpenRegularFile(session->root + L"\\" + child, session->sharedLogRead));
     }
   } while (FindNextFileW(rawFind, &entry));
   if (GetLastError() != ERROR_NO_MORE_FILES) throw WinError("Cannot enumerate project directory");
@@ -177,17 +178,21 @@ std::shared_ptr<Session> GetSession(const std::string& id) {
 }
 void Throw(napi_env env, const std::exception& error) { napi_throw_error(env, "CODEHELM_PATH_BOUNDARY", error.what()); }
 
-napi_value OpenRoot(napi_env env, napi_callback_info info) {
+napi_value OpenRootImpl(napi_env env, napi_callback_info info, bool sharedLogRead) {
   try {
     size_t argc = 2; napi_value argv[2]; Check(env, napi_get_cb_info(env, info, &argc, argv, nullptr, nullptr), "Invalid arguments"); if (argc != 2) throw std::runtime_error("openRoot requires rootPath and maxDirectories");
     std::wstring input = StringArg(env, argv[0]); uint32_t maxDirectories = UintArg(env, argv[1]); if (!maxDirectories) throw std::runtime_error("Invalid directory lock limit");
     auto rootHandle = OpenDirectory(input); auto session = std::make_shared<Session>(); session->root = FinalPath(static_cast<HANDLE>(rootHandle.get()));
+    session->sharedLogRead = sharedLogRead;
     session->directories.emplace(L"", std::move(rootHandle)); LockTree(session, L"", maxDirectories);
     std::string id = std::to_string(GetCurrentProcessId()) + "-" + std::to_string(nextId.fetch_add(1));
     { std::lock_guard<std::mutex> lock(registryMutex); registry.emplace(id, session); }
     return Utf8Value(env, id);
   } catch (const std::exception& error) { Throw(env, error); return nullptr; }
 }
+napi_value OpenRoot(napi_env env, napi_callback_info info) { return OpenRootImpl(env, info, false); }
+// Log readers retain directory identity without denying append/rotation on regular files.
+napi_value OpenLogRoot(napi_env env, napi_callback_info info) { return OpenRootImpl(env, info, true); }
 napi_value CloseRoot(napi_env env, napi_callback_info info) {
   try { size_t argc=1; napi_value argv[1]; Check(env,napi_get_cb_info(env,info,&argc,argv,nullptr,nullptr),"Invalid arguments"); if(argc!=1)throw std::runtime_error("closeRoot requires sessionId");
     std::string id=Utf8Arg(env,argv[0]); std::lock_guard<std::mutex> lock(registryMutex); registry.erase(id); napi_value out; napi_get_undefined(env,&out); return out;
@@ -220,9 +225,10 @@ napi_value FileExists(napi_env env, napi_callback_info info) {
 napi_value Init(napi_env env,napi_value exports){
   napi_property_descriptor properties[]={
     {"openRoot",nullptr,OpenRoot,nullptr,nullptr,nullptr,napi_default,nullptr},
+    {"openLogRoot",nullptr,OpenLogRoot,nullptr,nullptr,nullptr,napi_default,nullptr},
     {"closeRoot",nullptr,CloseRoot,nullptr,nullptr,nullptr,napi_default,nullptr},
     {"readFile",nullptr,ReadFile,nullptr,nullptr,nullptr,napi_default,nullptr},
     {"fileExists",nullptr,FileExists,nullptr,nullptr,nullptr,napi_default,nullptr},
-  };Check(env,napi_define_properties(env,exports,4,properties),"Cannot expose safe fs");return exports;
+  };Check(env,napi_define_properties(env,exports,5,properties),"Cannot expose safe fs");return exports;
 }
 } NAPI_MODULE(NODE_GYP_MODULE_NAME,Init)

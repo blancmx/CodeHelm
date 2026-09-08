@@ -112,7 +112,7 @@ export function mergeDetectedServices(
 
   // Preserve manually added services that have no analyzer counterpart.
   for (const existing of existingByIdentity.values()) {
-    if (existing.source === 'manual') merged.push(existing);
+    if (existing.source === 'manual' || existing.env.length > 0) merged.push(existing);
   }
   const validIds = new Set(merged.map((service) => service.id));
   const cleaned = merged.map((service) => ({

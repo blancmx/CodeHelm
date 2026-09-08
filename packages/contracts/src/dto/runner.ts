@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { RunProfileDtoSchema } from './profiles.js';
 
 export const ProcessStatusSchema = z.enum([
   'IDLE',
@@ -48,6 +49,11 @@ export const RunSessionDtoSchema = z.object({
   id: z.string().uuid(),
   projectId: z.string().uuid(),
   runProfileId: z.string().uuid(),
+  profileName: z.string().optional(),
+  profileUpdatedAt: z.string().optional(),
+  serviceCount: z.number().optional(),
+  servicesTruncated: z.boolean().optional(),
+  effectiveProfile: RunProfileDtoSchema.optional(),
   status: z.enum(['STARTING', 'RUNNING', 'STOPPING', 'STOPPED', 'PARTIAL_FAILED', 'FAILED', 'INTERRUPTED']),
   services: z.array(ServiceSessionDtoSchema),
   startedAt: z.string(),

@@ -16,7 +16,9 @@ export function getAnalysisTasks(db: DatabaseInstance, createWorker?: AnalysisWo
   const profiles = new ProfileRepository(db);
   const ports = getPersistentPortAllocator(db);
   tasks = new AnalysisTasks(async (snapshot, projectId, rootPath, signal) => {
-    const saveProfile = await prepareAutoDetectedProfile(profiles, projectId, snapshot, ports);
+    // Existing configurations change only after the user reviews the new analysis.
+    const saveProfile = profiles.findByProjectId(projectId).length === 0
+      ? await prepareAutoDetectedProfile(profiles, projectId, snapshot, ports) : () => {};
     if (signal.aborted || projects.findById(projectId)?.rootPath !== rootPath) throw new Error('项目已关闭或路径已改变');
     snapshot.projectId = projectId;
     db.transaction(() => {

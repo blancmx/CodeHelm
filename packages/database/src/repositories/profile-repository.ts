@@ -52,6 +52,9 @@ export class ProfileRepository {
     const now = new Date().toISOString();
 
     const saveTransaction = this.db.transaction(() => {
+      const previous = this.db.prepare('SELECT project_id,deleted_at FROM run_profiles WHERE id=?').get(id) as { project_id: string; deleted_at: string | null } | undefined;
+      if (previous && (previous.deleted_at || previous.project_id !== profile.projectId)) throw new Error('方案已删除或不属于此项目，请刷新后重试。');
+      if (profile.isDefault) this.db.prepare('UPDATE run_profiles SET is_default=0 WHERE project_id=? AND id<>?').run(profile.projectId, id);
       // Upsert profile
       const stmtProfile = this.db.prepare(`
         INSERT INTO run_profiles (id, project_id, name, description, is_default, failure_policy, user_confirmed_at, created_at, updated_at)
@@ -123,7 +126,7 @@ export class ProfileRepository {
   }
 
   findById(id: string): RunProfile | null {
-    const stmt = this.db.prepare('SELECT * FROM run_profiles WHERE id = ?');
+    const stmt = this.db.prepare('SELECT * FROM run_profiles WHERE id = ? AND deleted_at IS NULL');
     const row = stmt.get(id) as RunProfileRow | undefined;
     if (!row) return null;
 
@@ -143,9 +146,27 @@ export class ProfileRepository {
   }
 
   findByProjectId(projectId: string): RunProfile[] {
-    const stmt = this.db.prepare('SELECT id FROM run_profiles WHERE project_id = ? ORDER BY created_at ASC');
+    const stmt = this.db.prepare('SELECT id FROM run_profiles WHERE project_id = ? AND deleted_at IS NULL ORDER BY is_default DESC, created_at ASC');
     const rows = stmt.all(projectId) as { id: string }[];
     return rows.map((r) => this.findById(r.id)!).filter(Boolean);
+  }
+
+  remove(id: string): void {
+    this.db.transaction(() => {
+      const profile = this.findById(id);
+      if (!profile) throw new Error('方案不存在或已删除。');
+      const busy = this.db.prepare(`SELECT 1 FROM run_sessions r WHERE r.run_profile_id=? AND
+        (r.status IN ('STARTING','RUNNING','STOPPING','PARTIAL_FAILED') OR EXISTS
+        (SELECT 1 FROM service_sessions s WHERE s.run_session_id=r.id AND s.status IN ('ORPHANED','VERIFYING'))) LIMIT 1`).get(id);
+      if (busy) throw new Error('方案仍有活动或待核验会话，请先停止或处理遗留进程。');
+      this.db.prepare('UPDATE run_sessions SET profile_name=COALESCE(profile_name,?) WHERE run_profile_id=?').run(profile.name, id);
+      this.db.prepare('UPDATE run_profiles SET deleted_at=?,is_default=0 WHERE id=?').run(new Date().toISOString(), id);
+      this.db.prepare('DELETE FROM service_configs WHERE run_profile_id=?').run(id);
+      if (profile.isDefault) {
+        const next = this.findByProjectId(profile.projectId)[0];
+        if (next) this.db.prepare('UPDATE run_profiles SET is_default=1 WHERE id=?').run(next.id);
+      }
+    })();
   }
 
   private findServicesByProfileId(profileId: string): ServiceConfig[] {

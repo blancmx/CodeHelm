@@ -197,6 +197,7 @@ export class DiscoveryEngine {
       try {
         entryStat = await fs.lstat(safeResolvePath(normalizedRoot, relPath));
       } catch {
+        if (options.failOnLimit) throw new Error('部分文件无法检查，原分析结果保留');
         continue;
       }
       if (entryStat.isSymbolicLink() || !entryStat.isFile()) continue;

@@ -86,3 +86,12 @@ export const AnalysisTaskDtoSchema = AnalysisProgressDtoSchema.extend({
   errorMessage: z.string().optional(),
 });
 export type AnalysisTaskDto = z.infer<typeof AnalysisTaskDtoSchema>;
+
+export interface AnalysisReviewDto {
+  token: string;
+  snapshotId: string;
+  previousAt?: string;
+  currentAt: string;
+  changes: Array<{ modulePath: string; before: string; after: string }>;
+  canApply: boolean;
+}

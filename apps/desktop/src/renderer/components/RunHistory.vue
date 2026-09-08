@@ -12,7 +12,7 @@
           {{ projectId ? '本项目运行记录' : '运行历史' }}
         </h3>
         <p class="text-xs text-zinc-500 mt-1 leading-relaxed">
-          全部遗留待处理记录及最近 50 次历史。历史 PID 和端口不是实时状态，不提供直接启停。刷新只重新读取记录，不重新核验进程。
+          分页查询已保存会话，每页 20 次。历史 PID 和端口不是实时状态，不提供直接启停。刷新只重新读取记录，不重新核验进程。
         </p>
         <router-link
           v-if="projectId"
@@ -78,9 +78,18 @@
       </button>
     </div>
 
+    <form class="history-filters" @submit.prevent="searchHistory">
+      <label>方案名称<input v-model="profileFilter" aria-label="历史方案名称" maxlength="100" /></label>
+      <label>服务名称<input v-model="serviceFilter" aria-label="历史服务名称" maxlength="100" /></label>
+      <label>会话状态<select v-model="statusFilter" aria-label="历史会话状态"><option value="">全部状态</option><option v-for="(label,status) in statusLabels" :key="status" :value="status">{{ label }}</option></select></label>
+      <label>开始时间下限<input v-model="fromFilter" type="datetime-local" aria-label="会话开始时间下限" /></label>
+      <label>开始时间上限<input v-model="toFilter" type="datetime-local" aria-label="会话开始时间上限" /></label>
+      <n-button size="small" attr-type="submit" :loading="historyLoading">检索会话</n-button>
+    </form>
+    <p v-if="historyError" role="alert" class="text-rose-500 mt-3 text-sm">{{ historyError }}</p>
     <p v-if="runner.persistenceError" role="alert" class="text-rose-500 mt-3 text-sm">{{ runner.persistenceError }}</p>
     <p v-if="runner.stateError" role="alert" class="text-rose-500 mt-3 text-sm">{{ runner.stateError }}；已有记录可能不是最新状态。</p>
-    <p v-if="!runner.stateLoaded" class="text-sm text-zinc-500 py-5">{{ runner.stateLoading ? '正在读取运行记录…' : '运行记录尚未读取成功' }}</p>
+    <p v-if="historyLoading" class="text-sm text-zinc-500 py-5">正在读取运行记录…</p>
     <p v-else-if="sessions.length === 0" class="text-sm text-zinc-500 py-5">暂无符合条件的运行记录。之前版本未保存的会话无法补录。</p>
 
     <!-- Sessions List with Fluid Accordion Transitions -->
@@ -106,7 +115,7 @@
               {{ projects.projects.find(p => p.id === session.projectId)?.name || '项目 ' + session.projectId }}
             </span>
             <span
-              class="px-2 py-0.5 rounded text-[10px] font-sans font-bold uppercase tracking-wider transition-colors"
+              class="px-2 py-0.5 rounded text-[11px] font-sans font-bold uppercase tracking-wider transition-colors leading-none"
               :class="session.status === 'INTERRUPTED'
                 ? (theme.isDark ? 'bg-amber-950/40 text-amber-300 border border-amber-800' : 'bg-amber-50 text-amber-800 border border-amber-300')
                 : session.status === 'FAILED'
@@ -116,7 +125,7 @@
               {{ statusLabels[session.status] || session.status }}
             </span>
           </div>
-          <span class="text-xs text-zinc-500 font-sans"><span class="font-mono">{{ formatTime(session.startedAt) }}</span> · <span class="font-mono">{{ session.services.length }}</span> 条服务记录</span>
+          <span class="text-xs text-zinc-500 font-sans"><span class="font-mono">{{ session.profileName || '旧版方案记录' }} · {{ formatTime(session.startedAt) }}</span> · <span class="font-mono">{{ session.services.length }}</span> 条服务记录</span>
         </div>
 
         <!-- Buttery-Smooth CSS Grid Expand & Collapse Container -->
@@ -125,6 +134,9 @@
           :class="isExpanded(session.id) ? 'grid-rows-[1fr] opacity-100 mt-2' : 'grid-rows-[0fr] opacity-0 mt-0 pointer-events-none'"
         >
           <div class="min-h-0 overflow-hidden">
+            <p v-if="session.servicesTruncated" role="status" class="text-xs my-2 text-amber-600">本次会话共 {{ session.serviceCount }} 条服务记录，此处仅显示前 200 条；会话日志仍可查询全部服务的已保存输出。</p>
+            <p class="text-xs my-2">会话开始：{{ formatTime(session.startedAt) }} · 会话结束：{{ session.stoppedAt ? formatTime(session.stoppedAt) : '未知（未记录）' }} · 配置保存时间：{{ session.profileUpdatedAt ? formatTime(session.profileUpdatedAt) : '未知（旧版未记录）' }}</p>
+            <n-button size="small" class="mb-2" @click="openLogs(session)">查看会话日志</n-button>
             <p v-if="session.status === 'INTERRUPTED'" class="text-xs text-amber-600 dark:text-amber-400 mb-3 pl-6">
               上次应用退出前未记录完整结束状态。下方仅为启动时核验结果，不会自动接管或结束遗留进程。
             </p>
@@ -137,7 +149,7 @@
                 <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
                   <strong :class="theme.isDark ? 'text-zinc-200' : 'text-zinc-800'">{{ service.serviceName }}</strong>
                   <span
-                    class="px-1.5 py-0.2 rounded text-[10px] font-sans font-bold uppercase"
+                    class="px-1.5 py-0.5 rounded text-[11px] font-sans font-bold uppercase leading-none"
                     :class="service.status === 'STOPPED' ? 'text-zinc-400' : service.status === 'FAILED' ? 'text-rose-400' : 'text-zinc-300'"
                   >
                     {{ service.status }}
@@ -153,15 +165,22 @@
                 <router-link v-if="failureGuidance(service)" :to="{ path: `/projects/${session.projectId}`, query: { tab: 'environment' } }" class="inline-block mt-2 text-xs underline">检查此项目运行环境</router-link>
                 <p class="text-xs mt-1 text-zinc-500 font-sans">
                   结束时间：{{ service.stoppedAt ? formatTime(service.stoppedAt) : '未记录（不等于仍在运行）' }}
-                  <span v-if="service.exitCode !== undefined"> · 退出码 {{ service.exitCode }}</span>
+                  <span> · 退出码 {{ service.exitCode ?? '未知（未记录）' }}</span>
                   <span v-if="service.exitSignal"> · 信号 {{ service.exitSignal }}</span>
                 </p>
+                <n-button size="tiny" class="mt-2" @click="openLogs(session,service.id)">查看此服务日志</n-button>
               </li>
             </ul>
           </div>
         </div>
       </div>
     </div>
+    <div class="flex items-center gap-3 mt-3">
+      <n-button size="small" :disabled="historyLoading || cursorIndex===0" @click="previousHistory">上一页会话</n-button>
+      <span class="text-xs">会话页 {{ cursorIndex+1 }} · {{ sessions.length }} 条</span>
+      <n-button size="small" :disabled="historyLoading || !historyPage.nextCursor" @click="nextHistory">下一页会话</n-button>
+    </div>
+    <StoredLogs :run="logRun" :service-id="logService" @close="logRun=null" />
   </section>
 </template>
 
@@ -173,6 +192,9 @@ import { useThemeStore } from '../stores/themeStore.js';
 import { IconRefresh, IconChevronRight, IconArrowRight } from './icons/index.js';
 import { message } from '../utils/discrete.js';
 import { failureGuidance } from '../utils/failure-guidance.js';
+import StoredLogs from './StoredLogs.vue';
+import type { HistoryQuery, HistoryPage, RunSessionDto } from '@codehelm/contracts';
+import { displayIpcError } from '../utils/ipc-error.js';
 
 const runner = useRunnerStore();
 const projects = useProjectStore();
@@ -198,10 +220,34 @@ function toggleSession(id: string) {
   expandedSessionIds.value = next;
 }
 
-const sessions = computed(() => {
-  const targetProj = props.projectId || (selectedProjectFilter.value !== 'ALL' ? selectedProjectFilter.value : undefined);
-  return runner.displayHistory.filter(session => !targetProj || session.projectId === targetProj);
-});
+const profileFilter=ref(''),serviceFilter=ref(''),statusFilter=ref(''),fromFilter=ref(''),toFilter=ref('');
+const historyLoading=ref(false),historyError=ref('');
+const historyPage=ref<HistoryPage>({sessions:[]});
+const cursors=ref<Array<HistoryQuery['cursor']>>([undefined]),cursorIndex=ref(0);
+const appliedFilters=ref<HistoryQuery>({limit:20});
+const sessions=computed(()=>historyPage.value.sessions);
+const logRun=ref<RunSessionDto|null>(null),logService=ref<string>();
+let historyRevision=0;
+function openLogs(run:RunSessionDto,serviceId?:string) { logService.value=serviceId; logRun.value=run; }
+async function loadHistory() {
+  const request=++historyRevision;historyLoading.value=true;historyError.value='';
+  try {
+    const page=await window.codehelm.runner.queryHistory(JSON.parse(JSON.stringify({...appliedFilters.value,cursor:cursors.value[cursorIndex.value]})));
+    if(request===historyRevision) historyPage.value=page;
+  } catch(error) { if(request===historyRevision) historyError.value=displayIpcError(error,'历史读取失败'); }
+  finally { if(request===historyRevision) historyLoading.value=false; }
+}
+async function searchHistory() {
+  try {
+    appliedFilters.value={limit:20,projectId:props.projectId||(selectedProjectFilter.value==='ALL'?undefined:selectedProjectFilter.value),
+      profileName:profileFilter.value||undefined,serviceName:serviceFilter.value||undefined,status:(statusFilter.value||undefined) as HistoryQuery['status'],
+      from:fromFilter.value?new Date(fromFilter.value).toISOString():undefined,to:toFilter.value?new Date(toFilter.value).toISOString():undefined};
+    cursorIndex.value=0;cursors.value=[undefined]; await loadHistory();
+  } catch(error) { historyError.value=displayIpcError(error,'时间范围无效'); }
+}
+async function nextHistory() { if(historyPage.value.nextCursor) { cursors.value[++cursorIndex.value]=historyPage.value.nextCursor;await loadHistory(); } }
+async function previousHistory() { if(cursorIndex.value>0) { cursorIndex.value--;await loadHistory(); } }
+watch(()=>[props.projectId,selectedProjectFilter.value],()=>{void searchHistory();},{immediate:true});
 
 // Auto-expand orphaned or focus-requested sessions
 watch(
@@ -221,6 +267,7 @@ watch(
 async function handleRefresh() {
   refreshRotation.value += 180;
   await runner.fetchState();
+  await searchHistory();
   if (runner.stateError) {
     message.error(runner.stateError);
   } else {
@@ -239,6 +286,7 @@ watch(
 );
 
 const statusLabels: Record<string, string> = {
+  STARTING: '启动中（记录状态）', RUNNING: '运行中（记录状态）', STOPPING: '停止中（记录状态）',
   STOPPED: '已结束',
   FAILED: '失败',
   INTERRUPTED: '中断 · 已核验',
@@ -252,5 +300,14 @@ const recoveryLabels: Record<string, string> = {
   unverified: '无法确认进程身份或缺少指纹，未进行任何控制操作',
 };
 
-const formatTime = (value: string) => new Date(value).toLocaleString();
+const formatTime = (value: string) => Number.isFinite(Date.parse(value)) ? new Date(value).toLocaleString() : '未知（未记录）';
 </script>
+
+<style scoped>
+.history-filters { display:flex; flex-wrap:wrap; align-items:end; gap:10px; margin-top:16px; }
+.history-filters label { display:flex; flex-direction:column; gap:4px; font-size:12px; }
+.history-filters input,.history-filters select { background:transparent; border:1px solid #71717a; border-radius:6px; padding:5px 8px; max-width:185px; }
+.history-filters input { color-scheme:dark; }
+:global(.light) .history-filters input { color-scheme:light; }
+.history-filters select option { color:#18181b; }
+</style>

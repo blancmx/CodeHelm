@@ -5,6 +5,7 @@ import { toIpcPayload } from './ipc-payload.js';
 
 const api: CodeHelmApi = {
   projects: {
+    workspaces: () => ipcRenderer.invoke(IpcChannels.PROJECTS_WORKSPACES),
     startScan: (input) => ipcRenderer.invoke(IpcChannels.PROJECTS_START_SCAN, toIpcPayload(input)),
     startImport: (input) => ipcRenderer.invoke(IpcChannels.PROJECTS_START_IMPORT, toIpcPayload(input)),
     getTask: (taskId) => ipcRenderer.invoke(IpcChannels.PROJECTS_GET_TASK, taskId),
@@ -29,6 +30,8 @@ const api: CodeHelmApi = {
       ipcRenderer.invoke(IpcChannels.PROJECTS_GET_README, rootPath),
   },
   analysis: {
+    review: (projectId) => ipcRenderer.invoke(IpcChannels.ANALYSIS_REVIEW, projectId),
+    apply: (projectId, token) => ipcRenderer.invoke(IpcChannels.ANALYSIS_APPLY, projectId, token),
     start: (projectId) => ipcRenderer.invoke(IpcChannels.ANALYSIS_START, projectId),
     cancel: (taskId) => ipcRenderer.invoke(IpcChannels.ANALYSIS_CANCEL, taskId),
     getTask: (projectId) => ipcRenderer.invoke(IpcChannels.ANALYSIS_GET_TASK, projectId),
@@ -44,8 +47,12 @@ const api: CodeHelmApi = {
     save: (input) => ipcRenderer.invoke(IpcChannels.PROFILES_SAVE, toIpcPayload(input)),
     list: (projectId) => ipcRenderer.invoke(IpcChannels.PROFILES_LIST, projectId),
     get: (id) => ipcRenderer.invoke(IpcChannels.PROFILES_GET, id),
+    copy: (id, name) => ipcRenderer.invoke(IpcChannels.PROFILES_COPY, id, name),
+    remove: (id) => ipcRenderer.invoke(IpcChannels.PROFILES_REMOVE, id),
   },
   runner: {
+    queryHistory: input => ipcRenderer.invoke(IpcChannels.HISTORY_QUERY, toIpcPayload(input)),
+    queryLogs: input => ipcRenderer.invoke(IpcChannels.HISTORY_LOGS, toIpcPayload(input)),
     probeRuntime: (profileId, family) => ipcRenderer.invoke(IpcChannels.RUNNER_PROBE_RUNTIME, { profileId, family }),
     diagnose: (profileId) => ipcRenderer.invoke(IpcChannels.RUNNER_DIAGNOSE, { profileId }),
     getState: () => ipcRenderer.invoke(IpcChannels.RUNNER_GET_STATE),
@@ -84,6 +91,15 @@ const api: CodeHelmApi = {
       ipcRenderer.on(channel, subscription);
       return () => ipcRenderer.removeListener(channel, subscription);
     },
+  },
+  backups: {
+    list:()=>ipcRenderer.invoke(IpcChannels.BACKUPS_LIST),
+    create:()=>ipcRenderer.invoke(IpcChannels.BACKUPS_CREATE),
+    pin:(id,pinned)=>ipcRenderer.invoke(IpcChannels.BACKUPS_PIN,id,pinned),
+    setPolicy:policy=>ipcRenderer.invoke(IpcChannels.BACKUPS_POLICY,toIpcPayload(policy)),
+    prepare:id=>ipcRenderer.invoke(IpcChannels.BACKUPS_PREPARE,id),
+    restore:token=>ipcRenderer.invoke(IpcChannels.BACKUPS_RESTORE,token),
+    openDirectory:()=>ipcRenderer.invoke(IpcChannels.BACKUPS_OPEN),
   },
   settings: {
     get: () => ipcRenderer.invoke(IpcChannels.SETTINGS_GET),

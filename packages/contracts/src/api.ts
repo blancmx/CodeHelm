@@ -9,11 +9,13 @@ import type {
   FileTreeNodeDto,
   ReadmeSummaryDto,
   WorkspaceScanInput,
+  SavedWorkspace,
   ProjectTaskDto,
   ProjectTaskProgressDto,
 } from './dto/projects.js';
 import type {
   AnalysisTaskDto,
+  AnalysisReviewDto,
   AnalysisSnapshotDto,
 } from './dto/analysis.js';
 import type {
@@ -32,9 +34,11 @@ import type { AppSettingsDto, LogStorageStatusDto, LogCleanupResultDto } from '.
 import type { ProfileDiagnosticsDto } from './dto/diagnostics.js';
 
 export type Unsubscribe = () => void;
+import type { HistoryQuery, HistoryPage, StoredLogQuery, StoredLogPage } from './dto/history.js';
 
 export interface CodeHelmApi {
   projects: {
+    workspaces(): Promise<SavedWorkspace[]>;
     startScan(input: WorkspaceScanInput): Promise<{ taskId: string }>;
     startImport(input: BatchImportInput): Promise<{ taskId: string }>;
     getTask(taskId: string): Promise<ProjectTaskDto | null>;
@@ -52,6 +56,8 @@ export interface CodeHelmApi {
     getReadmeSummary(rootPath: string): Promise<ReadmeSummaryDto>;
   };
   analysis: {
+    review(projectId: string): Promise<AnalysisReviewDto>;
+    apply(projectId: string, token: string): Promise<void>;
     start(projectId: string): Promise<{ taskId: string }>;
     cancel(taskId: string): Promise<{ cancelled: boolean }>;
     getTask(projectId: string): Promise<AnalysisTaskDto | null>;
@@ -62,8 +68,12 @@ export interface CodeHelmApi {
     save(input: SaveRunProfileInput): Promise<RunProfileDto>;
     list(projectId: string): Promise<RunProfileDto[]>;
     get(id: string): Promise<RunProfileDto | null>;
+    copy(id: string, name: string): Promise<RunProfileDto>;
+    remove(id: string): Promise<void>;
   };
   runner: {
+    queryHistory(input: HistoryQuery): Promise<HistoryPage>;
+    queryLogs(input: StoredLogQuery): Promise<StoredLogPage>;
     probeRuntime(profileId: string, family: RuntimeFamily): Promise<RuntimeProbeDto | null>;
     diagnose(profileId: string): Promise<ProfileDiagnosticsDto>;
     getState(): Promise<RunnerStateDto>;
@@ -76,6 +86,15 @@ export interface CodeHelmApi {
     restartService(serviceSessionId: string): Promise<ServiceSessionDto>;
     onStatus(listener: (event: ServiceStatusEventDto) => void): Unsubscribe;
     onLogs(listener: (batch: LogBatchDto) => void): Unsubscribe;
+  };
+  backups: {
+    list():Promise<import('./dto/backups.js').BackupStatusDto>;
+    create():Promise<void>;
+    pin(id:string,pinned:boolean):Promise<void>;
+    setPolicy(policy:import('./dto/backups.js').BackupPolicyDto):Promise<void>;
+    prepare(id:string):Promise<import('./dto/backups.js').RestorePreviewDto>;
+    restore(token:string):Promise<{restored:boolean;preservedDirectory?:string}>;
+    openDirectory():Promise<void>;
   };
   settings: {
     get(): Promise<AppSettingsDto>;

@@ -16,6 +16,11 @@
         <n-button :type="mode === 'batch' ? 'primary' : 'default'" :disabled="busy" @click="changeMode('batch')">工作区批量导入</n-button>
       </div>
 
+      <details v-if="mode === 'batch'" class="border border-zinc-500/30 rounded-lg p-3">
+        <summary class="cursor-pointer">打开工作区复扫记录</summary>
+        <WorkspaceRescan />
+      </details>
+
       <div class="border rounded-xl p-4 space-y-3" :class="themeStore.isDark ? 'bg-[#18181b] border-[#27272a]' : 'bg-zinc-50 border-zinc-200'">
         <div class="flex items-center justify-between gap-3">
           <span class="text-sm font-semibold">{{ mode === 'single' ? '项目根目录' : '工作区父目录' }}</span>
@@ -106,6 +111,7 @@
 </template>
 
 <script setup lang="ts">
+import WorkspaceRescan from './WorkspaceRescan.vue';
 import { computed, onUnmounted, reactive, ref, watch } from 'vue';
 import { useProjectStore } from '../stores/projectStore.js';
 import { useThemeStore } from '../stores/themeStore.js';

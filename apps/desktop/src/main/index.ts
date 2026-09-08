@@ -3,6 +3,10 @@ import { app, BrowserWindow, shell, Menu, dialog } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
+import { CODEHELM_APP_VERSION } from './app-version.js';
+import { registerBackupHandlers,databaseBackupPolicy } from './ipc/backup-handlers.js';
+import { MaintenanceGate } from './ipc/maintenance-gate.js';
+import { assertRunnerStopped } from './ipc/runner-handlers.js';
 import {
   openProtectedDatabase,
   startPeriodicDatabaseBackups,
@@ -56,6 +60,7 @@ app.setPath('sessionData', stableSessionDataPath);
 let mainWindow: BrowserWindow | null = null;
 let db: DatabaseInstance | null = null;
 let databaseBackupController: PeriodicDatabaseBackupController | null = null;
+let databaseManagement:ReturnType<typeof registerBackupHandlers>|undefined;
 let startupBackupMaintenance: DatabaseBackupMaintenanceResult | null = null;
 let databaseBackupWarningOpen = false;
 let databaseBackupFailureNotified = false;
@@ -109,6 +114,7 @@ process.on('unhandledRejection', (reason) => {
 });
 
 const handleTrustedIpc = createTrustedIpcRegistrar(() => ({ window: mainWindow, renderer: trustedRenderer }));
+const maintenanceGate=new MaintenanceGate();
 
 function registerWindowIpcHandlers() {
   handleTrustedIpc(IpcChannels.WINDOW_MINIMIZE, () => {
@@ -309,7 +315,7 @@ app.whenReady().then(async () => {
   try {
     console.log('[Main] Initializing database at:', dbPath);
     const opened = await openProtectedDatabase({
-      databasePath: dbPath, backupDirectory,
+      databasePath: dbPath, backupDirectory,backupPolicy:databaseBackupPolicy(backupDirectory),appVersion:CODEHELM_APP_VERSION,
       legacyDatabasePath: requestedUserDataPath
         ? undefined
         : path.join(legacyUserDataPath, 'codehelm.sqlite'),
@@ -319,7 +325,16 @@ app.whenReady().then(async () => {
     if (isQuitting) { db.close(); db = null; return; }
     console.log('[Main] Verified startup backup:', opened.backup.manifestPath);
     if (opened.importedLegacy) console.log('[Main] Imported verified legacy snapshot into:', dbPath);
-    await registerAllIpcHandlers(db, handleTrustedIpc);
+    await registerAllIpcHandlers(db, maintenanceGate.wrap(handleTrustedIpc));
+    databaseManagement=registerBackupHandlers(handleTrustedIpc,db,backupDirectory,{
+      pausePeriodic:async()=>{await databaseBackupController?.stop();databaseBackupController=null;},
+      resumePeriodic:()=>{if(!isQuitting&&db&&!databaseBackupController) startBackups();},
+      quiesce:async()=>{
+        maintenanceGate.close();
+        await stopAllRunnerSessions();await closeAnalysisTasks();
+        await maintenanceGate.drain();assertRunnerStopped();await closeLogStorage();
+      },
+    });
     registerWindowIpcHandlers();
     console.log('[Main] IPC handlers registered successfully.');
   } catch (dbErr) {
@@ -342,10 +357,15 @@ app.whenReady().then(async () => {
     );
   }
   if (isQuitting || !db) return;
-  databaseBackupController = startPeriodicDatabaseBackups({
+  startBackups();
+
+  function startBackups() {
+    if(!db||databaseBackupController)return;
+    databaseBackupController = startPeriodicDatabaseBackups({
     source: db,
     sourcePath: dbPath,
     backupDirectory,
+    appVersion:CODEHELM_APP_VERSION,getPolicy:()=>databaseBackupPolicy(backupDirectory),
     onSuccess: (backup) => {
       databaseBackupFailureNotified = false;
       console.log('[Main] Verified periodic database backup:', backup.manifestPath);
@@ -367,7 +387,8 @@ app.whenReady().then(async () => {
       console.error('[Main] Periodic database backup failed:', error);
       void showPeriodicBackupWarning(error, backupDirectory);
     },
-  });
+    });
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -392,7 +413,8 @@ app.on('before-quit', (event) => {
     })
     .finally(async () => {
       try {
-        await databaseBackupController?.stop();
+          await databaseBackupController?.stop();
+          await databaseManagement?.waitForIdle();
         databaseBackupController = null;
         await closeAnalysisTasks();
         await closeLogStorage();

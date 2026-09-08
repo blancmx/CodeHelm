@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS run_profiles (
   is_default INTEGER NOT NULL DEFAULT 1,
   failure_policy TEXT NOT NULL DEFAULT 'block_dependents',
   user_confirmed_at TEXT,
+  deleted_at TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
@@ -86,6 +87,8 @@ CREATE TABLE IF NOT EXISTS run_sessions (
   project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   run_profile_id TEXT NOT NULL REFERENCES run_profiles(id) ON DELETE CASCADE,
   status TEXT NOT NULL,
+  profile_name TEXT,
+  profile_updated_at TEXT,
   started_at TEXT NOT NULL,
   stopped_at TEXT
 );

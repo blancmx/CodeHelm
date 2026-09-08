@@ -51,11 +51,11 @@
           :class="themeStore.isDark
             ? 'bg-[#18181b] border-[#27272a] text-zinc-300 hover:text-white hover:border-zinc-500'
             : 'bg-white border-zinc-200 text-zinc-700 hover:text-zinc-950 hover:border-zinc-400 shadow-2xs'"
-          title="导出当前过滤日志为 .log 文件"
+          title="仅导出当前已加载且符合筛选的日志，不是完整会话日志"
           @click="exportLogsToFile"
         >
           <IconDownload :size="13" />
-          <span>导出日志</span>
+          <span>导出已加载日志</span>
         </button>
 
         <!-- Clear Logs -->
@@ -75,6 +75,7 @@
         </button>
       </div>
     </header>
+    <p class="text-xs mt-2 text-zinc-500" role="status">当前缓冲 {{ runnerStore.logs.length }} 条；本次界面缓冲淘汰 {{ runnerStore.droppedLogEntries }} 条，截断 {{ runnerStore.truncatedLogEntries }} 条。导出仅包含已加载的筛选结果；更早内容请从运行历史查询。</p>
 
     <!-- Main Professional Terminal Window (Framed Dark macOS IDE Style) -->
     <div class="flex-1 mt-4 flex flex-col bg-[#09090b] border border-[#27272a] rounded-2xl overflow-hidden shadow-2xl transition-all">
@@ -251,8 +252,9 @@
             @click="toggleAutoScroll"
           >
             <IconZap :size="12" />
-            <span>{{ autoScroll ? '滚屏锁定' : hasBufferedLogs ? '自由滚动 · 有新日志' : '自由滚动' }}</span>
+            <span>{{ autoScroll ? '跟随最新' : hasBufferedLogs ? '暂停跟随 · 有新日志' : '暂停跟随' }}</span>
           </button>
+          <button v-if="!autoScroll" type="button" class="text-xs text-zinc-300 underline cursor-pointer" @click="toggleAutoScroll">回到最新</button>
 
           <!-- Show Timestamps Toggle -->
           <button
@@ -337,6 +339,7 @@
         :padding-top="16"
         :padding-bottom="16"
         :items-style="{ padding: '0 16px' }"
+        @scroll="rememberLogPosition"
       >
         <template #default="{ item: entry, index: idx }">
         <div
@@ -439,6 +442,7 @@ import {
   IconZap,
 } from '../components/icons/index.js';
 import type { LogEntryDto } from '@codehelm/contracts';
+import { downloadLoadedLogs, formatLoadedLogExport } from '../utils/log-export.js';
 import {
   countLogsByProject,
   hasBufferedLogEntries,
@@ -461,6 +465,13 @@ const autoScroll = ref(true);
 const isTrashHovered = ref(false);
 const logListRef = ref<VirtualListInst | null>(null);
 const frozenLogs = ref<LogEntryDto[] | null>(null);
+const scrollPositions = new Map<string, number>();
+const scrollScope = computed(() => `${selectedProjectFilter.value}:${selectedServiceFilter.value}`);
+function rememberLogPosition(event: Event) {
+  if (scrollPositions.size >= 100 && !scrollPositions.has(scrollScope.value)) scrollPositions.delete(scrollPositions.keys().next().value!);
+  scrollPositions.set(scrollScope.value, (event.target as HTMLElement)?.scrollTop ?? 0);
+}
+watch(scrollScope, () => { void nextTick(() => logListRef.value?.scrollTo({ top: autoScroll.value ? 0 : scrollPositions.get(scrollScope.value) ?? 0 })); });
 const displayedLogsSource = computed(() => resolveDisplayedLogs(runnerStore.logs, frozenLogs.value));
 const hasBufferedLogs = computed(() => hasBufferedLogEntries(runnerStore.logs, frozenLogs.value));
 
@@ -626,7 +637,9 @@ watch(
 );
 
 function scrollToLatest() {
-  nextTick(() => logListRef.value?.scrollTo({ index: 0 }));
+  // A row anchor can move to the end of a very tall entry when it is measured.
+  // Pin the viewport itself so returning to latest always shows the first line.
+  nextTick(() => logListRef.value?.scrollTo({ top: 0 }));
 }
 
 function toggleAutoScroll() {
@@ -666,27 +679,14 @@ function exportLogsToFile() {
     message.warning('当前没有可导出的日志');
     return;
   }
-  const text = filteredLogs.value
-    .map((e: LogEntryDto) => {
-      const ts = e.timestamp ? `[${new Date(e.timestamp).toISOString()}] ` : '';
-      const stream = e.stream === 'stderr' ? '[ERR] ' : '[OUT] ';
-      return `${ts}[${e.serviceName}] ${stream}${e.message}`;
-    })
-    .join('\n');
-
-  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  const projName = selectedProjectFilter.value !== 'ALL'
-    ? projectStore.projects.find((p) => p.id === selectedProjectFilter.value)?.name || 'project'
-    : 'all-projects';
-  a.download = `codehelm-console-${projName}-${Date.now()}.log`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-  message.success('已导出日志文件');
+  const text = formatLoadedLogExport(filteredLogs.value, {
+    mode: 'current-loaded-buffer', project: selectedProjectFilter.value, service: selectedServiceFilter.value,
+    stream: selectedStreamFilter.value, keyword: logSearch.value, paused: !autoScroll.value,
+    firstTimestamp: filteredLogs.value.at(-1)?.timestamp, lastTimestamp: filteredLogs.value[0]?.timestamp,
+    droppedEntries: runnerStore.droppedLogEntries, truncatedEntries: runnerStore.truncatedLogEntries,
+  });
+  downloadLoadedLogs(text, `codehelm-console-loaded-${Date.now()}.log`);
+  message.success(`已导出当前加载的 ${filteredLogs.value.length} 条筛选日志`);
 }
 
 function handleClearLogs() {

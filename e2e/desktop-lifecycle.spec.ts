@@ -19,7 +19,11 @@ const desktopRoot = path.join(repositoryRoot, 'apps', 'desktop');
 const mainEntry = path.join(desktopRoot, 'dist-electron', 'main', 'index.js');
 const managedService = path.join(repositoryRoot, 'e2e', 'fixtures', 'managed-service.cjs');
 const requireFromDesktop = createRequire(path.join(desktopRoot, 'package.json'));
-const electronExecutable = requireFromDesktop('electron') as string;
+const electronExecutable = process.env.CODEHELM_E2E_EXECUTABLE || requireFromDesktop('electron') as string;
+const launchArgs=process.env.CODEHELM_E2E_EXECUTABLE ? [] : [mainEntry];
+if(process.env.CI && ['CODEHELM_E2E_PYTHON','CODEHELM_E2E_JAVA','CODEHELM_E2E_CSC'].some(name=>!process.env[name])) {
+  throw new Error('CI requires Python, Java and CSC fixture paths; required desktop coverage must not silently skip.');
+}
 
 let app: ElectronApplication | undefined;
 let page: Page | undefined;
@@ -49,7 +53,7 @@ test.beforeEach(async () => {
   delete environment.VITE_DEV_SERVER_URL;
   app = await electron.launch({
     executablePath: electronExecutable,
-    args: [mainEntry],
+    args: launchArgs,
     cwd: desktopRoot,
     env: {
       ...environment,
@@ -386,6 +390,314 @@ test('matches a selected Java runtime against static and dynamic project metadat
   expect((await page!.evaluate(() => window.codehelm.runner.getState())).activeSessions).toHaveLength(0);
 });
 
+async function restartWithReview(id: string) {
+  const opened = app!.waitForEvent('window');
+  const pending = page!.evaluate(serviceId => window.codehelm.runner.restartService(serviceId), id);
+  const review = await opened;
+  await expect(review.getByText('其他服务不会联动重启。', { exact: false })).toBeVisible();
+  await review.getByRole('button', { name: '确认并启动' }).click();
+  return pending;
+}
+
+async function createMultiProfileFixture() {
+  const root = path.join(fixtureRoot, 'fixture-project');
+  await fs.copyFile(managedService, path.join(root, 'controlled.cjs'));
+  const project = await page!.evaluate(rootPath => window.codehelm.projects.import({ rootPath, name: '多方案验收', tags: [] }), root);
+  await page!.evaluate(id => window.codehelm.analysis.start(id), project.id);
+  await expect.poll(() => page!.evaluate(async id => (await window.codehelm.analysis.getTask(id))?.status, project.id)).toBe('completed');
+  return page!.evaluate(async ({ projectId, executable }) => window.codehelm.profiles.save({
+    id: (await window.codehelm.profiles.list(projectId))[0].id,
+    projectId, name: '完整开发', isDefault: true, failurePolicy: 'block_dependents',
+    services: [{ id: 'multi-service', runProfileId: '', name: '受控服务', type: 'tool', moduleRelativePath: '.', executable,
+      args: ['controlled.cjs'], cwdRelative: '.', env: [], dependsOn: [], enabled: true, source: 'manual' }],
+  }), { projectId: project.id, executable: process.execPath });
+}
+
+// eslint-disable-next-line no-empty-pattern
+test('migrates the released v0.1 schema and preserves a usable pre-upgrade snapshot',async({},testInfo)=>{
+  await app!.close();app=undefined;
+  const userData=path.join(fixtureRoot,'升级 中文 空格');await fs.mkdir(userData);
+  const DB=requireFromDesktop('better-sqlite3');
+  const filename=path.join(userData,'codehelm.sqlite'),old=new DB(filename);
+  old.exec(await fs.readFile(path.join(repositoryRoot,'e2e','fixtures','v010-schema.sql'),'utf8'));
+  const projectId=crypto.randomUUID(),profileId=crypto.randomUUID(),runId=crypto.randomUUID();
+  old.prepare('INSERT INTO projects(id,name,root_path,created_at,updated_at) VALUES (?,?,?,?,?)').run(projectId,'旧版项目',path.join(fixtureRoot,'fixture-project'),'2026-09-01','2026-09-01');
+  old.prepare('INSERT INTO run_profiles(id,project_id,name,created_at,updated_at) VALUES (?,?,?,?,?)').run(profileId,projectId,'旧版方案','2026-09-01','2026-09-01');
+  old.prepare('INSERT INTO run_sessions(id,project_id,run_profile_id,status,started_at,stopped_at) VALUES (?,?,?,?,?,?)').run(runId,projectId,profileId,'FAILED','2026-09-01T00:00:00.000Z','2026-09-01T00:01:00.000Z');
+  old.prepare('INSERT INTO app_settings VALUES (?,?)').run('global',JSON.stringify({maxScanFiles:12345}));old.close();
+  const environment={...process.env};delete environment.ELECTRON_RUN_AS_NODE;delete environment.VITE_DEV_SERVER_URL;
+  app=await electron.launch({executablePath:electronExecutable,args:launchArgs,cwd:desktopRoot,env:{...environment,CODEHELM_USER_DATA_DIR:userData}});
+  page=await app.firstWindow();await page.waitForLoadState('domcontentloaded');
+  expect((await page.evaluate(id=>window.codehelm.projects.get(id),projectId))?.name).toBe('旧版项目');
+  expect((await page.evaluate(id=>window.codehelm.profiles.get(id),profileId))?.name).toBe('旧版方案');
+  expect((await page.evaluate(()=>window.codehelm.settings.get())).maxScanFiles).toBe(12345);
+  expect((await page.evaluate(()=>window.codehelm.runner.queryHistory({limit:20}))).sessions[0].id).toBe(runId);
+  await page.evaluate(()=>{location.hash='/settings';});
+  await expect(page.getByRole('list',{name:'数据库备份列表'})).toContainText('schema 2');
+  await page.screenshot({path:testInfo.outputPath('upgrade-v010.png'),animations:'disabled'});
+  await app.close();app=undefined;page=undefined;
+  const upgraded=new DB(filename,{readonly:true});expect(upgraded.pragma('user_version',{simple:true})).toBe(3);upgraded.close();
+  const directories=await fs.readdir(path.join(userData,'backups'));
+  const snapshot=new DB(path.join(userData,'backups',directories.find(id=>!id.startsWith('.'))!,'codehelm.sqlite'),{readonly:true});
+  expect(snapshot.pragma('user_version',{simple:true})).toBe(2);
+  expect(snapshot.prepare('SELECT name FROM projects').get()).toEqual({name:'旧版项目'});snapshot.close();
+});
+
+// eslint-disable-next-line no-empty-pattern
+test('measures sustained log memory and stop latency',async({},testInfo)=>{
+  test.skip(process.env.CODEHELM_E2E_PERFORMANCE!=='1','Opt-in ten-minute sustained performance run.');
+  test.setTimeout(720_000);
+  const profile=await createMultiProfileFixture();
+  await fs.writeFile(path.join(fixtureRoot,'fixture-project','controlled.cjs'),"const line='load '+ 'x'.repeat(194)+'\\n';setInterval(()=>process.stdout.write(line.repeat(100)),100);");
+  const opened=app!.waitForEvent('window'),pending=page!.evaluate(id=>window.codehelm.runner.confirmExecution(id,'start'),profile.id);
+  await(await opened).getByRole('button',{name:'确认并启动'}).click();const token=await pending;
+  const run=await page!.evaluate(({id,token})=>window.codehelm.runner.start(id,token),{id:profile.id,token});
+  await page!.evaluate(()=>{location.hash='/console';});
+  const samples:Array<{seconds:number;workingSetKb:number}>=[];
+  const start=Date.now();
+  while(Date.now()-start<600_000){
+    const memory=await app!.evaluate(({app})=>app.getAppMetrics().reduce((sum,item)=>({workingSetKb:sum.workingSetKb+item.memory.workingSetSize}),{workingSetKb:0}));
+    samples.push({seconds:(Date.now()-start)/1000,...memory});
+    await new Promise(resolve=>setTimeout(resolve,5000));
+  }
+  const median=(values:number[])=>{const sorted=[...values].sort((a,b)=>a-b);return sorted[Math.floor(sorted.length/2)];};
+  const early=median(samples.filter(s=>s.seconds>=120&&s.seconds<180).map(s=>s.workingSetKb));
+  const late=median(samples.filter(s=>s.seconds>=540).map(s=>s.workingSetKb));
+  await page!.evaluate(()=>{location.hash='/runner';});
+  const stoppedAt=Date.now();await page!.getByRole('button',{name:'停止该项目'}).click();
+  await expect.poll(()=>page!.evaluate(()=>window.codehelm.runner.getState()).then(state=>state.activeSessions.length)).toBe(0);
+  const stopMs=Date.now()-stoppedAt;
+  await fs.writeFile(testInfo.outputPath('performance.json'),JSON.stringify({sample:'1000 lines/s, 200 bytes/line, 10 min',os:os.release(),cpu:os.cpus()[0].model,totalMemory:os.totalmem(),packaged:!!process.env.CODEHELM_E2E_EXECUTABLE,samples,earlyMedianKb:early,lateMedianKb:late,growth:late/early-1,stopMs,runId:run.id},null,2));
+  await page!.screenshot({path:testInfo.outputPath('performance-stopped.png'),animations:'disabled'});
+  expect(stopMs).toBeLessThanOrEqual(1000);expect(late/early).toBeLessThanOrEqual(1.2);
+});
+
+// eslint-disable-next-line no-empty-pattern
+test('backs up management data and restores it after confirmation and a real application restart',async({},testInfo)=>{
+  const profile=await createMultiProfileFixture();
+  await page!.evaluate(()=>window.codehelm.settings.update({maxScanFiles:12345}));
+  await page!.evaluate(()=>{location.hash='/settings';});
+  await page!.getByRole('button',{name:'创建管理数据备份',exact:true}).click();
+  const item=page!.getByRole('list',{name:'数据库备份列表'}).getByRole('listitem').filter({hasText:'手动备份'}).first();
+  await expect(item).toContainText('校验通过');
+  await expect(item).toContainText(`版本 ${JSON.parse(await fs.readFile(path.join(desktopRoot,'package.json'),'utf8')).version}`);
+  await item.getByRole('button',{name:'明确保留',exact:true}).click();
+  await expect(item.getByRole('button',{name:'解除保留'})).toBeVisible();
+  await page!.evaluate(async id=>{await window.codehelm.projects.update(id,{name:'恢复后应消失的名称'});await window.codehelm.settings.update({maxScanFiles:23456});},profile.projectId);
+  await item.getByRole('button',{name:'预检恢复'}).click();
+  await expect(page!.getByRole('dialog')).toContainText('项目 1 个');
+  await page!.screenshot({path:testInfo.outputPath('backup-restore-preview.png'),animations:'disabled'});
+  // Native system dialogs are replaced only in this isolated test process; business IPC is real.
+  await app!.evaluate(({dialog})=>{dialog.showMessageBox=(async()=>({response:0,checkboxChecked:false})) as typeof dialog.showMessageBox;});
+  await page!.getByRole('button',{name:'继续恢复确认'}).click();
+  await expect(page!.getByRole('dialog')).not.toBeVisible();
+  expect((await page!.evaluate(id=>window.codehelm.projects.get(id),profile.projectId))?.name).toBe('恢复后应消失的名称');
+  const opened=app!.waitForEvent('window');
+  const pending=page!.evaluate(id=>window.codehelm.runner.confirmExecution(id,'start'),profile.id);
+  await(await opened).getByRole('button',{name:'确认并启动'}).click();
+  const token=await pending;
+  const run=await page!.evaluate(({id,token})=>window.codehelm.runner.start(id,token),{id:profile.id,token});
+  const pid=run.services[0].pid!;
+  await item.getByRole('button',{name:'预检恢复'}).click();
+  await app!.evaluate(({dialog})=>{dialog.showMessageBox=(async(options:Electron.MessageBoxOptions)=>{
+    if(options.title!=='恢复 CodeHelm 管理数据'||!options.detail?.includes('将停止本应用任务'))throw new Error('Missing restore confirmation');
+    return {response:1,checkboxChecked:false};
+  }) as typeof dialog.showMessageBox;});
+  await page!.getByRole('button',{name:'继续恢复确认'}).click();
+  await expect(page!.getByText('恢复完成。原数据保全目录：',{exact:false})).toBeVisible();
+  expect(()=>process.kill(pid,0)).toThrow();
+  await expect(page!.evaluate(()=>window.codehelm.projects.list())).rejects.toThrow('维护');
+  await page!.screenshot({path:testInfo.outputPath('backup-restored.png'),animations:'disabled'});
+  await app!.close();app=undefined;
+  const environment={...process.env};delete environment.ELECTRON_RUN_AS_NODE;delete environment.VITE_DEV_SERVER_URL;
+  app=await electron.launch({executablePath:electronExecutable,args:launchArgs,cwd:desktopRoot,env:{...environment,CODEHELM_USER_DATA_DIR:path.join(fixtureRoot,'user-data'),CODEHELM_VALIDATION_WINDOW:'0'}});
+  page=await app.firstWindow();await page.waitForLoadState('domcontentloaded');
+  expect((await page.evaluate(id=>window.codehelm.projects.get(id),profile.projectId))?.name).toBe('多方案验收');
+  expect((await page.evaluate(()=>window.codehelm.settings.get())).maxScanFiles).toBe(12345);
+  expect((await page.evaluate(id=>window.codehelm.profiles.get(id),profile.id))?.name).toBe('完整开发');
+  expect((await page.evaluate(()=>window.codehelm.runner.getState())).activeSessions).toHaveLength(0);
+  await page.evaluate(()=>{location.hash='/settings';});
+  await expect(page.getByRole('list',{name:'数据库备份列表'})).toContainText('恢复前保全');
+  await page.getByRole('button',{name:'明亮模式',exact:true}).click();
+  await page.screenshot({path:testInfo.outputPath('backup-management-light.png'),animations:'disabled'});
+});
+
+// eslint-disable-next-line no-empty-pattern
+test('finds deleted-profile failure logs after app restart and exports the filtered loaded page', async ({}, testInfo) => {
+  let profile = await createMultiProfileFixture();
+  const script = path.join(fixtureRoot,'fixture-project','controlled.cjs');
+  const secret='V02_PRIVATE_FAILURE_SECRET';
+  await fs.writeFile(script, `process.stdout.write('ordinary-output\\n'); process.stderr.write('prefix '+process.env.SECRET.slice(0,8)); setTimeout(()=>{process.stderr.write(process.env.SECRET.slice(8)+'\\n');process.stderr.write('failure '+process.env.SECRET+'\\n');setTimeout(()=>process.exit(7),50)},40);`);
+  profile=await page!.evaluate(({input,secret})=>window.codehelm.profiles.save({...input,name:'日志故障方案',services:input.services.map(s=>({...s,env:[{key:'SECRET',value:secret,isSecret:true}]}))}),{input:profile,secret});
+  const opened=app!.waitForEvent('window');
+  const pending=page!.evaluate(id=>window.codehelm.runner.confirmExecution(id,'start'),profile.id);
+  await (await opened).getByRole('button',{name:'确认并启动'}).click();
+  const token=await pending;
+  await page!.evaluate(({id,token})=>window.codehelm.runner.start(id,token).catch(()=>null),{id:profile.id,token});
+  const state=await waitForRunnerState(state=>state.history.some(run=>run.runProfileId===profile.id&&run.status==='FAILED'));
+  const run=state.history.find(run=>run.runProfileId===profile.id)!;
+  await expect.poll(()=>page!.evaluate(async id=>(await window.codehelm.runner.queryLogs({runSessionId:id,stream:'stderr',keyword:'failure'})).entries.length,run.id)).toBeGreaterThan(0);
+  await page!.evaluate(id=>window.codehelm.profiles.remove(id),profile.id);
+  await app!.close();app=undefined;
+  const environment={...process.env};delete environment.ELECTRON_RUN_AS_NODE;delete environment.VITE_DEV_SERVER_URL;
+  app=await electron.launch({executablePath:electronExecutable,args:launchArgs,cwd:desktopRoot,env:{...environment,CODEHELM_USER_DATA_DIR:path.join(fixtureRoot,'user-data'),CODEHELM_VALIDATION_WINDOW:'0'}});
+  page=await app.firstWindow();await page.waitForLoadState('domcontentloaded');
+  const history=await page.evaluate(projectId=>window.codehelm.runner.queryHistory({projectId,profileName:'日志故障',serviceName:'受控',status:'FAILED',limit:20}),profile.projectId);
+  expect(history.sessions.map(item=>item.id)).toContain(run.id);
+  expect(history.sessions.find(item=>item.id===run.id)!.services[0].exitCode).toBe(7);
+  await page.evaluate(id=>{location.hash=`/projects/${id}?tab=history`;},profile.projectId);
+  await page.getByRole('textbox',{name:'历史方案名称'}).fill('日志故障');
+  await page.getByRole('button',{name:'检索会话',exact:true}).click();
+  await page.getByText('1 条服务记录',{exact:false}).click();
+  await page.getByRole('button',{name:'查看此服务日志',exact:true}).click();
+  const modal=page.getByRole('dialog');
+  await expect(modal.getByText('ordinary-output',{exact:false})).toBeVisible();
+  await modal.getByRole('combobox',{name:'历史日志输出流'}).selectOption('stderr');
+  await modal.getByRole('textbox',{name:'历史日志关键词'}).fill('failure');
+  await modal.getByRole('button',{name:'查询日志',exact:true}).click();
+  await expect(modal.locator('pre')).toContainText(['failure [REDACTED]']);
+  await expect(modal.getByText('ordinary-output',{exact:false})).toHaveCount(0);
+  expect(await modal.innerText()).not.toContain(secret);
+  const output=path.join(fixtureRoot,'filtered-history.log');
+  await app.evaluate(({BrowserWindow},file)=>{BrowserWindow.getAllWindows()[0].webContents.session.once('will-download',(_event,item)=>{item.setSavePath(file);});},output);
+  await modal.getByRole('button',{name:'导出本页已加载日志'}).click();
+  await expect.poll(async()=>fs.readFile(output,'utf8').catch(()=>'' )).toContain('failure [REDACTED]');
+  const exported=await fs.readFile(output,'utf8');
+  expect(exported).toContain('不是完整会话日志');expect(exported).not.toContain(secret);expect(exported).not.toContain('ordinary-output');
+  expect(exported.split('\n').filter(line=>line.startsWith('{')).every(line=>JSON.parse(line).stream==='stderr')).toBe(true);
+  await page.screenshot({path:testInfo.outputPath('stored-failure-logs.png'),animations:'disabled'});
+});
+
+// eslint-disable-next-line no-empty-pattern
+test('keeps stop controls responsive during high-volume logging and a stored-log query', async ({},testInfo)=>{
+  const profile=await createMultiProfileFixture();
+  await fs.writeFile(path.join(fixtureRoot,'fixture-project','controlled.cjs'),`let bytes=0;const value='x'.repeat(32768);const timer=setInterval(()=>{if(bytes<6*1024*1024){process.stdout.write(value+'\\n');bytes+=value.length;}},2);`);
+  const opened=app!.waitForEvent('window');
+  const pending=page!.evaluate(id=>window.codehelm.runner.confirmExecution(id,'start'),profile.id);
+  await(await opened).getByRole('button',{name:'确认并启动'}).click();
+  const token=await pending;
+  const run=await page!.evaluate(({id,token})=>window.codehelm.runner.start(id,token),{id:profile.id,token});
+  await page!.evaluate(()=>{location.hash='/console';});
+  await expect(page!.getByText('当前缓冲',{exact:false})).toBeVisible();
+  await expect.poll(()=>page!.locator('[data-log-entry-id]').count()).toBeGreaterThan(0);
+  await page!.getByRole('button',{name:'跟随最新',exact:true}).click();
+  await page!.getByPlaceholder('检索日志关键字...').fill('x');
+  await page!.getByRole('button',{name:'OUT',exact:true}).click();
+  const serviceButton=page!.getByRole('button',{name:new RegExp(`^${run.services[0].serviceName} \\(`)});
+  await serviceButton.click();
+  const scrollArea=page!.locator('.terminal-code-stream .v-vl');
+  const savedTop=await scrollArea.evaluate(el=>{el.scrollTop=320;el.dispatchEvent(new Event('scroll'));return el.scrollTop;});
+  expect(savedTop).toBeGreaterThan(0);
+  await page!.getByRole('button',{name:/^全部服务/}).click();
+  await serviceButton.click();
+  await expect.poll(()=>scrollArea.evaluate(el=>el.scrollTop)).toBe(savedTop);
+  await expect(page!.getByPlaceholder('检索日志关键字...')).toHaveValue('x');
+  await expect(page!.getByRole('button',{name:'OUT',exact:true})).toHaveClass(/bg-zinc-700/);
+  await page!.getByRole('button',{name:'回到最新',exact:true}).click();
+  await expect.poll(()=>scrollArea.evaluate(el=>el.scrollTop)).toBe(0);
+  const outcome=await page!.evaluate(async id=>{
+    const reading=window.codehelm.runner.queryLogs({runSessionId:id});
+    const start=performance.now();await window.codehelm.runner.stopSession(id);
+    return {elapsed:performance.now()-start,logs:await reading};
+  },run.id);
+  expect(outcome.elapsed).toBeLessThan(5000);
+  expect(outcome.logs.entries.length).toBeLessThanOrEqual(200);
+  expect((await page!.evaluate(()=>window.codehelm.runner.getState())).activeSessions).toHaveLength(0);
+  await page!.screenshot({path:testInfo.outputPath('bounded-live-console.png'),animations:'disabled'});
+});
+
+// eslint-disable-next-line no-empty-pattern
+test('manages three independent profiles in the desktop UI and persists the default after restart', async ({}, testInfo) => {
+  const original = await createMultiProfileFixture();
+  await page!.evaluate(id => { location.hash = `/projects/${id}?tab=config`; }, original.projectId);
+  for (const name of ['仅前端', '仅后端']) {
+    await page!.getByRole('button', { name: '复制方案', exact: true }).click();
+    const modal = page!.getByRole('dialog');
+    await modal.getByRole('textbox', { name: '方案名称', exact: true }).fill(name);
+    await modal.getByRole('button', { name: '保存方案', exact: true }).click();
+    await expect(page!.getByRole('textbox', { name: '编辑方案名称' })).toHaveValue(name);
+  }
+  await page!.getByRole('checkbox', { name: '设为此项目默认方案' }).check();
+  await page!.getByRole('button', { name: '保存方案修改', exact: true }).click();
+  await expect(page!.getByRole('combobox', { name: '当前运行方案' })).toBeEnabled();
+  const profiles = await page!.evaluate(id => window.codehelm.profiles.list(id), original.projectId);
+  expect(profiles).toHaveLength(3);
+  expect(profiles.filter(p => p.isDefault).map(p => p.name)).toEqual(['仅后端']);
+  expect(new Set(profiles.flatMap(p => p.services.map(s => s.id))).size).toBe(3);
+  for (const profile of profiles) {
+    await page!.getByRole('combobox', { name: '当前运行方案' }).selectOption(profile.id);
+    await expect(page!.getByRole('textbox', { name: '编辑方案名称' })).toHaveValue(profile.name);
+  }
+  await page!.getByRole('textbox', { name: '编辑方案名称' }).fill('未保存名称');
+  await expect(page!.getByRole('combobox', { name: '当前运行方案' })).toBeDisabled();
+  await page!.getByRole('button', { name: '放弃修改', exact: true }).click();
+  await expect(page!.getByRole('combobox', { name: '当前运行方案' })).toBeEnabled();
+  await page!.getByRole('button', { name: '新建方案', exact: true }).click();
+  await page!.getByRole('dialog').getByRole('textbox', { name: '方案名称', exact: true }).fill('临时方案');
+  await page!.getByRole('dialog').getByRole('button', { name: '保存方案', exact: true }).click();
+  await expect(page!.getByRole('textbox', { name: '编辑方案名称' })).toHaveValue('临时方案');
+  await page!.getByRole('button', { name: '删除方案', exact: true }).click();
+  await page!.getByRole('dialog').getByRole('button', { name: '删除方案', exact: true }).click();
+  await expect(page!.getByRole('textbox', { name: '编辑方案名称' })).toHaveValue('仅后端');
+  await page!.screenshot({ path: testInfo.outputPath('profiles-dark.png'), animations: 'disabled' });
+  await page!.locator('a[href="#/settings"]').click();
+  await page!.getByRole('button', { name: '明亮模式' }).click();
+  await expect(page!.locator('html')).toHaveClass(/light/);
+  await app!.close(); app = undefined;
+  const environment = { ...process.env }; delete environment.ELECTRON_RUN_AS_NODE; delete environment.VITE_DEV_SERVER_URL;
+  app = await electron.launch({ executablePath: electronExecutable, args: launchArgs, cwd: desktopRoot,
+    env: { ...environment, CODEHELM_USER_DATA_DIR: path.join(fixtureRoot, 'user-data'), CODEHELM_VALIDATION_WINDOW: '0' } });
+  page = await app.firstWindow(); await page.waitForLoadState('domcontentloaded');
+  await page.evaluate(id => { location.hash = `/projects/${id}?tab=config`; }, original.projectId);
+  await expect(page.getByRole('textbox', { name: '编辑方案名称' })).toHaveValue('仅后端');
+  expect(await page.evaluate(id => window.codehelm.profiles.list(id), original.projectId)).toEqual(profiles);
+  await page.screenshot({ path: testInfo.outputPath('profiles-light.png'), animations: 'disabled' });
+});
+
+// eslint-disable-next-line no-empty-pattern
+test('invalidates edited approvals and preserves the effective profile and history after deletion', async ({}, testInfo) => {
+  let profile = await createMultiProfileFixture();
+  async function confirmation(approved: boolean) {
+    const opened = app!.waitForEvent('window');
+    const pending = page!.evaluate(id => window.codehelm.runner.confirmExecution(id, 'start').then(token => ({ token, error: '' })).catch(error => ({ token: '', error: String(error) })), profile.id);
+    const review = await opened;
+    await review.getByRole('button', { name: approved ? '确认并启动' : '取消', exact: true }).click();
+    return pending;
+  }
+  expect((await confirmation(false)).error).toContain('cancelled');
+  expect((await page!.evaluate(() => window.codehelm.runner.getState())).activeSessions).toHaveLength(0);
+  const old = await confirmation(true);
+  profile = await page!.evaluate(input => window.codehelm.profiles.save({ ...input, services: input.services.map(s => ({ ...s, args: [...s.args, 'changed'] })) }), profile);
+  await expect(page!.evaluate(({ id, token }) => window.codehelm.runner.start(id, token), { id: profile.id, token: old.token })).rejects.toThrow('confirmation required');
+  expect((await page!.evaluate(() => window.codehelm.runner.getState())).activeSessions).toHaveLength(0);
+  const token = (await confirmation(true)).token;
+  const run = await page!.evaluate(({ id, token }) => window.codehelm.runner.start(id, token), { id: profile.id, token });
+  await expect(page!.evaluate(id => window.codehelm.profiles.remove(id), profile.id)).rejects.toThrow('停止');
+  const renamed = await page!.evaluate(input => window.codehelm.profiles.save({ ...input, name: '下次启动配置', services: input.services.map(s => ({ ...s, args: ['not-used.cjs'] })) }), profile);
+  const state = await page!.evaluate(() => window.codehelm.runner.getState());
+  expect(state.activeSessions[0].effectiveProfile?.name).toBe('完整开发');
+  expect(state.activeSessions[0].effectiveProfile?.services[0].args).toEqual(profile.services[0].args);
+  expect(state.activeSessions[0].services[0].pid).toBe(run.services[0].pid);
+  await page!.evaluate(id => { location.hash = `/projects/${id}?tab=services`; }, profile.projectId);
+  await expect(page!.getByText('本次会话配置快照：', { exact: false })).toBeVisible();
+  await expect(page!.getByRole('button', { name: '删除方案', exact: true })).toBeDisabled();
+  await page!.screenshot({ path: testInfo.outputPath('effective-profile.png'), animations: 'disabled' });
+  const opened = app!.waitForEvent('window');
+  const cancelled = page!.evaluate(id => window.codehelm.runner.restartService(id).then(() => '').catch(e => String(e)), run.services[0].id);
+  const review = await opened;
+  await expect(review.getByText('其他服务不会联动重启。', { exact: false })).toBeVisible();
+  await review.getByRole('button', { name: '取消', exact: true }).click();
+  expect(await cancelled).toContain('cancelled');
+  expect((await page!.evaluate(() => window.codehelm.runner.getState())).activeSessions[0].services[0].pid).toBe(run.services[0].pid);
+  await page!.evaluate(id => window.codehelm.runner.stopSession(id), run.id);
+  await page!.evaluate(id => window.codehelm.profiles.remove(id), renamed.id);
+  const history = (await page!.evaluate(() => window.codehelm.runner.getState())).history.find(item => item.id === run.id)!;
+  expect(history.profileName).toBe('完整开发'); expect(history.services).toHaveLength(1);
+  await page!.evaluate(id => { location.hash = `/projects/${id}?tab=history`; }, profile.projectId);
+  await page!.getByRole('button', { name: '刷新记录', exact: true }).click();
+  await expect(page!.getByText('完整开发 ·', { exact: false })).toBeVisible();
+});
+
 // eslint-disable-next-line no-empty-pattern
 test('checks an active service snapshot before restart and records a missing file failure', async ({}, testInfo) => {
   const projectRoot = path.join(fixtureRoot, 'fixture-project');
@@ -406,10 +718,10 @@ test('checks an active service snapshot before restart and records a missing fil
   await review.getByRole('button', { name: '确认并启动' }).click();
   const token = await pending;
   const started = await page!.evaluate(({ id, token }) => window.codehelm.runner.start(id, token), { id: profile.id, token });
-  const replacement = await page!.evaluate(id => window.codehelm.runner.restartService(id), started.services[0].id);
+  const replacement = await restartWithReview(started.services[0].id);
   expect(replacement.status).toBe('RUNNING');
   await fs.unlink(script);
-  await expect(page!.evaluate(id => window.codehelm.runner.restartService(id), replacement.id)).rejects.toThrow('CODEHELM_ENVIRONMENT_PREFLIGHT');
+  await expect(restartWithReview(replacement.id)).rejects.toThrow('CODEHELM_ENVIRONMENT_PREFLIGHT');
   const state = await page!.evaluate(() => window.codehelm.runner.getState());
   expect(state.activeSessions).toHaveLength(0);
   expect(state.history.find(item => item.id === started.id)?.services).toHaveLength(2);
@@ -443,6 +755,89 @@ test('bounds a confirmed version process and does not expose its output on timeo
   expect(Date.now() - started).toBeLessThan(10000);
   expect(await page!.locator('body').innerText()).not.toContain('SECRET_TIMEOUT_OUTPUT');
   expect((await page!.evaluate(() => window.codehelm.runner.getState())).activeSessions).toHaveLength(0);
+});
+
+// eslint-disable-next-line no-empty-pattern
+test('rescans saved workspaces and explicitly applies analysis changes', async ({}, testInfo) => {
+  const root = path.join(fixtureRoot, 'fixture-project');
+  const project = await page!.evaluate(rootPath => window.codehelm.projects.import({ rootPath, name: 'V02 rescan', tags: [] }), root);
+  const profilesBefore = await page!.evaluate(id => window.codehelm.profiles.list(id), project.id);
+  const scan = async () => {
+    const { taskId } = await page!.evaluate(rootPath => window.codehelm.projects.startScan({ rootPath, maxDepth: 2, remember: true }), root);
+    await expect.poll(() => page!.evaluate(id => window.codehelm.projects.getTask(id), taskId).then(task => task?.status)).toBe('completed');
+  };
+  await scan();
+  const manifest = path.join(root, 'package.json');
+  const oldText = await fs.readFile(manifest, 'utf8');
+  await fs.writeFile(manifest, oldText.replace('node service.cjs', 'node changed.cjs').replace('"start"', '"dev"'));
+  await fs.writeFile(path.join(root, 'changed.cjs'), 'process.exit(0)');
+  await scan();
+  const saved = await page!.evaluate(() => window.codehelm.projects.workspaces());
+  expect(saved[0].entries.find(item => item.relativePath === '.')).toMatchObject({ status: 'changed', changedFiles: ['package.json'] });
+  await page!.getByRole('button', { name: '导入项目', exact: true }).click();
+  await page!.getByRole('button', { name: '工作区批量导入', exact: true }).click();
+  await page!.getByText('打开工作区复扫记录', { exact: true }).click();
+  await page!.getByRole('combobox', { name: '保存的工作区', exact: true }).selectOption(root.replace(/\\/g, '/'));
+  await expect(page!.getByText('分析可能过期：package.json', { exact: true })).toBeVisible();
+  await page!.getByRole('button', { name: '保存设置并复扫', exact: true }).click();
+  await expect(page!.getByText('工作区发现完成', { exact: false })).toBeVisible();
+  await expect(page!.getByText('分析可能过期：package.json', { exact: true })).toBeVisible();
+  await page!.getByText('分析可能过期：package.json', { exact: true }).scrollIntoViewIfNeeded();
+  await page!.screenshot({ path: testInfo.outputPath('workspace-change.png'), animations: 'disabled' });
+  await page!.getByRole('button', { name: '关闭', exact: true }).last().click();
+  await page!.evaluate(id => { location.hash = `/projects/${id}?tab=config`; }, project.id);
+  await page!.getByRole('button', { name: '重新分析', exact: true }).click();
+  await expect.poll(() => page!.evaluate(id => window.codehelm.analysis.getTask(id), project.id).then(task => task?.status)).toBe('completed');
+  await page!.getByRole('dialog').getByRole('button', { name: '关闭', exact: true }).click();
+  expect(await page!.evaluate(id => window.codehelm.profiles.list(id), project.id)).toEqual(profilesBefore);
+  await page!.getByRole('button', { name: '查看分析差异', exact: true }).click();
+  await expect(page!.getByText('现在：', { exact: false })).toContainText('changed.cjs');
+  await page!.screenshot({ path: testInfo.outputPath('analysis-change.png'), animations: 'disabled' });
+  await page!.getByRole('button', { name: '确认应用分析建议', exact: true }).click();
+  await expect.poll(() => page!.evaluate(id => window.codehelm.profiles.list(id), project.id).then(profiles => profiles.some(profile => profile.services.some(service => service.args.includes('dev'))))).toBe(true);
+  const goodSnapshot = await page!.evaluate(id => window.codehelm.analysis.getLatest(id), project.id);
+  await fs.writeFile(manifest, '{broken');
+  await page!.evaluate(id => window.codehelm.analysis.start(id), project.id);
+  await expect.poll(() => page!.evaluate(id => window.codehelm.analysis.getTask(id), project.id).then(task => task?.status)).toBe('failed');
+  expect((await page!.evaluate(id => window.codehelm.analysis.getLatest(id), project.id))?.id).toBe(goodSnapshot?.id);
+  expect((await page!.evaluate(() => window.codehelm.runner.getState())).activeSessions).toHaveLength(0);
+});
+
+test('retains workspace settings across restart and retries only failed imports', async () => {
+  const root = path.join(fixtureRoot, '工作区 space');
+  for (const name of ['good', 'broken', 'archive', 'ignored']) {
+    await fs.mkdir(path.join(root, name), { recursive: true });
+    await fs.writeFile(path.join(root, name, 'package.json'), name === 'broken' ? '{broken' : JSON.stringify({ name }));
+  }
+  const input = { rootPath: root, maxDepth: 2, remember: true, excludeDirs: ['archive'], ignoredPaths: ['ignored'] };
+  const { taskId } = await page!.evaluate(input => window.codehelm.projects.startScan(input), input);
+  await expect.poll(() => page!.evaluate(id => window.codehelm.projects.getTask(id), taskId).then(task => task?.status)).toBe('completed');
+  const before = await page!.evaluate(() => window.codehelm.projects.workspaces());
+  expect(before[0].excludeDirs).toEqual(['archive']);
+  expect(before[0].issues).toContain('broken/package.json');
+  await app!.close();
+  app = undefined;
+  const environment = { ...process.env };
+  delete environment.ELECTRON_RUN_AS_NODE; delete environment.VITE_DEV_SERVER_URL;
+  app = await electron.launch({ executablePath: electronExecutable, args: launchArgs, cwd: desktopRoot,
+    env: { ...environment, CODEHELM_USER_DATA_DIR: path.join(fixtureRoot, 'user-data'), CODEHELM_VALIDATION_WINDOW: '0' } });
+  page = await app.firstWindow(); await page.waitForLoadState('domcontentloaded');
+  expect(await page.evaluate(() => window.codehelm.projects.workspaces())).toEqual(before);
+  await page.getByRole('button', { name: '导入项目', exact: true }).click();
+  await page.getByRole('button', { name: '工作区批量导入', exact: true }).click();
+  await page.getByText('打开工作区复扫记录', { exact: true }).click();
+  await page.getByRole('combobox', { name: '保存的工作区', exact: true }).selectOption(root.replace(/\\/g, '/'));
+  await page.getByRole('button', { name: '保存设置并复扫', exact: true }).click();
+  await expect(page.getByRole('button', { name: '导入未忽略的新项目（2）', exact: true })).toBeEnabled();
+  await page.getByRole('button', { name: '导入未忽略的新项目（2）', exact: true }).click();
+  await expect(page.getByText('成功 1 · 已纳管跳过 0 · 失败 1', { exact: true })).toBeVisible();
+  await fs.writeFile(path.join(root, 'broken', 'package.json'), '{"name":"fixed"}');
+  await page.getByRole('button', { name: '仅重试失败项目', exact: true }).click();
+  await expect(page.getByText('成功 1 · 已纳管跳过 0 · 失败 0', { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => window.codehelm.projects.list())).toHaveLength(2);
+  const rows = await page.evaluate(() => window.codehelm.projects.workspaces());
+  expect(rows[0].entries.filter(entry => entry.relativePath !== 'ignored').every(entry => !!entry.projectId)).toBe(true);
+  expect((await page.evaluate(() => window.codehelm.runner.getState())).activeSessions).toHaveLength(0);
 });
 
 test('rechecks a fixed port after approval without stopping the process that occupied it', async () => {

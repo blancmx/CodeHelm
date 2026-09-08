@@ -10,6 +10,9 @@ import { isPathBoundaryError, readUtf8FileFromLockedRoot, readUtf8FileWithinLimi
 export interface WorkspaceScannerOptions {
   rootSessionId?: string;
   maxDepth?: number;
+  excludeDirs?: string[];
+  onDirectory?: (relativePath: string) => void;
+  onIssue?: (relativePath: string) => void;
   onProgress?: (scannedDirectories: number, foundProjects: number) => void;
 }
 
@@ -91,8 +94,13 @@ function pythonModuleName(relativeFile: string): string {
 
 export class WorkspaceScanner {
   private boundaryFailure: Error | undefined;
+  private options: WorkspaceScannerOptions = {};
+  private directoryCount = 0;
 
   async scan(rootPath: string, options: WorkspaceScannerOptions = {}): Promise<DiscoveredProjectDto[]> {
+    this.options = options;
+    this.directoryCount = 0;
+    this.boundaryFailure = undefined;
     const normalizedRoot = normalizePath(rootPath);
     const maxDepth = normalizeMaxDepth(options.maxDepth);
     const results: DiscoveredProjectDto[] = [];
@@ -129,12 +137,14 @@ export class WorkspaceScanner {
     inspected: () => void,
     rootSessionId?: string,
   ): Promise<void> {
-    if (currentDepth > maxDepth || results.length >= MAX_WORKSPACE_SCAN_RESULTS) return;
+    if (currentDepth > maxDepth) return;
+    if (results.length >= MAX_WORKSPACE_SCAN_RESULTS) { this.options.onIssue?.(normalizePath(path.relative(workspaceRoot, currentDir)) || '.'); return; }
 
     let directory: Dir;
     try {
       directory = await fs.opendir(currentDir);
     } catch {
+      this.options.onIssue?.(path.relative(workspaceRoot, currentDir) || '.');
       return;
     }
 
@@ -144,20 +154,22 @@ export class WorkspaceScanner {
         if (
           inspectedEntries >= MAX_WORKSPACE_SCAN_ENTRIES_PER_DIRECTORY
           || results.length >= MAX_WORKSPACE_SCAN_RESULTS
-        ) break;
+        ) { this.options.onIssue?.(path.relative(workspaceRoot, currentDir) || '.'); break; }
         inspectedEntries += 1;
 
         const entry = directoryEntry.name;
-        if (IGNORED_DIRS.has(entry) || entry.startsWith('.')) continue;
+        if (IGNORED_DIRS.has(entry) || entry.startsWith('.') || this.options.excludeDirs?.includes(entry)) continue;
 
         const subPath = path.join(currentDir, entry);
         let stat;
         try {
           stat = await fs.lstat(subPath);
         } catch {
+          this.options.onIssue?.(path.relative(workspaceRoot, subPath));
           continue;
         }
 
+        if (stat.isSymbolicLink()) { this.options.onIssue?.(path.relative(workspaceRoot, subPath)); continue; }
         if (stat.isSymbolicLink() || !stat.isDirectory()) continue;
 
         // Inspect if subPath is a project
@@ -170,11 +182,7 @@ export class WorkspaceScanner {
           if (project) {
             results.push(project);
             scannedPaths.add(normalizedSub);
-            // If this directory is already a detected project (like a next.js app or python app),
-            // don't descend deeper into its source code unless it's a monorepo workspace (like packages/)
-            if (entry !== 'packages' && entry !== 'apps' && entry !== 'modules') {
-              continue;
-            }
+
           }
         }
 
@@ -187,6 +195,8 @@ export class WorkspaceScanner {
   }
 
   private async inspectDirectory(dirPath: string, workspaceRoot: string, rootSessionId?: string): Promise<DiscoveredProjectDto | null> {
+    if (++this.directoryCount > 2000) throw new Error('工作区目录数量超限，原结果保留');
+    this.options.onDirectory?.(normalizePath(path.relative(workspaceRoot, dirPath)) || '.');
     const dirName = path.basename(dirPath) || 'project';
     const relativePath = path.relative(workspaceRoot, dirPath) || '.';
 
@@ -210,7 +220,9 @@ export class WorkspaceScanner {
       let pkg: any = {};
       try {
         const pkgContent = await this.readInspectionFile(path.join(dirPath, 'package.json'), workspaceRoot, rootSessionId);
-        pkg = parseJson(pkgContent) || {};
+        const parsed = parseJson(pkgContent);
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) this.options.onIssue?.(path.relative(workspaceRoot, path.join(dirPath, 'package.json')).replace(/\\/g, '/'));
+        pkg = parsed || {};
       } catch {
         // ignore
       }
@@ -605,6 +617,7 @@ export class WorkspaceScanner {
         : await readUtf8FileWithinLimit(filePath, MAX_WORKSPACE_INSPECTION_FILE_BYTES);
       return result.text;
     } catch (error) {
+      this.options.onIssue?.(path.relative(workspaceRoot, filePath).replace(/\\/g, '/'));
       if (isPathBoundaryError(error)) this.boundaryFailure = error instanceof Error ? error : new Error(String(error));
       throw error;
     }

@@ -1,6 +1,7 @@
 import { LogRotator } from '@codehelm/runner';
 import type { LogBatch } from '@codehelm/domain';
 import type { AppSettingsDto, LogStorageStatusDto } from '@codehelm/contracts';
+import fs from 'node:fs/promises';
 
 const MAX_PENDING_BYTES = 4 * 1024 * 1024;
 const MAX_PENDING_ENTRIES = 10000;
@@ -98,6 +99,14 @@ export class LogStorage {
       pendingBytes: this.pendingBytes, droppedEntries: this.droppedEntries, lastError: this.lastError,
     };
   }
+
+  async prepareRead(): Promise<string> {
+    // Flush only the bounded write queue; a single-session read does not need a global stats walk.
+    await this.enqueue(async () => { await fs.mkdir(this.directory, { recursive: true }); });
+    return this.directory;
+  }
+
+  getReadCounters() { return { droppedEntries: this.droppedEntries, lastError: this.lastError }; }
 
   async getDirectoryForOpen(): Promise<string> {
     // Unlike the status read, an open request must not swallow initialization errors.
