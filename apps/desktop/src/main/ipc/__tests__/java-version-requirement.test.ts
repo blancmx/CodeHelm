@@ -8,6 +8,10 @@ describe('finite Java Enforcer ranges', () => {
     ['(,21]', '21.0.0', true], ['(,21]', '21.0.8', false], ['[21]', '21', true], ['[21]', '21.0.1', false],
     ['17', '21.0.8', true], ['(21,22)', '21.0.1', true], ['(21,22)', '21.0.0', false],
     ['17', '21-ea', null], ['17', '1.8.0_451', null], ['17', '21.0.0+1', null],
+    ['[99,)', '21.0.12.1', false], ['[9,99)', '21.0.12.1', true],
+    ['[21]', '21.0.0.0', true], ['[21]', '21.0.0.1', false],
+    ['(21,22)', '21.0.0.1', true], ['(,21]', '21.0.0.1', false],
+    ['17', '21.0.12.1-ea', null], ['17', '21.0.12.1+1', null], ['17', '21.0.0.0.1', null],
   ] as const)('%s against %s', (range, actual, expected) => expect(parseJavaRequirement(range)?.(actual)).toBe(expected));
   it.each(['8', '[1.8,)', '[17.0.1,)', '[22,17)', '(21,21)', '[,21]', '[17,]', '(,)', '${java.version}', '[17,18),[21,22)', 'SECRET'])('rejects unsupported ranges %s', range => expect(parseJavaRequirement(range)).toBeNull());
   it('reads exactly scoped local rules and does not interpret compiler targets as runtime requirements', () => {

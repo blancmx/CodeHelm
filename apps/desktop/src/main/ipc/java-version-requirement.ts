@@ -59,8 +59,9 @@ export function parseJavaRequirement(value: unknown): ((actual: string) => boole
     } else return null;
   }
   return actual => {
-    // Preserve patch semantics at integer bounds: [21] means 21.0.0, not all 21.x.
-    if (!/^(?:9|[1-9]\d{1,3})(?:\.\d{1,8}){0,2}$/.test(actual)) return null;
+    // Include the fourth (emergency patch) component; retain integer-bound semantics.
+    // [21] means 21.0.0.0, not all 21.x. Pre-release/build suffixes stay unsupported.
+    if (!/^(?:9|[1-9]\d{1,3})(?:\.\d{1,8}){0,3}$/.test(actual)) return null;
     const parts = actual.split('.').map(Number);
     const feature = parts[0];
     const nonZeroTail = parts.slice(1).some(part => part > 0);
