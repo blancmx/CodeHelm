@@ -9,6 +9,9 @@
   "include": [
     "e2e/**/*.ts",
     "playwright.config.ts",
-    "playwright.performance.config.ts"
+    "playwright.performance.config.ts",
+    "playwright.scan-performance.config.ts",
+    "playwright.candidate.config.ts",
+    "playwright.startup.config.ts"
   ]
 }

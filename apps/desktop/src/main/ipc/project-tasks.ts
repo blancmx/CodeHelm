@@ -155,6 +155,9 @@ export class ProjectTasks {
 
   private async scan(task: Task, input: WorkspaceScanInput): Promise<void> {
     const boundary = this.createBoundary(input.rootPath, this.scanLimit());
+    const cancelBoundary = () => boundary.cancel?.();
+    task.controller.signal.addEventListener('abort', cancelBoundary, { once: true });
+    if (task.controller.signal.aborted) cancelBoundary();
     let worker: Worker | undefined;
     let scanError: unknown;
     try {
@@ -199,6 +202,7 @@ export class ProjectTasks {
     }
 
     let boundaryError: unknown;
+    task.controller.signal.removeEventListener('abort', cancelBoundary);
     try {
       await boundary.close();
     } catch (error) {

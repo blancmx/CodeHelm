@@ -8,6 +8,44 @@ const test = require('node:test');
 const { Worker } = require('node:worker_threads');
 const safeFs = require('..');
 
+test('cancels native tree preparation across Workers and releases acquired handles', async () => {
+  const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'codehelm-cancel-root-'));
+  assert.equal(path.dirname(fixture), path.resolve(os.tmpdir()));
+  const flag = new Int32Array(new SharedArrayBuffer(4));
+  let worker;
+  try {
+    for (let i = 0; i < 5000; i++) fs.writeFileSync(path.join(fixture, `${i}.txt`), 'fixture');
+    Atomics.store(flag, 0, 1);
+    assert.throws(() => safeFs.openRoot(fixture, 50000, flag), /preparation cancelled/);
+    assert.throws(() => safeFs.openRoot(fixture, 50000, new Uint8Array(1)), /one Int32/);
+    Atomics.store(flag, 0, 0);
+    worker = new Worker(`
+      const { parentPort, workerData } = require('node:worker_threads');
+      const binding = require(workerData.modulePath);
+      parentPort.postMessage({ entering: true });
+      try { const id = binding.openRoot(workerData.root, 50000, workerData.flag); binding.closeRoot(id); parentPort.postMessage({ completed: true }); }
+      catch (error) { parentPort.postMessage({ error: error.message }); }
+    `, { eval: true, workerData: { modulePath: require.resolve('..'), root: fixture, flag } });
+    const result = await new Promise((resolve, reject) => {
+      worker.on('message', message => {
+        if (message.entering) Atomics.store(flag, 0, 1);
+        else resolve(message);
+      });
+      worker.once('error', reject);
+      worker.once('exit', code => { if (code) reject(new Error(`Worker exited: ${code}`)); });
+    });
+    assert.match(result.error ?? '', /preparation cancelled/);
+    // A leaked root/file handle would deny these mutations on Windows.
+    fs.writeFileSync(path.join(fixture, '0.txt'), 'released');
+    const moved = `${fixture}-moved`; fs.renameSync(fixture, moved); fs.renameSync(moved, fixture);
+    Atomics.store(flag, 0, 0);
+    const id = safeFs.openRoot(fixture, 50000, flag); safeFs.closeRoot(id);
+  } finally {
+    if (worker) await worker.terminate();
+    fs.rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
 test('shared log reads permit append and rotation while retaining the original non-reparse handle', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'codehelm-shared-log-'));
   assert.equal(path.dirname(root), path.resolve(os.tmpdir()));

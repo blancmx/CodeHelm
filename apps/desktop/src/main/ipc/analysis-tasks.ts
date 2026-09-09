@@ -10,11 +10,12 @@ export const createAnalysisWorker: AnalysisWorkerFactory = (rootPath, maxFiles, 
 
 export interface AnalysisBoundary {
   ready: Promise<string | undefined>;
+  cancel?(): void;
   close(): Promise<void>;
 }
 
 export type AnalysisBoundaryFactory = (rootPath: string, maxDirectories: number) => AnalysisBoundary;
-export function createAnalysisBoundaryFromWorker(worker: Worker): AnalysisBoundary {
+export function createAnalysisBoundaryFromWorker(worker: Worker, cancellation?: Int32Array): AnalysisBoundary {
   let readySettled = false;
   let closeRequested = false;
   let closeSettled = false;
@@ -68,9 +69,11 @@ export function createAnalysisBoundaryFromWorker(worker: Worker): AnalysisBounda
   let closePromise: Promise<void> | undefined;
   return {
     ready,
+    cancel() { if (cancellation) Atomics.store(cancellation, 0, 1); },
     close() {
       if (closePromise) return closePromise;
       closeRequested = true;
+      if (!readySettled && cancellation) Atomics.store(cancellation, 0, 1);
       closePromise = (async () => {
         try {
           await ready;
@@ -89,10 +92,11 @@ export function createAnalysisBoundaryFromWorker(worker: Worker): AnalysisBounda
 }
 
 export const createNativeAnalysisBoundary: AnalysisBoundaryFactory = (rootPath, maxDirectories) => {
+  const cancellation = new Int32Array(new SharedArrayBuffer(4));
   const worker = new Worker(path.join(__dirname, 'analysis-boundary-worker.js'), {
-    workerData: { rootPath, maxEntries: maxDirectories },
+    workerData: { rootPath, maxEntries: maxDirectories, cancellation },
   });
-  return createAnalysisBoundaryFromWorker(worker);
+  return createAnalysisBoundaryFromWorker(worker, cancellation);
 };
 const noBoundary: AnalysisBoundaryFactory = () => ({ ready: Promise.resolve(undefined), async close() {} });
 

@@ -1,4 +1,4 @@
-export function openRoot(rootPath: string, maxDirectories: number): string;
+export function openRoot(rootPath: string, maxDirectories: number, cancellation?: Int32Array): string;
 /** Mutable local logs only. Does not provide an immutable execution-input snapshot. */
 export function openLogRoot(rootPath: string, maxEntries: number): string;
 export function closeRoot(sessionId: string): void;

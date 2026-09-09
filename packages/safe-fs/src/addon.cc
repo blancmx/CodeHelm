@@ -129,7 +129,11 @@ void LockPythonVirtualEnvironment(const std::shared_ptr<Session>& session, const
   const std::wstring bin = relative + L"\\bin";
   if (lockDirectory(bin)) lockExecutable(bin + L"\\python");
 }
-void LockTree(const std::shared_ptr<Session>& session, const std::wstring& relative, uint32_t maxEntries) {
+void CheckCancellation(LONG* cancellation) {
+  if (cancellation && InterlockedCompareExchange(cancellation, 0, 0) != 0) throw std::runtime_error("Project boundary preparation cancelled");
+}
+void LockTree(const std::shared_ptr<Session>& session, const std::wstring& relative, uint32_t maxEntries, LONG* cancellation = nullptr) {
+  CheckCancellation(cancellation);
   const std::wstring absolute = relative.empty() ? session->root : session->root + L"\\" + relative;
   WIN32_FIND_DATAW entry{};
   HANDLE rawFind = FindFirstFileExW((absolute + L"\\*").c_str(), FindExInfoBasic, &entry, FindExSearchNameMatch, nullptr, FIND_FIRST_EX_LARGE_FETCH);
@@ -139,6 +143,7 @@ void LockTree(const std::shared_ptr<Session>& session, const std::wstring& relat
   }
   UniqueFind find(rawFind);
   do {
+    CheckCancellation(cancellation);
     std::wstring name(entry.cFileName); if (name == L"." || name == L"..") continue;
     if (entry.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) continue;
     ValidateName(name);
@@ -155,7 +160,7 @@ void LockTree(const std::shared_ptr<Session>& session, const std::wstring& relat
       std::wstring expectedPrefix = session->root + L"\\";
       if (_wcsnicmp(finalPath.c_str(), expectedPrefix.c_str(), expectedPrefix.size()) != 0) throw std::runtime_error("Project directory escaped locked root");
       session->directories.emplace(child, std::move(handle));
-      LockTree(session, child, maxEntries);
+      LockTree(session, child, maxEntries, cancellation);
     } else {
       if (session->files.size() >= maxEntries) throw std::runtime_error("Project file count exceeds security lock limit");
       session->files.emplace(child, OpenRegularFile(session->root + L"\\" + child, session->sharedLogRead));
@@ -180,11 +185,23 @@ void Throw(napi_env env, const std::exception& error) { napi_throw_error(env, "C
 
 napi_value OpenRootImpl(napi_env env, napi_callback_info info, bool sharedLogRead) {
   try {
-    size_t argc = 2; napi_value argv[2]; Check(env, napi_get_cb_info(env, info, &argc, argv, nullptr, nullptr), "Invalid arguments"); if (argc != 2) throw std::runtime_error("openRoot requires rootPath and maxDirectories");
+    size_t argc = 3; napi_value argv[3]; Check(env, napi_get_cb_info(env, info, &argc, argv, nullptr, nullptr), "Invalid arguments"); if (argc < 2) throw std::runtime_error("openRoot requires rootPath and maxDirectories");
+    LONG* cancellation = nullptr;
+    if (argc == 3) {
+      napi_valuetype valueType; Check(env, napi_typeof(env, argv[2], &valueType), "Invalid cancellation flag");
+      if (valueType != napi_undefined) {
+        napi_typedarray_type type; size_t length, offset; void* data; napi_value buffer;
+        Check(env, napi_get_typedarray_info(env, argv[2], &type, &length, &data, &buffer, &offset), "Cancellation must be an Int32Array");
+        if (type != napi_int32_array || length != 1 || !data) throw std::runtime_error("Cancellation must contain one Int32 value");
+        cancellation = static_cast<LONG*>(data);
+      }
+    }
+    CheckCancellation(cancellation);
     std::wstring input = StringArg(env, argv[0]); uint32_t maxDirectories = UintArg(env, argv[1]); if (!maxDirectories) throw std::runtime_error("Invalid directory lock limit");
     auto rootHandle = OpenDirectory(input); auto session = std::make_shared<Session>(); session->root = FinalPath(static_cast<HANDLE>(rootHandle.get()));
     session->sharedLogRead = sharedLogRead;
-    session->directories.emplace(L"", std::move(rootHandle)); LockTree(session, L"", maxDirectories);
+    session->directories.emplace(L"", std::move(rootHandle)); LockTree(session, L"", maxDirectories, cancellation);
+    CheckCancellation(cancellation);
     std::string id = std::to_string(GetCurrentProcessId()) + "-" + std::to_string(nextId.fetch_add(1));
     { std::lock_guard<std::mutex> lock(registryMutex); registry.emplace(id, session); }
     return Utf8Value(env, id);

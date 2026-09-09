@@ -5,6 +5,11 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+    inputs:
+      performance:
+        description: Run isolated scan, search and sustained-log acceptance samples
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -52,9 +57,32 @@ jobs:
         run: |
           $env:CODEHELM_E2E_EXECUTABLE = (Resolve-Path 'test-results/v02-006-package/win-unpacked/CodeHelm.exe').Path
           pnpm test:e2e:built
+      - name: Optional isolated performance acceptance
+        if: github.event_name == 'workflow_dispatch' && inputs.performance
+        shell: pwsh
+        run: |
+          $env:CODEHELM_E2E_EXECUTABLE = (Resolve-Path 'test-results/v02-006-package/win-unpacked/CodeHelm.exe').Path
+          $env:CODEHELM_E2E_SCAN_LIMIT = '1'
+          pnpm exec playwright test --config=playwright.scan-performance.config.ts
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $env:CODEHELM_E2E_MATRIX = '1'
+          pnpm exec playwright test --config=playwright.performance.config.ts
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $env:CODEHELM_E2E_OVERVIEW = '1'
+          pnpm exec playwright test --config=playwright.performance.config.ts
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $env:CODEHELM_E2E_PERFORMANCE = '1'
+          $env:CODEHELM_E2E_SCOPE = 'sustained'
+          pnpm exec playwright test --config=playwright.candidate.config.ts --grep 'measures sustained'
       - name: Record candidate evidence
         if: always()
-        run: node apps/desktop/scripts/collect-candidate-evidence.mjs
+        shell: pwsh
+        run: |
+          $reports = @('test-results/packaged-e2e-results.json')
+          if ('${{ github.event_name }}' -eq 'workflow_dispatch' -and '${{ inputs.performance }}' -eq 'true') {
+            $reports += 'test-results/v02-006-scan-limit-results.json', 'test-results/v02-006-matrix-results.json', 'test-results/v02-006-overview-results.json', 'test-results/v02-006-foreground-log-results.json'
+          }
+          node apps/desktop/scripts/collect-candidate-evidence.mjs test-results/v02-006-package test-results/v02-006-evidence.json @reports
       - name: Upload Electron E2E diagnostics
         if: always()
         uses: actions/upload-artifact@v4
@@ -64,5 +92,9 @@ jobs:
             test-results/*e2e-results.json
             test-results/*e2e-artifacts/
             test-results/v02-006-evidence.json
+            test-results/v02-006-*-results.json
+            test-results/v02-006-*-benchmarks/
+            test-results/v02-006-active-log-artifacts/
+            test-results/v02-006-foreground-log-artifacts/
           if-no-files-found: ignore
           retention-days: 7

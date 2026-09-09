@@ -32,13 +32,18 @@ async function walk(directory){
   }
 }
 await walk(candidate);
-const resultFile=path.join(root,'test-results/packaged-e2e-results.json');
-let tests={status:'not-recorded'};
-if(fs.existsSync(resultFile)){
+// Explicit reports prevent a new candidate from silently inheriting an older run's result.
+const resultFiles=process.argv.slice(4);
+if(!resultFiles.length)resultFiles.push('test-results/packaged-e2e-results.json');
+const tests=[];
+for(const input of resultFiles){
+  const resultFile=path.resolve(input);
+  if(!fs.existsSync(resultFile)){tests.push({path:input,status:'not-recorded'});continue;}
   const report=JSON.parse(fs.readFileSync(resultFile,'utf8'));
-  tests={status:report.stats.unexpected||report.stats.flaky?'failed-or-flaky':'recorded',stats:report.stats,sha256:await hashFile(resultFile)};
+  const failed=!!report.errors?.length||!report.stats?.expected||!!report.stats?.unexpected||!!report.stats?.flaky;
+  tests.push({path:path.relative(root,resultFile).replaceAll('\\','/'),status:failed?'failed-or-incomplete':report.stats.skipped?'recorded-with-skips':'recorded',stats:report.stats,sha256:await hashFile(resultFile)});
 }
-const evidence={formatVersion:1,generatedAt:new Date().toISOString(),productVersion:JSON.parse(fs.readFileSync('apps/desktop/package.json','utf8')).version,
+const evidence={formatVersion:2,generatedAt:new Date().toISOString(),productVersion:JSON.parse(fs.readFileSync('apps/desktop/package.json','utf8')).version,
   git:{head:git('rev-parse','HEAD'),branch:git('branch','--show-current'),dirty:!!git('status','--porcelain'),sourceDigest:digest(JSON.stringify(sourceInventory)),sourceInventory},
   environment:{platform:process.platform,arch:process.arch,os:os.release(),cpu:os.cpus()[0]?.model,totalMemoryBytes:os.totalmem(),node:process.version,
     configuredPackageManager:JSON.parse(fs.readFileSync('package.json','utf8')).packageManager,electron:packageVersion('electron'),electronBuilder:packageVersion('electron-builder')},

@@ -11,6 +11,7 @@ declare global {
   interface Window {
     codehelm: CodeHelmApi;
     __codehelmE2eLogs?: string[];
+    __codehelmLoad?: { lines: number; bytes: number };
   }
 }
 
@@ -53,7 +54,7 @@ test.beforeEach(async () => {
   delete environment.VITE_DEV_SERVER_URL;
   app = await electron.launch({
     executablePath: electronExecutable,
-    args: launchArgs,
+    args: [...launchArgs, ...(process.env.CODEHELM_E2E_PERFORMANCE === '1' ? ['--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding', '--disable-background-timer-throttling', '--disable-features=CalculateNativeWinOcclusion'] : [])],
     cwd: desktopRoot,
     env: {
       ...environment,
@@ -447,29 +448,66 @@ test('migrates the released v0.1 schema and preserves a usable pre-upgrade snaps
 test('measures sustained log memory and stop latency',async({},testInfo)=>{
   test.skip(process.env.CODEHELM_E2E_PERFORMANCE!=='1','Opt-in ten-minute sustained performance run.');
   test.setTimeout(720_000);
+  // Input measurements model an active desktop window, not Chromium's occluded-window frame timer.
+  await app!.evaluate(({ BrowserWindow }) => {
+    for (const window of BrowserWindow.getAllWindows()) window.webContents.setBackgroundThrottling(false);
+  });
   const profile=await createMultiProfileFixture();
-  await fs.writeFile(path.join(fixtureRoot,'fixture-project','controlled.cjs'),"const line='load '+ 'x'.repeat(194)+'\\n';setInterval(()=>process.stdout.write(line.repeat(100)),100);");
+  await fs.writeFile(path.join(fixtureRoot,'fixture-project','controlled.cjs'),"const line='load '+'x'.repeat(194)+'\\n';const started=Date.now();let sent=0;function tick(){const count=Math.min(100,Math.floor((Date.now()-started)/100)*100-sent);if(count>0){sent+=count;if(!process.stdout.write(line.repeat(count))){process.stdout.once('drain',()=>setTimeout(tick,10));return;}}setTimeout(tick,10);}tick();");
+  await page!.evaluate(() => {
+    window.__codehelmLoad = { lines: 0, bytes: 0 };
+    window.codehelm.runner.onLogs(batch => {
+      for (const entry of batch.entries) if (entry.message.startsWith('load ')) {
+        window.__codehelmLoad!.lines += (entry.message.match(/\n/g) ?? []).length;
+        window.__codehelmLoad!.bytes += new TextEncoder().encode(entry.message).length;
+      }
+    });
+  });
   const opened=app!.waitForEvent('window'),pending=page!.evaluate(id=>window.codehelm.runner.confirmExecution(id,'start'),profile.id);
   await(await opened).getByRole('button',{name:'确认并启动'}).click();const token=await pending;
   const run=await page!.evaluate(({id,token})=>window.codehelm.runner.start(id,token),{id:profile.id,token});
   await page!.evaluate(()=>{location.hash='/console';});
-  const samples:Array<{seconds:number;workingSetKb:number}>=[];
+  await app!.evaluate(({ BrowserWindow }) => { for (const window of BrowserWindow.getAllWindows()) { window.show(); window.focus(); } });
+  const samples:Array<{seconds:number;workingSetKb:number;receivedLines:number;receivedBytes:number}>=[];
+  const inputLatencyMs: number[] = [];
+  const filterInput = page!.getByPlaceholder('检索日志关键字...');
+  await expect(filterInput).toBeVisible();
   const start=Date.now();
-  while(Date.now()-start<600_000){
+  const smoke = process.env.CODEHELM_E2E_SCOPE === 'smoke';
+  const durationMs = smoke ? 60000 : 600000;
+  while(Date.now()-start<durationMs){
     const memory=await app!.evaluate(({app})=>app.getAppMetrics().reduce((sum,item)=>({workingSetKb:sum.workingSetKb+item.memory.workingSetSize}),{workingSetKb:0}));
-    samples.push({seconds:(Date.now()-start)/1000,...memory});
+    const received = await page!.evaluate(() => window.__codehelmLoad!);
+    samples.push({seconds:(Date.now()-start)/1000,...memory,receivedLines:received.lines,receivedBytes:received.bytes});
+    await filterInput.evaluate(el => el.addEventListener('input', () => performance.mark('log-filter-input'), { once: true, capture: true }));
+    await filterInput.fill(samples.length % 2 ? 'load' : '');
+    inputLatencyMs.push(await page!.evaluate(() => new Promise<number>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => {
+      resolve(performance.now() - performance.getEntriesByName('log-filter-input').at(-1)!.startTime);
+    })))));
+    if (samples.length % 12 === 0) {
+      await fs.writeFile(testInfo.outputPath('performance-progress.json'), JSON.stringify({ complete: false, samples, inputLatencyMs }, null, 2));
+    }
     await new Promise(resolve=>setTimeout(resolve,5000));
   }
   const median=(values:number[])=>{const sorted=[...values].sort((a,b)=>a-b);return sorted[Math.floor(sorted.length/2)];};
-  const early=median(samples.filter(s=>s.seconds>=120&&s.seconds<180).map(s=>s.workingSetKb));
-  const late=median(samples.filter(s=>s.seconds>=540).map(s=>s.workingSetKb));
+  const early=median(samples.filter(s=>smoke ? s.seconds < 20 : s.seconds>=120&&s.seconds<180).map(s=>s.workingSetKb));
+  const late=median(samples.filter(s=>smoke ? s.seconds >= 40 : s.seconds>=540).map(s=>s.workingSetKb));
+  const bufferStatus = await page!.getByText(/^当前缓冲 /).first().textContent();
   await page!.evaluate(()=>{location.hash='/runner';});
-  const stoppedAt=Date.now();await page!.getByRole('button',{name:'停止该项目'}).click();
-  await expect.poll(()=>page!.evaluate(()=>window.codehelm.runner.getState()).then(state=>state.activeSessions.length)).toBe(0);
-  const stopMs=Date.now()-stoppedAt;
-  await fs.writeFile(testInfo.outputPath('performance.json'),JSON.stringify({sample:'1000 lines/s, 200 bytes/line, 10 min',os:os.release(),cpu:os.cpus()[0].model,totalMemory:os.totalmem(),packaged:!!process.env.CODEHELM_E2E_EXECUTABLE,samples,earlyMedianKb:early,lateMedianKb:late,growth:late/early-1,stopMs,runId:run.id},null,2));
+  const stopButton = page!.getByRole('button',{name:'停止该项目'});
+  await expect(stopButton).toBeVisible(); await expect(stopButton).toBeEnabled();
+  await stopButton.evaluate(el => el.addEventListener('click', () => performance.mark('stop-click'), { once: true, capture: true }));
+  await stopButton.click();
+  await expect.poll(()=>page!.evaluate(()=>window.codehelm.runner.getState()).then(state=>state.activeSessions.length), { intervals: [20] }).toBe(0);
+  const stopMs=await page!.evaluate(() => performance.now() - performance.getEntriesByName('stop-click').at(-1)!.startTime);
+  const first = samples[0], last = samples.at(-1)!;
+  const receivedLinesPerSecond = (last.receivedLines - first.receivedLines) / (last.seconds - first.seconds);
+  const sortedLatency = [...inputLatencyMs].sort((a, b) => a - b);
+  const inputP95Ms = sortedLatency[Math.ceil(sortedLatency.length * .95) - 1];
+  await fs.writeFile(testInfo.outputPath('performance.json'),JSON.stringify({sample:'nominal 1000 lines/s, 200 bytes/line',durationMs,acceptanceRun:!smoke,backgroundThrottling:false,occlusionThrottling:false,stopTiming:'captured DOM click to zero active sessions; navigation excluded',os:os.release(),cpu:os.cpus()[0].model,totalMemory:os.totalmem(),packaged:!!process.env.CODEHELM_E2E_EXECUTABLE,samples,receivedLinesPerSecond,inputLatencyMs,inputP95Ms,bufferStatus,earlyMedianKb:early,lateMedianKb:late,growth:late/early-1,stopMs,runId:run.id},null,2));
   await page!.screenshot({path:testInfo.outputPath('performance-stopped.png'),animations:'disabled'});
-  expect(stopMs).toBeLessThanOrEqual(1000);expect(late/early).toBeLessThanOrEqual(1.2);
+  expect(stopMs).toBeLessThanOrEqual(1000);if (!smoke) expect(late/early).toBeLessThanOrEqual(1.2);
+  expect(inputP95Ms).toBeLessThanOrEqual(200);
 });
 
 // eslint-disable-next-line no-empty-pattern

@@ -6,7 +6,9 @@ const port = parentPort;
 
 let sessionId: string | undefined;
 try {
-  sessionId = (workerData.sharedLogRead === true ? openLogRoot : openRoot)(String(workerData.rootPath), Number(workerData.maxEntries));
+  sessionId = workerData.sharedLogRead === true
+    ? openLogRoot(String(workerData.rootPath), Number(workerData.maxEntries))
+    : openRoot(String(workerData.rootPath), Number(workerData.maxEntries), workerData.cancellation);
   port.postMessage({ type: 'ready', sessionId });
 } catch (error) {
   port.postMessage({ type: 'error', errorMessage: error instanceof Error ? error.message : String(error) });
