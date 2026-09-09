@@ -35,7 +35,7 @@ const candidateExists=fs.existsSync(candidate);
 if(candidateExists)await walk(candidate);
 // Explicit reports prevent a new candidate from silently inheriting an older run's result.
 const resultFiles=process.argv.slice(4);
-if(!resultFiles.length)resultFiles.push('test-results/packaged-e2e-results.json');
+if(!resultFiles.length)resultFiles.push('test-results/e2e-results.json','test-results/packaged-e2e-results.json');
 const tests=[];
 for(const input of resultFiles){
   const resultFile=path.resolve(input);

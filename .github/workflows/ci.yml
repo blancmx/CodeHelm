@@ -10,6 +10,10 @@ on:
         description: Run isolated scan, search and sustained-log acceptance samples
         type: boolean
         default: false
+      java_stability:
+        description: Repeat Java desktop matching ten times without retries
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -57,6 +61,12 @@ jobs:
         run: |
           $env:CODEHELM_E2E_EXECUTABLE = (Resolve-Path 'test-results/v02-006-package/win-unpacked/CodeHelm.exe').Path
           pnpm test:e2e:built
+      - name: Optional Java stability acceptance
+        if: github.event_name == 'workflow_dispatch' && inputs.java_stability
+        shell: pwsh
+        run: |
+          $env:PLAYWRIGHT_JSON_OUTPUT_NAME = 'test-results/v02-006-java-stability-results.json'
+          pnpm exec playwright test --config=playwright.config.ts --grep 'matches a selected Java' --repeat-each=10 --retries=0 --output=test-results/v02-006-java-stability-artifacts --reporter=json
       - name: Optional isolated performance acceptance
         if: github.event_name == 'workflow_dispatch' && inputs.performance
         shell: pwsh
@@ -78,7 +88,10 @@ jobs:
         if: always()
         shell: pwsh
         run: |
-          $reports = @('test-results/packaged-e2e-results.json')
+          $reports = @('test-results/e2e-results.json', 'test-results/packaged-e2e-results.json')
+          if ('${{ github.event_name }}' -eq 'workflow_dispatch' -and '${{ inputs.java_stability }}' -eq 'true') {
+            $reports += 'test-results/v02-006-java-stability-results.json'
+          }
           if ('${{ github.event_name }}' -eq 'workflow_dispatch' -and '${{ inputs.performance }}' -eq 'true') {
             $reports += 'test-results/v02-006-scan-limit-results.json', 'test-results/v02-006-matrix-results.json', 'test-results/v02-006-overview-results.json', 'test-results/v02-006-foreground-log-results.json'
           }
@@ -96,5 +109,6 @@ jobs:
             test-results/v02-006-*-benchmarks/
             test-results/v02-006-active-log-artifacts/
             test-results/v02-006-foreground-log-artifacts/
+            test-results/v02-006-java-stability-artifacts/
           if-no-files-found: ignore
           retention-days: 7
