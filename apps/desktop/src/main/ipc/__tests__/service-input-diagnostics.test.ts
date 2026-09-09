@@ -8,7 +8,11 @@ import { diagnoseServiceInputs } from '../service-input-diagnostics.js';
 
 let root: string;
 const service = (patch: Partial<ServiceConfig> = {}): ServiceConfig => ({ id: 's', runProfileId: 'p', name: 'fixture', type: 'tool', moduleRelativePath: '.', cwdRelative: '.', executable: 'node', args: [], env: [], dependsOn: [], enabled: true, source: 'manual', ...patch });
-const check = (patch: Partial<ServiceConfig> = {}) => withExecutionReadBudget(budget => diagnoseServiceInputs(root, root, service(patch), budget));
+const check = (patch: Partial<ServiceConfig> = {}) => withExecutionReadBudget(async budget => {
+  // Match diagnoseProfile: Windows TEMP may contain an 8.3 alias or a junction.
+  const physicalRoot = await budget.physical(root);
+  return diagnoseServiceInputs(physicalRoot, physicalRoot, service(patch), budget);
+});
 beforeEach(async () => { root = await fs.mkdtemp(path.join(os.tmpdir(), 'codehelm-inputs-')); });
 afterEach(async () => {
   if (path.dirname(root) !== os.tmpdir() || !path.basename(root).startsWith('codehelm-inputs-')) throw new Error('Unsafe cleanup');

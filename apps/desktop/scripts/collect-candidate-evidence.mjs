@@ -31,7 +31,8 @@ async function walk(directory){
     else if(entry.isFile())artifacts.push({path:path.relative(candidate,absolute).replaceAll('\\','/'),bytes:fs.statSync(absolute).size,sha256:await hashFile(absolute)});
   }
 }
-await walk(candidate);
+const candidateExists=fs.existsSync(candidate);
+if(candidateExists)await walk(candidate);
 // Explicit reports prevent a new candidate from silently inheriting an older run's result.
 const resultFiles=process.argv.slice(4);
 if(!resultFiles.length)resultFiles.push('test-results/packaged-e2e-results.json');
@@ -47,7 +48,7 @@ const evidence={formatVersion:2,generatedAt:new Date().toISOString(),productVers
   git:{head:git('rev-parse','HEAD'),branch:git('branch','--show-current'),dirty:!!git('status','--porcelain'),sourceDigest:digest(JSON.stringify(sourceInventory)),sourceInventory},
   environment:{platform:process.platform,arch:process.arch,os:os.release(),cpu:os.cpus()[0]?.model,totalMemoryBytes:os.totalmem(),node:process.version,
     configuredPackageManager:JSON.parse(fs.readFileSync('package.json','utf8')).packageManager,electron:packageVersion('electron'),electronBuilder:packageVersion('electron-builder')},
-  lockfileSha256:await hashFile('pnpm-lock.yaml'),candidateDirectory:candidate,excludedRuntimeDirectories:['logs'],artifacts,tests,
+  lockfileSha256:await hashFile('pnpm-lock.yaml'),candidateDirectory:candidate,candidateStatus:candidateExists?'recorded':'not-built',excludedRuntimeDirectories:['logs'],artifacts,tests,
   releaseReady:false,limitations:['Local working-tree candidate; not a published release.','Installer clean-system, upgrade and rollback matrix requires separate evidence.','Test report and file hashes record observed files; build provenance requires a frozen commit and CI run.']};
 fs.mkdirSync(path.dirname(output),{recursive:true});fs.writeFileSync(output,JSON.stringify(evidence,null,2)+'\n');
 console.log(`Candidate evidence written: ${output}; ${artifacts.length} files; releaseReady=false`);
