@@ -15,7 +15,7 @@
             class="text-[11px] font-medium px-2.5 py-0.5 rounded-full border flex items-center gap-1.5 shadow-2xs"
             :class="themeStore.isDark ? 'bg-emerald-950/60 text-emerald-300 border-emerald-500/40' : 'bg-emerald-50 text-emerald-700 border-emerald-300'"
           >
-            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 pulsing-dot-active flex-shrink-0 -translate-y-[0.5px]" />
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 pulsing-dot-active flex-shrink-0" />
             <span>{{ runnerStore.runningCount }} 个活跃进程捕获中</span>
           </span>
           <span
@@ -371,7 +371,7 @@
           <!-- Project Tag (when in ALL projects mode) -->
           <span
             v-if="selectedProjectFilter === 'ALL' && getEntryProjectName(entry)"
-            class="text-zinc-400 text-[10px] bg-[#14141c] px-1.5 py-0.2 rounded flex-shrink-0 select-none border border-[#27272a] font-sans truncate max-w-[120px]"
+            class="text-zinc-400 text-[10px] bg-[#14141c] px-1.5 py-0.5 rounded flex-shrink-0 select-none border border-[#27272a] font-sans truncate max-w-[120px] leading-none"
             :title="getEntryProjectName(entry)"
           >
             {{ getEntryProjectName(entry) }}
@@ -379,14 +379,14 @@
 
           <!-- Service Name Capsule -->
           <span
-            class="text-zinc-200 font-medium text-[11px] bg-[#1a1a22] px-2 py-0.2 rounded-md flex-shrink-0 select-none border border-zinc-700/80 font-sans"
+            class="text-zinc-200 font-medium text-[11px] bg-[#1a1a22] px-2 py-0.5 rounded-md flex-shrink-0 select-none border border-zinc-700/80 font-sans leading-none"
           >
             {{ entry.serviceName }}
           </span>
 
           <!-- Stream Type Badge (ERR / OUT) -->
           <span
-            class="text-[10px] font-bold px-1.5 py-0.2 rounded flex-shrink-0 select-none uppercase font-mono"
+            class="text-[10px] font-bold px-1.5 py-0.5 rounded flex-shrink-0 select-none uppercase font-mono leading-none"
             :class="entry.stream === 'stderr' ? 'bg-rose-950 text-rose-300 border border-rose-800' : 'text-zinc-500'"
           >
             {{ entry.stream === 'stderr' ? 'ERR' : 'OUT' }}
@@ -716,9 +716,10 @@ onMounted(async () => {
 
 <style scoped>
 .terminal-code-stream {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-family: "Cascadia Code", Consolas, "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, "Microsoft YaHei", "PingFang SC", monospace;
   font-size: 12px;
   line-height: 1.6;
+  -webkit-font-smoothing: auto;
 }
 
 .terminal-log-row {

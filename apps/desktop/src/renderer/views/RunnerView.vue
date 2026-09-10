@@ -57,7 +57,7 @@
             <div class="flex items-center gap-1.5">
               <span
                 v-if="runningProjectGroups.length > 0"
-                class="w-1.5 h-1.5 rounded-full bg-emerald-400 pulsing-dot-active flex-shrink-0 -translate-y-[0.5px]"
+                class="w-1.5 h-1.5 rounded-full bg-emerald-400 pulsing-dot-active flex-shrink-0"
               />
               <span>活跃受管项目</span>
               <span
@@ -192,10 +192,10 @@
                         {{ svc.name }}
                       </span>
                       <span
-                        class="text-[10px] font-mono px-1.5 py-0.5 rounded border font-medium flex items-center gap-1 leading-none"
+                        class="text-[11px] font-mono px-2 py-0.5 rounded border font-medium flex items-center gap-1 leading-none"
                         :class="themeStore.isDark ? 'bg-white text-black border-white font-bold' : 'bg-black text-white border-black font-bold'"
                       >
-                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 pulsing-dot-active flex-shrink-0 -translate-y-[0.5px]" />
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 pulsing-dot-active flex-shrink-0" />
                         <span>RUNNING</span>
                       </span>
                     </div>

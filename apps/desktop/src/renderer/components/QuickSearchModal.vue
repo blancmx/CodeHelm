@@ -81,10 +81,12 @@
                         {{ project.name }}
                       </span>
                       <span
-                        class="text-[10px] font-sans font-medium px-1.5 py-0.2 rounded border flex-shrink-0"
-                        :class="themeStore.isDark ? 'bg-[#18181b] text-zinc-400 border-[#27272a]' : 'bg-zinc-100 text-zinc-600 border-zinc-200'"
+                        class="text-[11px] font-normal px-2 py-0.5 rounded-md border flex-shrink-0 inline-flex items-center gap-1 leading-none select-none"
+                        :class="themeStore.isDark ? 'bg-[#18181b] text-zinc-300 border-[#27272a]' : 'bg-zinc-100 text-zinc-700 border-zinc-200'"
                       >
-                        <span class="font-mono">{{ project.moduleCount || 0 }}</span> 模块 / <span class="font-mono">{{ project.serviceCount || 0 }}</span> 服务
+                        <span>{{ project.moduleCount || 0 }} 模块</span>
+                        <span class="opacity-40">/</span>
+                        <span>{{ project.serviceCount || 0 }} 服务</span>
                       </span>
                     </div>
                     <p
@@ -103,7 +105,7 @@
                     <span
                       v-for="lang in (project.primaryLanguages || []).slice(0, 2)"
                       :key="lang"
-                      class="text-[9px] font-mono px-1.5 py-0.2 rounded border"
+                      class="text-[11px] font-mono px-1.5 py-0.5 rounded border leading-none"
                       :class="themeStore.isDark ? 'bg-[#18181b] text-zinc-300 border-[#27272a]' : 'bg-zinc-100 text-zinc-700 border-zinc-200'"
                     >
                       {{ lang }}

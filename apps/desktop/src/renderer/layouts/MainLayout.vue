@@ -47,7 +47,7 @@
               <h1 class="font-bold text-xs tracking-tight truncate select-none" :class="themeStore.isDark ? 'text-white' : 'text-zinc-950'">
                 CodeHelm
               </h1>
-              <p class="text-[9px] font-medium truncate select-none" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
+              <p class="text-[11px] font-medium truncate select-none" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
                 本地项目控制台
               </p>
             </div>
@@ -109,7 +109,7 @@
               <span class="truncate text-xs font-medium transition-transform duration-150 group-hover:translate-x-0.5">项目总览</span>
               <span
                 v-if="projectStore.projects.length"
-                class="text-[9px] px-1.5 py-0.2 rounded font-mono font-medium flex-shrink-0 ml-1.5"
+                class="text-[10px] px-1.5 py-0.5 rounded font-mono font-medium flex-shrink-0 ml-1.5 leading-none"
                 :class="themeStore.isDark ? 'bg-[#27272a] text-zinc-300' : ($route.name === 'overview' ? 'bg-zinc-800 text-zinc-200' : 'bg-zinc-200 text-zinc-700')"
               >
                 {{ projectStore.projects.length }}
@@ -161,10 +161,10 @@
               <span class="truncate text-xs font-medium transition-transform duration-150 group-hover:translate-x-0.5">运行中心</span>
               <div
                 v-if="runnerStore.runningCount > 0"
-                class="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[9px] font-mono font-medium flex-shrink-0 ml-1.5 leading-none"
+                class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-mono font-medium flex-shrink-0 ml-1.5 leading-none"
                 :class="themeStore.isDark ? 'bg-white/15 text-white border border-white/30' : ($route.name === 'runner' ? 'bg-zinc-800 text-white border border-zinc-700' : 'bg-black text-white border border-black')"
               >
-                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 pulsing-dot-active flex-shrink-0 -translate-y-[0.5px]" />
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 pulsing-dot-active flex-shrink-0" />
                 <span class="leading-none">{{ runnerStore.runningCount }}</span>
               </div>
             </div>
@@ -192,7 +192,7 @@
                 ? (themeStore.isDark ? 'bg-white/10 text-white font-semibold' : 'bg-black text-white font-semibold shadow-xs')
                 : (themeStore.isDark ? 'text-zinc-400 hover:bg-[#18181b] hover:text-zinc-100' : 'text-zinc-600 hover:bg-zinc-200/70 hover:text-zinc-950')
             ]"
-            :title="sidebarStore.isCollapsed ? `实时控制台 (${runnerStore.logs.length} 条日志)` : ''"
+            :title="sidebarStore.isCollapsed ? `实时控制台 (${stderrLogsCount > 0 ? stderrLogsCount + ' 处错误' : runnerStore.logs.length + ' 条日志'})` : ''"
             @mouseenter="isConsoleHovered = true"
             @mouseleave="isConsoleHovered = false"
           >
@@ -213,12 +213,12 @@
               <span class="truncate text-xs font-medium transition-transform duration-150 group-hover:translate-x-0.5">实时控制台</span>
               <div
                 v-if="runnerStore.logs.length > 0"
-                class="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[9px] font-mono font-medium flex-shrink-0 ml-1.5 leading-none"
+                class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-mono font-medium flex-shrink-0 ml-1.5 leading-none"
                 :class="stderrLogsCount > 0
                   ? (themeStore.isDark ? 'bg-rose-950/70 text-rose-300 border border-rose-700/60' : 'bg-rose-100 text-rose-800 border border-rose-300')
                   : (themeStore.isDark ? 'bg-[#27272a] text-zinc-300' : ($route.name === 'console' ? 'bg-zinc-800 text-zinc-200' : 'bg-zinc-200 text-zinc-700'))"
               >
-                <span v-if="stderrLogsCount > 0" class="w-1.5 h-1.5 rounded-full bg-rose-400 flex-shrink-0 -translate-y-[0.5px]" />
+                <span v-if="stderrLogsCount > 0" class="w-1.5 h-1.5 rounded-full bg-rose-400 flex-shrink-0" />
                 <span class="leading-none">{{ stderrLogsCount > 0 ? stderrLogsCount + ' 错' : runnerStore.logs.length }}</span>
               </div>
             </div>

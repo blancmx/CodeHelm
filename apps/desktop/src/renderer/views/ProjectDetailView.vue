@@ -129,7 +129,7 @@
             <IconSquare
               :size="13"
               stroke-width="2"
-              class="text-rose-600 dark:text-rose-400 fill-transparent group-hover:fill-current transition-all duration-200 group-hover:scale-90 flex-shrink-0 -translate-y-[0.5px]"
+              class="text-rose-600 dark:text-rose-400 fill-transparent group-hover:fill-current transition-all duration-200 group-hover:scale-90 flex-shrink-0"
             />
             <span class="leading-none">停止服务</span>
           </button>
@@ -199,7 +199,7 @@
                     </h3>
                     <span
                       v-if="readmeSummary.hasReadme"
-                      class="text-[10px] font-mono px-1.5 py-0.2 rounded border font-medium"
+                      class="text-[10px] font-mono px-1.5 py-0.5 rounded border font-medium leading-none"
                       :class="themeStore.isDark ? 'bg-[#18181b] text-zinc-400 border-[#27272a]' : 'bg-zinc-100 text-zinc-600 border-zinc-200'"
                     >
                       README.md
@@ -422,7 +422,7 @@
                         :class="themeStore.isDark ? 'bg-[#18181b] text-zinc-300 border-[#27272a]' : 'bg-zinc-100 text-zinc-700 border-zinc-200'"
                       >
                         <span class="font-semibold">{{ Math.round(tech.confidence * 100) }}%</span>
-                        <span class="text-[10px] opacity-75">置信度</span>
+                        <span class="text-[11px] opacity-90">置信度</span>
                       </span>
                     </div>
 
@@ -476,7 +476,7 @@
                     </h4>
                   </div>
                   <span class="text-xs font-sans font-medium text-emerald-600 dark:text-emerald-400 inline-flex items-center gap-1.5 select-none">
-                    <IconCheck :size="13" :stroke-width="2.5" class="text-emerald-500 dark:text-emerald-400 flex-shrink-0 -translate-y-[0.5px]" />
+                    <IconCheck :size="13" :stroke-width="2.5" class="text-emerald-500 dark:text-emerald-400 flex-shrink-0" />
                     <span>全部端口与 HTTP 健康检查已通过</span>
                   </span>
                 </div>
@@ -504,8 +504,8 @@
                           </a>
                         </td>
                         <td class="py-2.5">
-                          <span class="px-2 py-0.5 rounded text-[10px] font-semibold border flex items-center gap-1.5 w-max leading-none" :class="themeStore.isDark ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-emerald-50 text-emerald-700 border-emerald-200'">
-                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 pulsing-dot-active flex-shrink-0 -translate-y-[0.5px]" />
+                          <span class="px-2 py-0.5 rounded-md text-[11px] font-semibold border flex items-center gap-1.5 w-max leading-none" :class="themeStore.isDark ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-emerald-50 text-emerald-700 border-emerald-200'">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 pulsing-dot-active flex-shrink-0" />
                             <span class="leading-none">{{ ep.statusCode || 200 }} 就绪</span>
                           </span>
                         </td>
@@ -569,19 +569,19 @@
                             {{ service.name }}
                           </span>
                           <span
-                            class="border px-2 py-0.2 rounded text-[10px] font-medium uppercase"
+                            class="border px-2 py-0.5 rounded text-[11px] font-medium uppercase leading-none"
                             :class="themeStore.isDark ? 'bg-[#27272a] text-zinc-300 border-[#3f3f46]' : 'bg-white text-zinc-600 border-zinc-200'"
                           >
                             {{ service.type }}
                           </span>
                           <!-- Status badge -->
                           <span
-                            class="px-2 py-0.5 rounded-md text-[10px] font-sans font-bold tracking-wider uppercase inline-flex items-center gap-1.5 leading-none select-none shadow-2xs"
+                            class="px-2 py-0.5 rounded-md text-[11px] font-sans font-bold tracking-wider uppercase inline-flex items-center gap-1.5 leading-none select-none shadow-2xs"
                             :class="statusBadgeClass(getServiceStatus(service.id).status)"
                           >
                             <span
                               v-if="getServiceStatus(service.id).status === 'RUNNING'"
-                              class="w-1.5 h-1.5 rounded-full bg-emerald-400 pulsing-dot-active flex-shrink-0 -translate-y-[0.5px]"
+                              class="w-1.5 h-1.5 rounded-full bg-emerald-400 pulsing-dot-active flex-shrink-0"
                             />
                             <span class="leading-none">{{ serviceStatusLabel(getServiceStatus(service.id).status) }}</span>
                           </span>
@@ -595,7 +595,7 @@
                           <span :class="themeStore.isDark ? 'text-zinc-300' : 'text-zinc-700'">$ {{ service.executable }} {{ service.args.join(' ') }}</span>
                           <span
                             v-if="service.port"
-                            class="font-bold px-1.5 py-0.2 rounded border"
+                            class="font-bold px-1.5 py-0.5 rounded border leading-none"
                             :class="themeStore.isDark ? 'text-zinc-200 bg-[#27272a] border-[#3f3f46]' : 'text-zinc-900 bg-zinc-100 border-zinc-300'"
                           >
                             Port: {{ service.port }}
@@ -639,7 +639,7 @@
                         <IconSquare
                           :size="11"
                           stroke-width="2"
-                          class="text-rose-600 dark:text-rose-400 fill-transparent group-hover:fill-current transition-all duration-200 group-hover:scale-90 flex-shrink-0 -translate-y-[0.5px]"
+                          class="text-rose-600 dark:text-rose-400 fill-transparent group-hover:fill-current transition-all duration-200 group-hover:scale-90 flex-shrink-0"
                         />
                         <span class="leading-none">停止</span>
                       </button>
@@ -712,12 +712,12 @@
                           {{ service.name }}
                         </span>
                         <span
-                          class="border px-1.5 py-0.2 rounded text-[10px]"
+                          class="border px-1.5 py-0.5 rounded text-[11px] leading-none"
                           :class="themeStore.isDark ? 'bg-[#27272a] text-zinc-400 border-transparent' : 'bg-white text-zinc-500 border-zinc-200'"
                         >
                           {{ service.type }}
                         </span>
-                        <span v-if="service.dependsOn?.length" class="text-[10px] text-zinc-400 font-mono">
+                        <span v-if="service.dependsOn?.length" class="text-[11px] text-zinc-400 font-mono">
                           依赖: [{{ service.dependsOn.join(', ') }}]
                         </span>
                       </div>
@@ -729,7 +729,7 @@
 
                   <div class="flex items-center gap-3">
                     <div class="flex items-center gap-1.5">
-                      <span class="text-[10px] whitespace-nowrap" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
+                      <span class="text-[11px] whitespace-nowrap" :class="themeStore.isDark ? 'text-zinc-300' : 'text-zinc-700'">
                         自定义端口
                       </span>
                       <n-input-number
@@ -1382,8 +1382,7 @@ function serviceStatusLabel(status: ProcessStatus | string) {
 <style scoped>
 .terminal-code-stream {
   font-family: ui-monospace, SFMono-Regular, "Cascadia Code", "Fira Code", "JetBrains Mono", Menlo, Consolas, -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  -webkit-font-smoothing: auto;
 }
 
 </style>

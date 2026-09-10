@@ -209,7 +209,7 @@
           @click="onlyRunning = !onlyRunning"
         >
           <span
-            class="w-1.5 h-1.5 rounded-full flex-shrink-0 transition-colors -translate-y-[0.5px]"
+            class="w-1.5 h-1.5 rounded-full flex-shrink-0 transition-colors"
             :class="runningProjectsCount > 0 ? (onlyRunning ? 'bg-emerald-400 pulsing-dot-active' : 'bg-emerald-400') : 'bg-zinc-400'"
           />
           <span>运行中 / 启动中</span>
@@ -236,7 +236,7 @@
         >
           <button
             type="button"
-            class="h-7.5 w-[124px] px-2.5 rounded-lg border flex items-center justify-between font-sans antialiased text-xs font-medium transition-all cursor-pointer select-none"
+            class="h-7.5 w-[124px] px-2.5 rounded-lg border flex items-center justify-between font-sans text-xs font-medium transition-all cursor-pointer select-none"
             :class="[
               isSortOpen
                 ? (themeStore.isDark ? 'bg-[#18181b] border-white text-white shadow-xs' : 'bg-white border-black text-zinc-950 shadow-xs')
@@ -362,7 +362,7 @@
               <IconFolderOpen :size="14" />
               <span>总目录扫描</span>
             </div>
-            <div class="text-[10px] mt-1 leading-normal" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
+            <div class="text-[11px] mt-1 leading-normal" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
               自动深度探测子项目与 Monorepo 拓扑
             </div>
           </div>
@@ -375,7 +375,7 @@
               <IconZap :size="14" />
               <span>智能命令推断</span>
             </div>
-            <div class="text-[10px] mt-1 leading-normal" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
+            <div class="text-[11px] mt-1 leading-normal" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
               零配置推断 Vite、Next.js、FastAPI 等启动脚本
             </div>
           </div>
@@ -388,7 +388,7 @@
               <IconLock :size="14" />
               <span>纯本地隔离</span>
             </div>
-            <div class="text-[10px] mt-1 leading-normal" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
+            <div class="text-[11px] mt-1 leading-normal" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
               零云端上传，进程树防孤儿自动安全清理
             </div>
           </div>
@@ -468,13 +468,13 @@
 
               <!-- Status Badge -->
               <span
-                class="px-1.5 py-0.5 rounded-full text-[10px] font-sans font-medium inline-flex items-center gap-1 flex-shrink-0 border leading-none"
+                class="px-2 py-0.5 rounded-full text-[11px] font-sans font-medium inline-flex items-center gap-1 flex-shrink-0 border leading-none"
                 :class="statusBadgeClass(project.runtime.status)"
                 :title="runtimeStatusTitle(project)"
               >
                 <span
                   v-if="project.runtime.status === 'RUNNING'"
-                  class="w-1.5 h-1.5 rounded-full bg-emerald-400 pulsing-dot-active flex-shrink-0 -translate-y-[0.5px]"
+                  class="w-1.5 h-1.5 rounded-full bg-emerald-400 pulsing-dot-active flex-shrink-0"
                 />
                 <span class="leading-none">{{ runtimeStatusLabel(project.runtime.status, project.id) }}</span>
               </span>
@@ -600,7 +600,7 @@
                   <span
                     v-for="lang in (project.primaryLanguages || []).slice(0, 3)"
                     :key="lang"
-                    class="px-1.5 py-0.2 rounded text-[10px] font-mono border"
+                    class="px-1.5 py-0.5 rounded text-[11px] font-mono border leading-none"
                     :class="themeStore.isDark ? 'bg-[#18181b] text-zinc-300 border-[#27272a]' : 'bg-zinc-100 text-zinc-800 border-zinc-200'"
                   >
                     {{ lang }}
@@ -608,7 +608,7 @@
                   <span
                     v-for="fw in (project.primaryFrameworks || []).slice(0, 2)"
                     :key="fw"
-                    class="px-1.5 py-0.2 rounded text-[10px] font-mono border"
+                    class="px-1.5 py-0.5 rounded text-[11px] font-mono border leading-none"
                     :class="themeStore.isDark ? 'bg-[#27272a] text-zinc-200 border-[#3f3f46]' : 'bg-zinc-200 text-zinc-900 border-zinc-300'"
                   >
                     {{ fw }}
@@ -617,20 +617,20 @@
               </td>
 
               <!-- Scale -->
-              <td class="py-3.5 px-4 text-[11px] truncate" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
+              <td class="py-3.5 px-4 text-xs truncate" :class="themeStore.isDark ? 'text-zinc-300' : 'text-zinc-700'">
                 <span>{{ project.moduleCount || 0 }} 模块 / {{ project.serviceCount || 0 }} 服务</span>
               </td>
 
               <!-- Status -->
               <td class="py-3.5 px-4">
                 <span
-                  class="px-1.5 py-0.5 rounded-full text-[10px] font-mono font-medium inline-flex items-center gap-1 border leading-none"
+                  class="px-2 py-0.5 rounded-full text-[11px] font-mono font-medium inline-flex items-center gap-1 border leading-none"
                   :class="statusBadgeClass(project.runtime.status)"
                   :title="runtimeStatusTitle(project)"
                 >
                   <span
                     v-if="project.runtime.status === 'RUNNING'"
-                    class="w-1.5 h-1.5 rounded-full bg-emerald-400 pulsing-dot-active flex-shrink-0 -translate-y-[0.5px]"
+                    class="w-1.5 h-1.5 rounded-full bg-emerald-400 pulsing-dot-active flex-shrink-0"
                   />
                   <span class="leading-none">{{ runtimeStatusLabel(project.runtime.status, project.id) }}</span>
                 </span>
@@ -772,7 +772,7 @@ const indicatorStyle = ref<{
   height: string;
   opacity: number;
 }>({
-  transform: 'translate3d(0, 0, 0)',
+  transform: 'translate(0px, 0px)',
   width: '0px',
   height: '0px',
   opacity: 0,
@@ -785,7 +785,7 @@ function updateIndicator() {
   const activeEl = tabRefs.get(activeFilter.value) || container.querySelector<HTMLElement>(`[data-tab="${activeFilter.value}"]`);
   if (!activeEl) {
     indicatorStyle.value = {
-      transform: 'translate3d(0, 0, 0)',
+      transform: 'translate(0px, 0px)',
       width: '0px',
       height: '0px',
       opacity: 0,
@@ -793,17 +793,17 @@ function updateIndicator() {
     return;
   }
 
-  const left = activeEl.offsetLeft;
-  const top = activeEl.offsetTop;
-  const width = activeEl.offsetWidth;
-  const height = activeEl.offsetHeight;
+  const left = Math.round(activeEl.offsetLeft);
+  const top = Math.round(activeEl.offsetTop);
+  const width = Math.round(activeEl.offsetWidth);
+  const height = Math.round(activeEl.offsetHeight);
 
   if (width === 0 && height === 0) {
     return;
   }
 
   indicatorStyle.value = {
-    transform: `translate3d(${left}px, ${top}px, 0)`,
+    transform: `translate(${left}px, ${top}px)`,
     width: `${width}px`,
     height: `${height}px`,
     opacity: 1,
