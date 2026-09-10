@@ -3,9 +3,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const releaseDir = path.resolve(process.argv[2] ?? 'dist-release');
+const { version } = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+if (typeof version !== 'string' || !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?$/.test(version)) {
+  throw new Error('Invalid desktop package version');
+}
 const artifactNames = [
-  'CodeHelm Setup 0.1.0.exe',
-  'CodeHelm Setup 0.1.0.exe.blockmap',
+  `CodeHelm Setup ${version}.exe`,
+  `CodeHelm Setup ${version}.exe.blockmap`,
   'win-unpacked/CodeHelm.exe',
 ];
 
@@ -25,7 +29,7 @@ const artifacts = artifactNames.map((name) => {
 const checksums = artifacts.map((artifact) => `${artifact.sha256}  *${artifact.path}`).join('\n') + '\n';
 fs.writeFileSync(path.join(releaseDir, 'SHA256SUMS.txt'), checksums, 'utf8');
 
-const notice = `CodeHelm v0.1.0 未签名开发版本 / Unsigned development build
+const notice = `CodeHelm v${version} 未签名开发版本 / Unsigned development build
 
 此安装器仅用于开发和内测，未使用 Authenticode 代码签名证书。
 Windows SmartScreen 或杀毒软件可能显示“未知发布者”警告。
@@ -44,7 +48,7 @@ fs.writeFileSync(
   `${JSON.stringify(
     {
       product: 'CodeHelm',
-      version: '0.1.0',
+      version,
       channel: 'development',
       signaturePolicy: 'unsigned',
       generatedAt: new Date().toISOString(),
