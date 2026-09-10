@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
@@ -23,6 +23,7 @@ function profile(services: Partial<ServiceConfig>[] = [{}]): RunProfile {
 
 beforeEach(async () => { root = await fs.mkdtemp(path.join(os.tmpdir(), 'codehelm-diagnostics-')); });
 afterEach(async () => {
+  vi.restoreAllMocks();
   const resolved = path.resolve(root);
   if (path.dirname(resolved) !== path.resolve(os.tmpdir()) || !path.basename(resolved).startsWith('codehelm-diagnostics-')) {
     throw new Error('Unsafe fixture cleanup');
@@ -31,6 +32,43 @@ afterEach(async () => {
 });
 
 describe('metadata-only environment diagnostics', () => {
+  it.each(['EACCES', 'EIO'])('reports root %s without exposing filesystem error contents', async code => {
+    const realpath = vi.spyOn(fs, 'realpath').mockRejectedValueOnce(Object.assign(new Error('PRIVATE_DISK_PATH'), { code }));
+    const result = await diagnoseProfile(root, profile());
+    expect(result.checks).toContainEqual(expect.objectContaining({ code: 'ROOT_UNREADABLE', status: 'unknown' }));
+    expect(result.checks.some(item => item.code === 'COMMAND_FOUND')).toBe(false);
+    expect(JSON.stringify(result)).not.toContain('PRIVATE_DISK_PATH');
+    realpath.mockRestore();
+    expect((await diagnoseProfile(root, profile())).checks).toContainEqual(expect.objectContaining({ code: 'ROOT_AVAILABLE', status: 'passed' }));
+  });
+
+  it.each(['cancel', 'timeout'])('settles diagnostics on %s while root I/O is pending and recovers afterward', async kind => {
+    const physicalRoot = await fs.realpath(root);
+    let release!: (value: string) => void;
+    let entered!: () => void;
+    const started = new Promise<void>(resolve => { entered = resolve; });
+    const pending = new Promise<string>(resolve => { release = resolve; });
+    const read = vi.spyOn(fs, 'realpath').mockImplementationOnce(async () => { entered(); return pending; });
+    const controller = new AbortController();
+    const input = profile();
+    const before = JSON.stringify(input);
+    const result = diagnoseProfile(root, input, { signal: controller.signal });
+    const rejected = expect(result).rejects.toThrow(kind === 'cancel' ? '取消' : '超时');
+    try {
+      await started;
+      if (kind === 'cancel') controller.abort();
+      await rejected;
+      expect(JSON.stringify(input)).toBe(before);
+    } finally {
+      release(physicalRoot);
+      await pending;
+      // Let the suspended physical read observe cancellation and release its budget slot.
+      await new Promise<void>(resolve => setImmediate(resolve));
+      read.mockRestore();
+    }
+    expect((await diagnoseProfile(root, input)).checks).toContainEqual(expect.objectContaining({ code: 'ROOT_AVAILABLE', status: 'passed' }));
+  }, 15000);
+
   it('does not execute local scripts or expose secrets, and leaves input unchanged', async () => {
     const sentinel = path.join(root, 'SIDE_EFFECT');
     const executable = path.join(root, 'local.cmd');
