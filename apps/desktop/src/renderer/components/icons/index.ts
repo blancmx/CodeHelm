@@ -17,6 +17,14 @@ function createIcon(name: string, svgPaths: () => ReturnType<typeof h>[]) {
         type: [String, Array, Object],
         default: '',
       },
+      fill: {
+        type: String,
+        default: 'none',
+      },
+      filled: {
+        type: Boolean,
+        default: false,
+      },
     },
     setup(props) {
       return () =>
@@ -27,7 +35,7 @@ function createIcon(name: string, svgPaths: () => ReturnType<typeof h>[]) {
             viewBox: '0 0 24 24',
             width: props.size,
             height: props.size,
-            fill: 'none',
+            fill: props.filled ? 'currentColor' : props.fill,
             stroke: 'currentColor',
             'stroke-width': props.strokeWidth,
             'stroke-linecap': 'round',
@@ -303,6 +311,135 @@ export const IconSidebar = createIcon('IconSidebar', () => [
   h('rect', { width: 18, height: 18, x: 3, y: 3, rx: 2 }),
   h('path', { d: 'M9 3v18' }),
 ]);
+
+export const IconStar = defineComponent({
+  name: 'IconStar',
+  props: {
+    size: {
+      type: [Number, String],
+      default: 16,
+    },
+    strokeWidth: {
+      type: [Number, String],
+      default: 1.8,
+    },
+    class: {
+      type: [String, Array, Object],
+      default: '',
+    },
+    filled: {
+      type: Boolean,
+      default: false,
+    },
+  },
+  setup(props, { attrs }) {
+    return () =>
+      h(
+        'svg',
+        {
+          xmlns: 'http://www.w3.org/2000/svg',
+          viewBox: '0 0 24 24',
+          width: props.size,
+          height: props.size,
+          fill: 'none',
+          stroke: 'currentColor',
+          'stroke-width': props.strokeWidth,
+          'stroke-linecap': 'round',
+          'stroke-linejoin': 'round',
+          ...attrs,
+          class: [props.class, attrs.class],
+          style: attrs.style,
+        },
+        [
+          h('polygon', {
+            points: '12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2',
+            fill: 'currentColor',
+            'fill-opacity': props.filled ? 1 : 0,
+            style: 'transition: fill-opacity 0.28s cubic-bezier(0.4, 0, 0.2, 1), stroke 0.28s cubic-bezier(0.4, 0, 0.2, 1);',
+          }),
+        ]
+      );
+  },
+});
+
+export const IconStarFilled = createIcon('IconStarFilled', () => [
+  h('polygon', {
+    points: '12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2',
+    fill: 'currentColor',
+  }),
+]);
+
+export const IconCircle = createIcon('IconCircle', () => [
+  h('circle', { cx: 12, cy: 12, r: 9 }),
+]);
+
+export const IconArchive = defineComponent({
+  name: 'IconArchive',
+  props: {
+    size: {
+      type: [Number, String],
+      default: 16,
+    },
+    strokeWidth: {
+      type: [Number, String],
+      default: 1.8,
+    },
+    class: {
+      type: [String, Array, Object],
+      default: '',
+    },
+    filled: {
+      type: Boolean,
+      default: false,
+    },
+  },
+  setup(props, { attrs }) {
+    return () =>
+      h(
+        'svg',
+        {
+          xmlns: 'http://www.w3.org/2000/svg',
+          viewBox: '0 0 24 24',
+          width: props.size,
+          height: props.size,
+          fill: 'none',
+          stroke: 'currentColor',
+          'stroke-width': props.strokeWidth,
+          'stroke-linecap': 'round',
+          'stroke-linejoin': 'round',
+          ...attrs,
+          class: [props.class, attrs.class],
+          style: attrs.style,
+        },
+        [
+          h('polyline', {
+            points: '21 8 21 21 3 21 3 8',
+            fill: 'currentColor',
+            'fill-opacity': props.filled ? 1 : 0,
+            style: 'transition: fill-opacity 0.28s cubic-bezier(0.4, 0, 0.2, 1), stroke 0.28s cubic-bezier(0.4, 0, 0.2, 1);',
+          }),
+          h('rect', {
+            x: 1,
+            y: 3,
+            width: 22,
+            height: 5,
+            rx: 1,
+            fill: 'currentColor',
+            'fill-opacity': props.filled ? 1 : 0,
+            style: 'transition: fill-opacity 0.28s cubic-bezier(0.4, 0, 0.2, 1), stroke 0.28s cubic-bezier(0.4, 0, 0.2, 1);',
+          }),
+          h('line', {
+            x1: 10,
+            y1: 12,
+            x2: 14,
+            y2: 12,
+            stroke: props.filled ? '#ffffff' : 'currentColor',
+            style: 'transition: stroke 0.28s cubic-bezier(0.4, 0, 0.2, 1);',
+          }),
+        ]
+      );
+  },
+});
 
 export { default as IconCodeHelmLogo } from './IconCodeHelmLogo.vue';
 export { default as IconProjectGrid } from './IconProjectGrid.vue';

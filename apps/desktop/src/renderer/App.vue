@@ -5,7 +5,7 @@
     class="h-full w-full"
   >
     <div
-      class="h-full w-full font-sans flex flex-col antialiased overflow-hidden select-none transition-colors duration-300 relative"
+      class="h-full w-full font-sans flex flex-col subpixel-antialiased overflow-hidden select-none transition-colors duration-300 relative"
       :class="themeStore.isDark ? 'bg-[#0f0f12] text-[#ffffff]' : 'bg-[#f4f4f5] text-[#09090b]'"
     >
       <!-- Modern Frameless Window Header Bar with Drag Region & Windows 11 Controls -->
@@ -188,6 +188,26 @@ const darkThemeOverrides: GlobalThemeOverrides = {
       },
     },
   },
+  Checkbox: {
+    borderRadius: '4px',
+    color: '#18181b',
+    colorChecked: '#ffffff',
+    colorDisabled: '#27272a',
+    colorDisabledChecked: '#3f3f46',
+    border: '1px solid #3f3f46',
+    borderHover: '1px solid #71717a',
+    borderChecked: '1px solid #ffffff',
+    borderFocus: '1px solid #ffffff',
+    borderDisabled: '1px solid #27272a',
+    borderDisabledChecked: '1px solid #3f3f46',
+    checkMarkColor: '#09090b',
+    checkMarkColorDisabled: '#71717a',
+    checkMarkColorDisabledChecked: '#71717a',
+    boxShadowFocus: 'none',
+    fontSizeSmall: '12px',
+    fontSizeMedium: '13px',
+    fontSizeLarge: '14px',
+  },
 };
 
 const lightThemeOverrides: GlobalThemeOverrides = {
@@ -350,6 +370,26 @@ const lightThemeOverrides: GlobalThemeOverrides = {
       },
     },
   },
+  Checkbox: {
+    borderRadius: '4px',
+    color: '#ffffff',
+    colorChecked: '#18181b',
+    colorDisabled: '#f4f4f5',
+    colorDisabledChecked: '#e4e4e7',
+    border: '1px solid #d4d4d8',
+    borderHover: '1px solid #71717a',
+    borderChecked: '1px solid #18181b',
+    borderFocus: '1px solid #18181b',
+    borderDisabled: '1px solid #e4e4e7',
+    borderDisabledChecked: '1px solid #d4d4d8',
+    checkMarkColor: '#ffffff',
+    checkMarkColorDisabled: '#a1a1aa',
+    checkMarkColorDisabledChecked: '#a1a1aa',
+    boxShadowFocus: 'none',
+    fontSizeSmall: '12px',
+    fontSizeMedium: '13px',
+    fontSizeLarge: '14px',
+  },
 };
 
 const currentThemeOverrides = computed(() => {
@@ -434,16 +474,16 @@ html, body, #app {
   margin: 0;
   padding: 0;
   overflow: hidden;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "WenQuanYi Micro Hei", sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-rendering: optimizeLegibility;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "WenQuanYi Micro Hei", sans-serif;
+  -webkit-font-smoothing: subpixel-antialiased;
+  -moz-osx-font-smoothing: auto;
+  text-rendering: geometricPrecision;
 }
 
 button, input, select, textarea {
   font-family: inherit !important;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  -webkit-font-smoothing: subpixel-antialiased;
+  -moz-osx-font-smoothing: auto;
 }
 
 html.light,
@@ -484,8 +524,30 @@ html.dark #app {
 }
 
 .n-dialog .n-dialog__action .n-button .n-button__border,
-.n-dialog .n-dialog__action .n-button .n-button__state-border {
+.n-dialog .n-dialog__action .n-button .n-button__state-border,
+.btn-cancel-selection .n-button__border,
+.btn-cancel-selection .n-button__state-border {
   display: none !important;
+}
+
+/* Completely suppress Naive UI water wave ripple effect on toggle button */
+.n-button.btn-select-toggle .n-base-wave,
+.n-button.btn-select-toggle .n-base-wave--active,
+.n-button.btn-cancel-selection .n-base-wave,
+.n-button.btn-cancel-selection .n-base-wave--active {
+  display: none !important;
+  opacity: 0 !important;
+  animation: none !important;
+  box-shadow: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+.n-button.btn-select-toggle,
+.n-button.btn-cancel-selection {
+  --n-ripple-duration: 0s !important;
+  --n-ripple-color: transparent !important;
+  --n-wave-opacity: 0 !important;
 }
 
 /* =========================================================
@@ -551,28 +613,28 @@ html.dark .n-button.n-button--secondary * {
 }
 
 /* 5. Default Buttons */
-html.light .n-button.n-button--default-type {
+html.light .n-button.n-button--default-type:not(.n-button--secondary):not(.n-button--ghost):not(.n-button--quaternary):not(.n-button--tertiary):not(.project-organization-action):not(.btn-cancel-selection) {
   background-color: #ffffff !important;
   border: 1px solid #e4e4e7 !important;
 }
-html.light .n-button.n-button--default-type:hover {
+html.light .n-button.n-button--default-type:not(.n-button--secondary):not(.n-button--ghost):not(.n-button--quaternary):not(.n-button--tertiary):not(.project-organization-action):not(.btn-cancel-selection):hover {
   background-color: #f4f4f5 !important;
   border-color: #d4d4d8 !important;
 }
-html.light .n-button.n-button--default-type * {
+html.light .n-button.n-button--default-type:not(.n-button--secondary):not(.n-button--ghost):not(.n-button--quaternary):not(.n-button--tertiary):not(.project-organization-action):not(.btn-cancel-selection) * {
   color: #09090b !important;
   stroke: #09090b !important;
 }
 
-html.dark .n-button.n-button--default-type {
+html.dark .n-button.n-button--default-type:not(.n-button--secondary):not(.n-button--ghost):not(.n-button--quaternary):not(.n-button--tertiary):not(.project-organization-action):not(.btn-cancel-selection) {
   background-color: #121216 !important;
   border: 1px solid #27272a !important;
 }
-html.dark .n-button.n-button--default-type:hover {
+html.dark .n-button.n-button--default-type:not(.n-button--secondary):not(.n-button--ghost):not(.n-button--quaternary):not(.n-button--tertiary):not(.project-organization-action):not(.btn-cancel-selection):hover {
   background-color: #18181b !important;
   border-color: #3f3f46 !important;
 }
-html.dark .n-button.n-button--default-type * {
+html.dark .n-button.n-button--default-type:not(.n-button--secondary):not(.n-button--ghost):not(.n-button--quaternary):not(.n-button--tertiary):not(.project-organization-action):not(.btn-cancel-selection) * {
   color: #ffffff !important;
   stroke: #ffffff !important;
 }
@@ -685,19 +747,22 @@ html.light .n-dialog .n-dialog__action .n-button.n-button--primary-type * {
 html.dark .n-dialog .n-dialog__action .n-button.n-button--error-type,
 html.dark .n-dialog .n-dialog__action .n-button--error-type,
 html.dark .n-dialog--warning .n-dialog__action .n-button.n-button--primary-type,
-html.dark .n-dialog--error .n-dialog__action .n-button.n-button--primary-type {
+html.dark .n-dialog--error .n-dialog__action .n-button.n-button--primary-type,
+html.dark .n-button.btn-cancel-selection {
   background-color: rgba(225, 29, 72, 0.1) !important;
   border: 1px solid rgba(225, 29, 72, 0.35) !important;
   color: #fb7185 !important;
   font-weight: 600 !important;
   border-radius: 8px !important;
   box-shadow: none !important;
+  outline: none !important;
 }
 
 html.dark .n-dialog .n-dialog__action .n-button.n-button--error-type:hover,
 html.dark .n-dialog .n-dialog__action .n-button--error-type:hover,
 html.dark .n-dialog--warning .n-dialog__action .n-button.n-button--primary-type:hover,
-html.dark .n-dialog--error .n-dialog__action .n-button.n-button--primary-type:hover {
+html.dark .n-dialog--error .n-dialog__action .n-button.n-button--primary-type:hover,
+html.dark .n-button.btn-cancel-selection:hover {
   background-color: rgba(225, 29, 72, 0.22) !important;
   border-color: rgba(225, 29, 72, 0.6) !important;
   color: #fda4af !important;
@@ -706,7 +771,8 @@ html.dark .n-dialog--error .n-dialog__action .n-button.n-button--primary-type:ho
 html.dark .n-dialog .n-dialog__action .n-button.n-button--error-type *,
 html.dark .n-dialog .n-dialog__action .n-button--error-type *,
 html.dark .n-dialog--warning .n-dialog__action .n-button.n-button--primary-type *,
-html.dark .n-dialog--error .n-dialog__action .n-button.n-button--primary-type * {
+html.dark .n-dialog--error .n-dialog__action .n-button.n-button--primary-type *,
+html.dark .n-button.btn-cancel-selection * {
   color: #fb7185 !important;
   stroke: #fb7185 !important;
 }
@@ -714,7 +780,8 @@ html.dark .n-dialog--error .n-dialog__action .n-button.n-button--primary-type * 
 html.dark .n-dialog .n-dialog__action .n-button.n-button--error-type:hover *,
 html.dark .n-dialog .n-dialog__action .n-button--error-type:hover *,
 html.dark .n-dialog--warning .n-dialog__action .n-button.n-button--primary-type:hover *,
-html.dark .n-dialog--error .n-dialog__action .n-button.n-button--primary-type:hover * {
+html.dark .n-dialog--error .n-dialog__action .n-button.n-button--primary-type:hover *,
+html.dark .n-button.btn-cancel-selection:hover * {
   color: #fda4af !important;
   stroke: #fda4af !important;
 }
@@ -723,19 +790,22 @@ html.dark .n-dialog--error .n-dialog__action .n-button.n-button--primary-type:ho
 html.light .n-dialog .n-dialog__action .n-button.n-button--error-type,
 html.light .n-dialog .n-dialog__action .n-button--error-type,
 html.light .n-dialog--warning .n-dialog__action .n-button.n-button--primary-type,
-html.light .n-dialog--error .n-dialog__action .n-button.n-button--primary-type {
+html.light .n-dialog--error .n-dialog__action .n-button.n-button--primary-type,
+html.light .n-button.btn-cancel-selection {
   background-color: #fff1f2 !important;
   border: 1px solid #fecdd3 !important;
   color: #e11d48 !important;
   font-weight: 600 !important;
   border-radius: 8px !important;
   box-shadow: none !important;
+  outline: none !important;
 }
 
 html.light .n-dialog .n-dialog__action .n-button.n-button--error-type:hover,
 html.light .n-dialog .n-dialog__action .n-button--error-type:hover,
 html.light .n-dialog--warning .n-dialog__action .n-button.n-button--primary-type:hover,
-html.light .n-dialog--error .n-dialog__action .n-button.n-button--primary-type:hover {
+html.light .n-dialog--error .n-dialog__action .n-button.n-button--primary-type:hover,
+html.light .n-button.btn-cancel-selection:hover {
   background-color: #ffe4e6 !important;
   border-color: #fda4af !important;
   color: #be123c !important;
@@ -744,7 +814,8 @@ html.light .n-dialog--error .n-dialog__action .n-button.n-button--primary-type:h
 html.light .n-dialog .n-dialog__action .n-button.n-button--error-type *,
 html.light .n-dialog .n-dialog__action .n-button--error-type *,
 html.light .n-dialog--warning .n-dialog__action .n-button.n-button--primary-type *,
-html.light .n-dialog--error .n-dialog__action .n-button.n-button--primary-type * {
+html.light .n-dialog--error .n-dialog__action .n-button.n-button--primary-type *,
+html.light .n-button.btn-cancel-selection * {
   color: #e11d48 !important;
   stroke: #e11d48 !important;
 }
@@ -752,7 +823,8 @@ html.light .n-dialog--error .n-dialog__action .n-button.n-button--primary-type *
 html.light .n-dialog .n-dialog__action .n-button.n-button--error-type:hover *,
 html.light .n-dialog .n-dialog__action .n-button--error-type:hover *,
 html.light .n-dialog--warning .n-dialog__action .n-button.n-button--primary-type:hover *,
-html.light .n-dialog--error .n-dialog__action .n-button.n-button--primary-type:hover * {
+html.light .n-dialog--error .n-dialog__action .n-button.n-button--primary-type:hover *,
+html.light .n-button.btn-cancel-selection:hover * {
   color: #be123c !important;
   stroke: #be123c !important;
 }
@@ -914,5 +986,45 @@ html.light .n-select-menu {
   color: inherit !important;
 }
 html.dark .n-button.n-button--error-type {
+}
+
+/* =========================================================
+   Checkbox Modern Geometric & Focus Halo Elimination
+   ========================================================= */
+.n-checkbox {
+  --n-border-radius: 4px !important;
+}
+
+.n-checkbox .n-checkbox-box {
+  border-radius: 4px !important;
+  box-shadow: none !important;
+}
+
+/* Eliminate fuzzy translucent grey focus halo around the box */
+.n-checkbox .n-checkbox-box__border,
+.n-checkbox:focus .n-checkbox-box,
+.n-checkbox:focus:not(:active) .n-checkbox-box,
+.n-checkbox:focus .n-checkbox-box__border,
+.n-checkbox:focus:not(:active) .n-checkbox-box__border,
+.n-checkbox.n-checkbox--checked:focus:not(:active) .n-checkbox-box__border,
+.n-checkbox.n-checkbox--checked .n-checkbox-box__border {
+  box-shadow: none !important;
+}
+
+/* Crisp, clean focus-visible outline for keyboard navigation */
+.n-checkbox:focus-visible .n-checkbox-box {
+  outline: 2px solid currentColor !important;
+  outline-offset: 2px !important;
+}
+
+/* Modern crisp, slender stroke checkmark inside the checkbox box */
+.n-checkbox .check-icon path {
+  display: none !important;
+}
+
+.n-checkbox .check-icon {
+  background-color: var(--n-check-mark-color) !important;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'/%3E%3C/svg%3E") no-repeat center / 78% !important;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'/%3E%3C/svg%3E") no-repeat center / 78% !important;
 }
 </style>

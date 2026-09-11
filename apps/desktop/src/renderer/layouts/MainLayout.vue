@@ -47,7 +47,7 @@
               <h1 class="font-bold text-xs tracking-tight truncate select-none" :class="themeStore.isDark ? 'text-white' : 'text-zinc-950'">
                 CodeHelm
               </h1>
-              <p class="text-[11px] font-medium truncate select-none" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
+              <p class="text-xs font-medium truncate select-none" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
                 本地项目控制台
               </p>
             </div>
@@ -109,7 +109,7 @@
               <span class="truncate text-xs font-medium transition-transform duration-150 group-hover:translate-x-0.5">项目总览</span>
               <span
                 v-if="projectStore.projects.length"
-                class="text-[10px] px-1.5 py-0.5 rounded font-mono font-medium flex-shrink-0 ml-1.5 leading-none"
+                class="text-xs px-1.5 py-0.5 rounded font-mono font-medium flex-shrink-0 ml-1.5 leading-none"
                 :class="themeStore.isDark ? 'bg-[#27272a] text-zinc-300' : ($route.name === 'overview' ? 'bg-zinc-800 text-zinc-200' : 'bg-zinc-200 text-zinc-700')"
               >
                 {{ projectStore.projects.length }}
@@ -119,7 +119,7 @@
             <!-- Collapsed Float Badge: Positioned at outside square top-right corner, 100% round and unclipped -->
             <span
               v-if="projectStore.projects.length"
-              class="absolute -top-1 -right-1 min-w-[16px] h-[16px] px-1 rounded-full text-[9px] font-mono font-bold flex items-center justify-center border shadow-xs z-20 select-none leading-none"
+              class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full text-xs font-mono font-bold flex items-center justify-center border shadow-xs z-20 select-none leading-none"
               :class="[
                 sidebarStore.isCollapsed ? 'opacity-100 scale-100' : 'opacity-0 scale-50 pointer-events-none',
                 themeStore.isDark ? 'bg-[#27272a] text-white border-[#3f3f46]' : 'bg-zinc-200 text-zinc-900 border-zinc-300'
@@ -161,7 +161,7 @@
               <span class="truncate text-xs font-medium transition-transform duration-150 group-hover:translate-x-0.5">运行中心</span>
               <div
                 v-if="runnerStore.runningCount > 0"
-                class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-mono font-medium flex-shrink-0 ml-1.5 leading-none"
+                class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-mono font-medium flex-shrink-0 ml-1.5 leading-none"
                 :class="themeStore.isDark ? 'bg-white/15 text-white border border-white/30' : ($route.name === 'runner' ? 'bg-zinc-800 text-white border border-zinc-700' : 'bg-black text-white border border-black')"
               >
                 <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 pulsing-dot-active flex-shrink-0" />
@@ -172,7 +172,7 @@
             <!-- Collapsed Float Badge: Positioned at outside square top-right corner, 100% round and unclipped -->
             <span
               v-if="runnerStore.runningCount > 0"
-              class="absolute -top-1 -right-1 min-w-[16px] h-[16px] px-1 rounded-full text-[9px] font-mono font-bold flex items-center justify-center border shadow-xs z-20 select-none leading-none"
+              class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full text-xs font-mono font-bold flex items-center justify-center border shadow-xs z-20 select-none leading-none"
               :class="[
                 sidebarStore.isCollapsed ? 'opacity-100 scale-100' : 'opacity-0 scale-50 pointer-events-none',
                 themeStore.isDark ? 'bg-white text-black border-zinc-200' : 'bg-black text-white border-zinc-800'
@@ -213,7 +213,7 @@
               <span class="truncate text-xs font-medium transition-transform duration-150 group-hover:translate-x-0.5">实时控制台</span>
               <div
                 v-if="runnerStore.logs.length > 0"
-                class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-mono font-medium flex-shrink-0 ml-1.5 leading-none"
+                class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-mono font-medium flex-shrink-0 ml-1.5 leading-none"
                 :class="stderrLogsCount > 0
                   ? (themeStore.isDark ? 'bg-rose-950/70 text-rose-300 border border-rose-700/60' : 'bg-rose-100 text-rose-800 border border-rose-300')
                   : (themeStore.isDark ? 'bg-[#27272a] text-zinc-300' : ($route.name === 'console' ? 'bg-zinc-800 text-zinc-200' : 'bg-zinc-200 text-zinc-700'))"
@@ -226,7 +226,7 @@
             <!-- Collapsed Float Badge: Positioned at outside square top-right corner, 100% round and unclipped -->
             <span
               v-if="stderrLogsCount > 0 || (runnerStore.runningCount > 0 && runnerStore.logs.length > 0)"
-              class="absolute -top-1 -right-1 min-w-[16px] h-[16px] px-1 rounded-full text-[9px] font-mono font-bold flex items-center justify-center border shadow-xs z-20 select-none leading-none"
+              class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full text-xs font-mono font-bold flex items-center justify-center border shadow-xs z-20 select-none leading-none"
               :class="[
                 sidebarStore.isCollapsed ? 'opacity-100 scale-100' : 'opacity-0 scale-50 pointer-events-none',
                 stderrLogsCount > 0

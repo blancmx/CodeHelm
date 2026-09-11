@@ -24,7 +24,7 @@
 
       <div class="flex items-center gap-2 text-xs">
         <span
-          class="font-mono text-[11px] px-2 py-0.5 rounded border"
+          class="font-mono text-xs px-2 py-0.5 rounded border"
           :class="themeStore.isDark ? 'bg-[#18181b] text-zinc-400 border-[#27272a]' : 'bg-white text-zinc-600 border-zinc-200'"
         >
           {{ totalStats.dirs }} 目录 · {{ totalStats.files }} 文件
@@ -331,7 +331,7 @@ const TreeNodeItem = {
                     'span',
                     {
                       class: [
-                        'text-[10px] px-1 rounded uppercase font-mono tracking-wider',
+                        'text-xs px-1.5 rounded uppercase font-mono tracking-wider',
                         themeStore.isDark ? 'bg-[#27272a] text-zinc-400' : 'bg-zinc-200 text-zinc-600',
                       ],
                     },
@@ -341,9 +341,9 @@ const TreeNodeItem = {
             ]),
 
             // Right: Size + Copy Action
-            h('div', { class: 'flex items-center gap-2.5 text-[11px] text-zinc-400 flex-shrink-0' }, [
+            h('div', { class: 'flex items-center gap-2.5 text-xs text-zinc-400 flex-shrink-0' }, [
               !isDir && itemProps.node.size
-                ? h('span', { class: 'font-mono text-[10px]' }, formatSize(itemProps.node.size))
+                ? h('span', { class: 'font-mono text-xs' }, formatSize(itemProps.node.size))
                 : null,
 
               h(

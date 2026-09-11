@@ -52,7 +52,7 @@
       class="mt-4 pt-3 border-t flex items-center gap-2 overflow-x-auto pb-1 text-xs select-none"
       :class="theme.isDark ? 'border-zinc-800/80' : 'border-zinc-100'"
     >
-      <span class="text-zinc-500 flex-shrink-0 text-[11px]">筛选工程：</span>
+      <span class="text-zinc-500 flex-shrink-0 text-xs">筛选工程：</span>
       <button
         type="button"
         class="px-2.5 py-1 rounded-lg border transition-colors cursor-pointer select-none font-medium text-xs flex-shrink-0"
@@ -115,7 +115,7 @@
               {{ projects.projects.find(p => p.id === session.projectId)?.name || '项目 ' + session.projectId }}
             </span>
             <span
-              class="px-2 py-0.5 rounded text-[11px] font-sans font-bold uppercase tracking-wider transition-colors leading-none"
+              class="px-2 py-0.5 rounded text-xs font-sans font-bold uppercase tracking-wider transition-colors leading-none"
               :class="session.status === 'INTERRUPTED'
                 ? (theme.isDark ? 'bg-amber-950/40 text-amber-300 border border-amber-800' : 'bg-amber-50 text-amber-800 border border-amber-300')
                 : session.status === 'FAILED'
@@ -150,7 +150,7 @@
                 <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
                   <strong :class="theme.isDark ? 'text-zinc-200' : 'text-zinc-800'">{{ service.serviceName }}</strong>
                   <span
-                    class="px-1.5 py-0.5 rounded text-[11px] font-sans font-bold uppercase leading-none"
+                    class="px-1.5 py-0.5 rounded text-xs font-sans font-bold uppercase leading-none"
                     :class="service.status === 'STOPPED' ? 'text-zinc-400' : service.status === 'FAILED' ? 'text-rose-400' : 'text-zinc-300'"
                   >
                     {{ service.status }}

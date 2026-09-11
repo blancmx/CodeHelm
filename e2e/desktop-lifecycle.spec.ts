@@ -66,6 +66,51 @@ test.beforeEach(async () => {
   await page.waitForLoadState('domcontentloaded');
 });
 
+// eslint-disable-next-line no-empty-pattern
+test('keeps the project overview inside the window and scrolls to its complete bottom content', async ({}, testInfo) => {
+  const projectRoot = path.join(fixtureRoot, 'fixture-project');
+  await fs.writeFile(path.join(projectRoot, 'README.md'), [
+    '# Scrollable overview fixture',
+    '',
+    'A fixture with enough overview content to require an internal scrollbar.',
+    '',
+    '## Features',
+    '',
+    ...Array.from({ length: 12 }, (_, index) => `- Feature ${index + 1} with representative project detail content`),
+  ].join('\n'));
+
+  const project = await page!.evaluate(rootPath => window.codehelm.projects.import({
+    rootPath,
+    name: 'Overview Scroll Fixture',
+    tags: [],
+  }), projectRoot);
+  await page!.evaluate(id => window.codehelm.analysis.start(id), project.id);
+  await expect.poll(() => page!.evaluate(async id => (await window.codehelm.analysis.getTask(id))?.status, project.id)).toBe('completed');
+  await app!.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setBounds({ width: 900, height: 600 }));
+  await page!.evaluate(id => { location.hash = `/projects/${id}`; }, project.id);
+
+  const overviewPane = page!.getByTestId('project-overview-pane');
+  await expect(overviewPane).toBeVisible();
+  await expect.poll(async () => overviewPane.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true);
+
+  const bounds = await overviewPane.evaluate((element) => {
+    const paneBounds = element.getBoundingClientRect();
+    const mainBounds = element.closest('main')?.getBoundingClientRect();
+    return {
+      paneBottom: paneBounds.bottom,
+      mainBottom: mainBounds?.bottom ?? 0,
+      overflowY: getComputedStyle(element).overflowY,
+    };
+  });
+  expect(bounds.overflowY).toBe('auto');
+  expect(bounds.paneBottom).toBeLessThanOrEqual(bounds.mainBottom + 1);
+
+  await overviewPane.evaluate((element) => element.scrollTo({ top: element.scrollHeight }));
+  await expect.poll(async () => overviewPane.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+  await expect(page!.getByTestId('project-overview-profile-card')).toBeInViewport();
+  await page!.screenshot({ path: testInfo.outputPath('overview-bottom-visible.png'), animations: 'disabled' });
+});
+
 // Playwright requires the hook fixture argument to use an object destructuring pattern.
 // eslint-disable-next-line no-empty-pattern
 test.afterEach(async ({}, testInfo) => {
@@ -102,6 +147,8 @@ test('organizes projects across restart and repairs a moved project through revi
   const project = await page!.evaluate(rootPath => window.codehelm.projects.import({rootPath,name:'V02-007 整理验收',tags:['work','web']}),original);
   await page!.getByRole('button',{name:'刷新项目列表与实时状态'}).click();
   await page!.getByRole('button',{name:'收藏 V02-007 整理验收',exact:true}).click();
+  await page!.getByLabel('归档范围').click();
+  await page!.getByText('未归档',{exact:true}).click();
   await page!.getByRole('checkbox',{name:'仅收藏',exact:true}).check();
   await page!.getByLabel('组合标签').click();
   await page!.getByText('work',{exact:true}).click();
@@ -113,6 +160,8 @@ test('organizes projects across restart and repairs a moved project through revi
   await page!.getByLabel('归档范围').click();
   await page!.getByText('已归档',{exact:true}).click();
   await expect(page!.getByText('V02-007 整理验收',{exact:true})).toBeVisible();
+  await expect(page!.getByRole('button',{name:'取消收藏 V02-007 整理验收',exact:true}).locator('svg')).toHaveCSS('color', 'rgb(250, 204, 21)');
+  await expect(page!.getByRole('button',{name:'取消归档',exact:true}).locator('svg')).toHaveCSS('color', 'rgb(14, 165, 233)');
   await page!.screenshot({path:testInfo.outputPath('organization-dark.png'),animations:'disabled'});
   await app!.close();app=undefined;
   const environment={...process.env};delete environment.ELECTRON_RUN_AS_NODE;delete environment.VITE_DEV_SERVER_URL;
@@ -142,9 +191,18 @@ test('organizes projects across restart and repairs a moved project through revi
   await expect.poll(async()=>(await page!.evaluate(id=>window.codehelm.analysis.getTask(id),project.id))?.status).toBe('completed');
   await page.evaluate(()=>{location.hash='/settings';});
   await page.getByRole('button',{name:'明亮模式',exact:true}).click();
+  await page.evaluate(id=>{location.hash=`/projects/${id}`;},project.id);
+  await expect(page.getByLabel('项目标签')).toBeVisible();
+  await expect(page.locator('.project-tag-select .n-base-suffix')).toHaveCSS('color','rgb(9, 9, 11)');
   await page.evaluate(()=>{location.hash='/';});
-  await page.getByLabel('归档范围').click();await page.getByText('已归档',{exact:true}).click();
+  await page.getByLabel('归档范围').click();
+  await expect(page.locator('.n-base-select-option--selected .n-base-select-option__check').first()).toHaveCSS('color','rgb(9, 9, 11)');
+  await page.getByText('已归档',{exact:true}).click();
   await page.getByRole('button',{name:'选择本页',exact:true}).click();
+  await page.mouse.move(0,0);
+  await expect(page.getByRole('button',{name:'取消选择',exact:true})).toHaveCSS('color','rgb(225, 29, 72)');
+  await expect(page.locator('html')).toHaveCSS('color','rgb(9, 9, 11)');
+  await page.screenshot({path:testInfo.outputPath('selection-colors-light.png'),animations:'disabled'});
   await page.getByRole('button',{name:'批量取消归档',exact:true}).click();
   await expect(page.getByRole('status').filter({hasText:'批量整理'})).toContainText('成功 1 / 1');
   await page.getByLabel('归档范围').click();await page.getByText('未归档',{exact:true}).click();

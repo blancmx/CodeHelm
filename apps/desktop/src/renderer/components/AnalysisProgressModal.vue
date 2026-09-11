@@ -20,7 +20,7 @@
             {{ projectName || '项目工程' }}
           </span>
           <span
-            class="text-[11px] font-sans font-semibold px-2 py-0.5 rounded-md border flex-shrink-0 leading-none transition-colors"
+            class="text-xs font-sans font-semibold px-2 py-0.5 rounded-md border flex-shrink-0 leading-none transition-colors"
             :class="statusClass"
           >
             {{ presentation.label }}
@@ -74,7 +74,7 @@
         />
 
         <!-- Stats details -->
-        <div class="flex items-center justify-between text-[11px] text-zinc-500 pt-1">
+        <div class="flex items-center justify-between text-xs text-zinc-500 pt-1">
           <span>已发现文件: <strong class="font-mono" :class="themeStore.isDark ? 'text-zinc-300' : 'text-zinc-700'">{{ scannedFiles ?? 0 }}</strong></span>
           <span v-if="currentFile" class="font-mono truncate max-w-[260px]" :title="currentFile">
             {{ currentFile }}

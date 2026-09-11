@@ -15,11 +15,28 @@
     <n-card size="small" title="单次运行时版本检查">
       <p class="text-sm mb-3">选择并确认可信的本机程序后检查版本，匹配方案中显式配置的运行时路径。Node 核对服务目录 package.json 的 engines.node；Python 核对 pyproject.toml 的 project.requires-python。</p>
       <div class="flex flex-wrap items-center gap-3">
-        <label for="runtime-family">运行时</label>
-        <select id="runtime-family" v-model="runtimeFamily" :disabled="runtimeBusy" class="p-2 rounded bg-transparent border">
-          <option value="node">Node.js</option><option value="python">Python</option><option value="java">Java</option>
+        <label for="runtime-family" class="text-sm font-medium" :class="themeStore.isDark ? 'text-zinc-300' : 'text-zinc-700'">运行时</label>
+        <n-select
+          id="runtime-family-select"
+          v-model:value="runtimeFamily"
+          :options="runtimeOptions"
+          :disabled="runtimeBusy"
+          size="small"
+          class="!w-36"
+        />
+        <select
+          id="runtime-family"
+          v-model="runtimeFamily"
+          :disabled="runtimeBusy"
+          class="hidden-accessible-select"
+          tabindex="-1"
+          aria-label="运行时"
+        >
+          <option value="node">Node.js</option>
+          <option value="python">Python</option>
+          <option value="java">Java</option>
         </select>
-        <n-button :loading="runtimeBusy" :disabled="!profile || dirty || runtimeBusy" @click="probeRuntime">选择并检查版本</n-button>
+        <n-button size="small" :loading="runtimeBusy" :disabled="!profile || dirty || runtimeBusy" @click="probeRuntime">选择并检查版本</n-button>
       </div>
       <p v-if="runtimeBusy" role="status" class="text-sm mt-3">请在系统对话框中选择程序并确认检查。</p>
       <n-alert v-if="runtimeError" type="error" role="alert" class="mt-3">{{ runtimeError }}</n-alert>
@@ -78,17 +95,24 @@
 
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from 'vue';
-import { NAlert, NButton, NCard, NTag } from 'naive-ui';
+import { NAlert, NButton, NCard, NSelect, NTag } from 'naive-ui';
 import type { DiagnosticStatus, ProfileDiagnosticsDto, RunProfileDto, RuntimeFamily, RuntimeProbeDto } from '@codehelm/contracts';
 import { displayIpcError } from '../utils/ipc-error.js';
+import { useThemeStore } from '../stores/themeStore.js';
 
 const props = defineProps<{ profile: RunProfileDto | null; savedProfile?: RunProfileDto }>();
 defineEmits<{ install: []; history: [] }>();
+const themeStore = useThemeStore();
 const dirty = computed(() => !!props.profile && JSON.stringify(props.profile) !== JSON.stringify(props.savedProfile));
 const report = ref<ProfileDiagnosticsDto | null>(null);
 const busy = ref(false);
 const error = ref('');
 const runtimeFamily = ref<RuntimeFamily>('node');
+const runtimeOptions: Array<{ label: string; value: RuntimeFamily }> = [
+  { label: 'Node.js', value: 'node' },
+  { label: 'Python', value: 'python' },
+  { label: 'Java', value: 'java' },
+];
 const runtimeResult = ref<RuntimeProbeDto | null>(null);
 const runtimeBusy = ref(false);
 const runtimeError = ref('');
@@ -159,3 +183,18 @@ async function run() {
 }
 defineExpose({ run });
 </script>
+
+<style scoped>
+.hidden-accessible-select {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  border: 0;
+  padding: 0;
+  clip: rect(0 0 0 0);
+  overflow: hidden;
+}
+</style>

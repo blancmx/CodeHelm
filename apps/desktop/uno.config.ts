@@ -12,9 +12,9 @@ export default defineConfig({
   shortcuts: {
     'flex-center': 'flex items-center justify-center',
     'flex-between': 'flex items-center justify-between',
-    'badge-neutral': 'bg-zinc-500/10 text-zinc-300 border border-zinc-500/20 px-2 py-0.5 rounded text-[11px] font-medium leading-none',
-    'badge-dark': 'bg-black text-white border border-zinc-800 px-2 py-0.5 rounded text-[11px] font-medium leading-none',
-    'badge-light': 'bg-white text-black border border-zinc-200 px-2 py-0.5 rounded text-[11px] font-medium leading-none',
+    'badge-neutral': 'bg-zinc-500/10 text-zinc-300 border border-zinc-500/20 px-2 py-0.5 rounded text-xs font-medium leading-none',
+    'badge-dark': 'bg-black text-white border border-zinc-800 px-2 py-0.5 rounded text-xs font-medium leading-none',
+    'badge-light': 'bg-white text-black border border-zinc-200 px-2 py-0.5 rounded text-xs font-medium leading-none',
   },
   safelist: [
     'text-black',

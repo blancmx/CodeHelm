@@ -62,7 +62,7 @@
               <span>活跃受管项目</span>
               <span
                 v-if="runningProjectGroups.length > 0"
-                class="text-[10px] font-mono opacity-80"
+                class="text-xs font-mono opacity-80"
               >
                 ({{ runningProjectGroups.length }})
               </span>
@@ -129,13 +129,13 @@
                         <IconExternalLink :size="12" class="opacity-60" />
                       </router-link>
                       <span
-                        class="text-[10px] font-medium px-2 py-0.5 rounded border"
+                        class="text-xs font-medium px-2 py-0.5 rounded border"
                         :class="themeStore.isDark ? 'bg-[#18181b] text-emerald-300 border-emerald-500/30' : 'bg-emerald-50 text-emerald-700 border-emerald-200'"
                       >
                         {{ proj.services.length }} 个活跃服务
                       </span>
                     </div>
-                    <div class="flex items-center gap-1.5 mt-1 text-[11px] text-zinc-500 font-mono">
+                    <div class="flex items-center gap-1.5 mt-1 text-xs text-zinc-500 font-mono">
                       <span class="truncate max-w-[480px]" :title="proj.projectPath">{{ proj.projectPath }}</span>
                       <button
                         type="button"
@@ -192,7 +192,7 @@
                         {{ svc.name }}
                       </span>
                       <span
-                        class="text-[11px] font-mono px-2 py-0.5 rounded border font-medium flex items-center gap-1 leading-none"
+                        class="text-xs font-mono px-2 py-0.5 rounded border font-medium flex items-center gap-1 leading-none"
                         :class="themeStore.isDark ? 'bg-white text-black border-white font-bold' : 'bg-black text-white border-black font-bold'"
                       >
                         <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 pulsing-dot-active flex-shrink-0" />
@@ -269,7 +269,7 @@
 
                       <button
                         type="button"
-                        class="group h-6 px-2.5 rounded-md border text-[11px] font-semibold inline-flex items-center gap-1 transition-all duration-200 cursor-pointer select-none relative overflow-hidden bg-rose-500/10 hover:bg-rose-500/20 active:scale-[0.95] text-rose-600 dark:text-rose-400 border-rose-500/30 hover:border-rose-500/70 hover:shadow-[0_0_10px_rgba(244,63,94,0.2)]"
+                        class="group h-6 px-2.5 rounded-md border text-xs font-semibold inline-flex items-center gap-1 transition-all duration-200 cursor-pointer select-none relative overflow-hidden bg-rose-500/10 hover:bg-rose-500/20 active:scale-[0.95] text-rose-600 dark:text-rose-400 border-rose-500/30 hover:border-rose-500/70 hover:shadow-[0_0_10px_rgba(244,63,94,0.2)]"
                         :disabled="stoppingServiceIds.has(svc.sessionServiceId)"
                         title="终止此服务进程"
                         @click="handleStopSingleService(svc.sessionServiceId)"
@@ -303,7 +303,7 @@
               <span>历史记录</span>
               <span
                 v-if="runnerStore.displayHistory.length > 0"
-                class="text-[10px] font-mono opacity-80"
+                class="text-xs font-mono opacity-80"
               >
                 ({{ runnerStore.displayHistory.length }})
               </span>

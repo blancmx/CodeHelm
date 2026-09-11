@@ -127,7 +127,7 @@
                 单项目最大扫描文件数上限
               </label>
               <n-input-number v-model:value="settings.maxScanFiles" :min="1000" :max="50000" :precision="0" class="w-full" />
-              <p class="text-[11px] mt-2 leading-relaxed" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
+              <p class="text-xs mt-2 leading-relaxed" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
                 保存后用于下一次导入或重新分析，不影响正在运行的任务。安全上限为 50,000；超过上限会停止分析并保留旧结果，可调整上限或 .gitignore 后重试。
               </p>
             </div>
@@ -219,12 +219,12 @@
       >
         <div class="flex items-center justify-between">
           <span class="font-bold" :class="themeStore.isDark ? 'text-white' : 'text-zinc-950'">关于 CodeHelm</span>
-          <span class="font-mono px-2 py-0.5 rounded text-[10px] border" :class="themeStore.isDark ? 'bg-[#18181b] text-zinc-300 border-[#27272a]' : 'bg-zinc-100 text-zinc-800 border-zinc-200'">
+          <span class="font-mono px-2 py-0.5 rounded text-xs border" :class="themeStore.isDark ? 'bg-[#18181b] text-zinc-300 border-[#27272a]' : 'bg-zinc-100 text-zinc-800 border-zinc-200'">
             v0.1 (Windows x64)
           </span>
         </div>
         <div
-          class="flex items-center justify-between pt-2 border-t text-[11px]"
+          class="flex items-center justify-between pt-2 border-t text-xs"
           :class="themeStore.isDark ? 'border-[#1f1f23]' : 'border-zinc-100'"
         >
           <span>开发者控制台快捷键</span>

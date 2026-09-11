@@ -81,7 +81,7 @@
                         {{ project.name }}
                       </span>
                       <span
-                        class="text-[11px] font-normal px-2 py-0.5 rounded-md border flex-shrink-0 inline-flex items-center gap-1 leading-none select-none"
+                        class="text-xs font-normal px-2 py-0.5 rounded-md border flex-shrink-0 inline-flex items-center gap-1 leading-none select-none"
                         :class="themeStore.isDark ? 'bg-[#18181b] text-zinc-300 border-[#27272a]' : 'bg-zinc-100 text-zinc-700 border-zinc-200'"
                       >
                         <span>{{ project.moduleCount || 0 }} 模块</span>
@@ -90,7 +90,7 @@
                       </span>
                     </div>
                     <p
-                      class="font-mono text-[11px] truncate mt-0.5"
+                      class="font-mono text-xs truncate mt-0.5"
                       :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'"
                     >
                       {{ project.rootPath }}
@@ -105,7 +105,7 @@
                     <span
                       v-for="lang in (project.primaryLanguages || []).slice(0, 2)"
                       :key="lang"
-                      class="text-[11px] font-mono px-1.5 py-0.5 rounded border leading-none"
+                      class="text-xs font-mono px-1.5 py-0.5 rounded border leading-none"
                       :class="themeStore.isDark ? 'bg-[#18181b] text-zinc-300 border-[#27272a]' : 'bg-zinc-100 text-zinc-700 border-zinc-200'"
                     >
                       {{ lang }}
@@ -125,14 +125,14 @@
                 <p class="text-xs font-bold" :class="themeStore.isDark ? 'text-zinc-300' : 'text-zinc-700'">
                   未找到匹配的工程项目
                 </p>
-                <p class="text-[11px] mt-1 text-zinc-400">
+                <p class="text-xs mt-1 text-zinc-400">
                   可尝试搜索其他名称、本地路径或语言画像关键词
                 </p>
               </div>
 
             <!-- Bottom Status Footer (Clean, No Shortcut Displays) -->
             <div
-              class="h-8 px-4 flex items-center justify-between border-t text-[11px] transition-colors"
+              class="h-8 px-4 flex items-center justify-between border-t text-xs transition-colors"
               :class="themeStore.isDark ? 'border-[#1f1f24] bg-[#0e0e11] text-zinc-400' : 'border-zinc-100 bg-zinc-50 text-zinc-500'"
             >
               <div class="flex items-center gap-2">

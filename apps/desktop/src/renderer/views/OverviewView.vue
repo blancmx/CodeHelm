@@ -70,13 +70,13 @@
         :class="themeStore.isDark ? 'bg-[#121216] hover:bg-[#18181c] border-[#27272a] hover:border-zinc-500 shadow-sm' : 'bg-white hover:bg-zinc-50 border-zinc-200 hover:border-zinc-300 shadow-sm'"
       >
         <div>
-          <div class="text-[11px] font-medium" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
+          <div class="text-xs font-medium" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
             已纳管工程总数
           </div>
           <div class="text-2xl font-bold mt-1 font-mono tracking-tight" :class="themeStore.isDark ? 'text-white' : 'text-zinc-950'">
             {{ projectStore.hasLoadedProjects ? projectStore.projects.length : '—' }}
           </div>
-          <div class="text-[10px] mt-1 flex items-center gap-1.5" :class="themeStore.isDark ? 'text-zinc-500' : 'text-zinc-400'">
+          <div class="text-xs mt-1 flex items-center gap-1.5" :class="themeStore.isDark ? 'text-zinc-500' : 'text-zinc-400'">
             <span>{{ projectStore.hasLoadedProjects ? `覆盖 ${totalModulesCount} 个子模块` : '等待项目数据' }}</span>
           </div>
         </div>
@@ -96,14 +96,14 @@
         @click="router.push('/runner')"
       >
         <div>
-          <div class="text-[11px] font-medium flex items-center gap-1.5" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
+          <div class="text-xs font-medium flex items-center gap-1.5" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
             <span>本次受管 · 运行中 / 启动中</span>
             <span v-if="(runtimeReady && runnerStore.runningCount > 0)" class="w-1.5 h-1.5 rounded-full bg-emerald-400 pulsing-dot-active" />
           </div>
           <div class="text-2xl font-bold mt-1 font-mono tracking-tight" :class="(runtimeReady && runnerStore.runningCount > 0) ? (themeStore.isDark ? 'text-white' : 'text-zinc-950') : (themeStore.isDark ? 'text-zinc-500' : 'text-zinc-400')">
             {{ runtimeReady ? runnerStore.runningCount : '—' }}
           </div>
-          <div class="text-[10px] mt-1 flex items-center gap-1" :class="themeStore.isDark ? 'text-zinc-400 group-hover:text-white' : 'text-zinc-500 group-hover:text-zinc-900'">
+          <div class="text-xs mt-1 flex items-center gap-1" :class="themeStore.isDark ? 'text-zinc-400 group-hover:text-white' : 'text-zinc-500 group-hover:text-zinc-900'">
             <span>查看控制中心日志流</span>
             <IconArrowRight :size="10" class="transition-transform group-hover:translate-x-0.5" />
           </div>
@@ -124,13 +124,13 @@
         :class="themeStore.isDark ? 'bg-[#121216] hover:bg-[#18181c] border-[#27272a] hover:border-zinc-500 shadow-sm' : 'bg-white border-zinc-200 shadow-sm hover:border-zinc-300'"
       >
         <div>
-          <div class="text-[11px] font-medium" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
+          <div class="text-xs font-medium" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
             技术生态与语言画像
           </div>
           <div class="text-2xl font-bold mt-1 font-mono tracking-tight" :class="themeStore.isDark ? 'text-white' : 'text-zinc-950'">
             {{ projectStore.hasLoadedProjects ? uniqueTechnologies.length : '—' }} <span class="text-xs font-normal font-sans" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">类技术</span>
           </div>
-          <div class="text-[10px] mt-1 truncate max-w-200px font-mono" :class="themeStore.isDark ? 'text-zinc-500' : 'text-zinc-400'">
+          <div class="text-xs mt-1 truncate max-w-200px font-mono" :class="themeStore.isDark ? 'text-zinc-500' : 'text-zinc-400'">
             {{ projectStore.hasLoadedProjects ? topTechnologiesText : '等待项目数据' }}
           </div>
         </div>
@@ -144,21 +144,60 @@
     </div>
 
     <div v-if="projectStore.hasLoadedProjects" class="flex flex-wrap items-center gap-3 pt-3 flex-shrink-0" aria-label="项目整理筛选">
-      <n-select v-model:value="organizationScope" class="w-32" aria-label="归档范围" :options="[{label:'未归档',value:'active'},{label:'已归档',value:'archived'},{label:'全部项目',value:'all'}]" />
+      <n-select v-model:value="organizationScope" class="w-32" aria-label="归档范围" :options="[{label:'全部项目',value:'all'},{label:'未归档',value:'active'},{label:'已归档',value:'archived'}]" />
       <n-checkbox v-model:checked="onlyFavorites">仅收藏</n-checkbox>
-      <n-select v-model:value="selectedTags" multiple clearable filterable class="w-64" aria-label="组合标签" placeholder="标签（同时满足）" :options="tagOptions" />
-      <n-button size="small" :disabled="bulkBusy" @click="selectedIds = pagedProjects.map(p => p.id)">选择本页</n-button>
-      <n-button size="small" :disabled="bulkBusy || !selectedIds.length" @click="selectedIds = []">清除选择</n-button>
-      <span class="text-xs">已选 {{ selectedIds.length }}</span>
-      <n-button size="small" :disabled="bulkBusy || !selectedIds.length" @click="organizeSelected({favorite:true})">批量收藏</n-button>
-      <n-button size="small" :disabled="bulkBusy || !selectedIds.length" @click="organizeSelected({archived:true})">批量归档</n-button>
-      <n-button size="small" :disabled="bulkBusy || !selectedIds.length" @click="organizeSelected({archived:false})">批量取消归档</n-button>
-      <n-button v-if="bulkBusy" size="small" @click="bulkCancel = true">停止后续操作</n-button>
+      <n-select
+        ref="tagSelectRef"
+        v-model:value="selectedTags"
+        :show="isTagFilterOpen"
+        multiple
+        clearable
+        filterable
+        class="w-64"
+        aria-label="组合标签"
+        placeholder="标签（同时满足）"
+        :options="tagOptions"
+        @mousedown="handleTagSelectMouseDown"
+        @click="handleTagSelectClick"
+        @update:show="handleTagSelectShowChange"
+      />
+      <div class="h-4 w-px bg-zinc-200 dark:bg-zinc-800 mx-0.5" />
+      <n-button
+        size="small"
+        class="btn-select-toggle"
+        :class="selectedIds.length > 0 ? 'btn-cancel-selection' : ''"
+        :disabled="bulkBusy"
+        @click="toggleSelectPage"
+      >
+        {{ selectedIds.length > 0 ? '取消选择' : '选择本页' }}
+      </n-button>
+      <transition
+        enter-active-class="transition-all duration-120 cubic-bezier(0.16, 1, 0.3, 1)"
+        enter-from-class="opacity-0 translate-y-1 scale-98"
+        enter-to-class="opacity-100 translate-y-0 scale-100"
+        leave-active-class="transition-all duration-90 ease-out"
+        leave-from-class="opacity-100 translate-y-0 scale-100"
+        leave-to-class="opacity-0 translate-y-1 scale-98"
+      >
+        <div v-if="selectedIds.length > 0" class="flex items-center gap-2 will-change-transform">
+          <span
+            class="text-xs font-mono font-medium px-2 py-0.5 rounded border"
+            :class="themeStore.isDark
+              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+              : 'bg-emerald-50 text-emerald-600 border-emerald-200'"
+          >
+            已选 {{ selectedIds.length }}
+          </span>
+          <n-button size="small" :disabled="bulkBusy" @click="organizeSelected({favorite:true})">批量收藏</n-button>
+          <n-button size="small" :disabled="bulkBusy" @click="organizeSelected({archived:true})">批量归档</n-button>
+          <n-button size="small" :disabled="bulkBusy" @click="organizeSelected({archived:false})">批量取消归档</n-button>
+          <n-button v-if="bulkBusy" size="small" @click="bulkCancel = true">停止后续操作</n-button>
+        </div>
+      </transition>
     </div>
-    <details v-if="bulkResults.length" class="text-xs py-2 flex-shrink-0 max-h-32 overflow-auto" :open="bulkBusy">
-      <summary role="status">批量整理：成功 {{ bulkResults.filter(r => r.status === '已完成').length }} / {{ bulkTotal }}，{{ bulkBusy ? '处理中' : '已结束' }}</summary>
-      <p v-for="result in bulkResults" :key="result.id">{{ result.name }}：{{ result.status }}</p>
-    </details>
+    <div v-if="bulkResults.length" role="status" class="sr-only">
+      批量整理：成功 {{ bulkResults.filter(r => r.status === '已完成').length }} / {{ bulkTotal }}，{{ bulkBusy ? '处理中' : '已结束' }}
+    </div>
     <!-- Quick Filter Tabs, Sorting & View Mode Switcher -->
     <div v-if="projectStore.hasLoadedProjects" class="flex items-center justify-between pt-3 pb-2 flex-shrink-0 gap-3">
       <!-- Left: Dynamic Ecosystem Tabs & Independent Running Toggle -->
@@ -195,7 +234,7 @@
             <span>{{ filter.label }}</span>
             <span
               v-if="filter.count !== undefined"
-              class="ml-1 text-[10px] font-mono transition-colors duration-200"
+              class="ml-1 text-xs font-mono transition-colors duration-200"
               :class="activeFilter === filter.value
                 ? (themeStore.isDark ? 'text-black/80 font-bold' : 'text-white/80 font-bold')
                 : (themeStore.isDark ? 'text-zinc-500' : 'text-zinc-400')"
@@ -229,7 +268,7 @@
             :class="runningProjectsCount > 0 ? (onlyRunning ? 'bg-emerald-400 pulsing-dot-active' : 'bg-emerald-400') : 'bg-zinc-400'"
           />
           <span>运行中 / 启动中</span>
-          <span class="text-[10px] opacity-80 font-mono">({{ runtimeReady ? runningProjectsCount : '—' }})</span>
+          <span class="text-xs opacity-80 font-mono">({{ runtimeReady ? runningProjectsCount : '—' }})</span>
         </button>
       </div>
 
@@ -378,7 +417,7 @@
               <IconFolderOpen :size="14" />
               <span>总目录扫描</span>
             </div>
-            <div class="text-[11px] mt-1 leading-normal" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
+            <div class="text-xs mt-1 leading-normal" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
               自动深度探测子项目与 Monorepo 拓扑
             </div>
           </div>
@@ -391,7 +430,7 @@
               <IconZap :size="14" />
               <span>智能命令推断</span>
             </div>
-            <div class="text-[11px] mt-1 leading-normal" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
+            <div class="text-xs mt-1 leading-normal" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
               零配置推断 Vite、Next.js、FastAPI 等启动脚本
             </div>
           </div>
@@ -404,7 +443,7 @@
               <IconLock :size="14" />
               <span>纯本地隔离</span>
             </div>
-            <div class="text-[11px] mt-1 leading-normal" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
+            <div class="text-xs mt-1 leading-normal" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
               零云端上传，进程树防孤儿自动安全清理
             </div>
           </div>
@@ -449,23 +488,27 @@
           v-for="project in pagedProjects"
           :key="project.id"
           class="border rounded-xl p-5 transition-all duration-150 cursor-pointer flex flex-col justify-between group"
-          :class="themeStore.isDark
-            ? 'bg-[#121216] hover:bg-[#18181c] border-[#27272a] hover:border-zinc-500 shadow-sm'
-            : 'bg-white hover:bg-zinc-50 border-zinc-200 hover:border-zinc-400 shadow-sm'"
+          :class="[
+            selectedIds.includes(project.id)
+              ? (themeStore.isDark
+                  ? 'bg-[#151a17] border-emerald-500/60 shadow-md shadow-emerald-950/30'
+                  : 'bg-emerald-50/20 border-emerald-400/80 shadow-md shadow-emerald-100/40')
+              : (themeStore.isDark
+                  ? 'bg-[#121216] hover:bg-[#18181c] border-[#27272a] hover:border-zinc-500 shadow-sm'
+                  : 'bg-white hover:bg-zinc-50 border-zinc-200 hover:border-zinc-400 shadow-sm'),
+          ]"
           @click="navigateToProject(project.id)"
         >
           <div>
-            <!-- Top Card Info -->
-            <ProjectOrganizationActions :project="project" :selected="selectedIds.includes(project.id)" @select="selectProject(project.id, $event)" />
-            <div class="flex items-start justify-between">
+            <!-- Top Card Info: Left Avatar Checkbox & Name; Right Status Badge -->
+            <div class="flex items-start justify-between gap-2.5">
               <div class="flex items-center gap-3 min-w-0">
-                <!-- Monogram Avatar -->
-                <div
-                  class="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm flex-shrink-0 border font-mono transition-transform duration-200 group-hover:scale-105"
-                  :class="themeStore.isDark ? 'bg-[#18181b] border-[#27272a] text-white' : 'bg-zinc-100 border-zinc-200 text-zinc-900'"
-                >
-                  {{ (project.name || 'P').slice(0, 2).toUpperCase() }}
-                </div>
+                <ProjectAvatarCheckbox
+                  size="md"
+                  :project="project"
+                  :selected="selectedIds.includes(project.id)"
+                  @select="selectProject(project.id, $event)"
+                />
                 <div class="min-w-0">
                   <h4
                     class="font-bold text-sm group-hover:underline transition-all truncate"
@@ -474,7 +517,7 @@
                     {{ project.name }}
                   </h4>
                   <p
-                    class="text-[11px] font-mono truncate max-w-200px mt-0.5"
+                    class="text-xs font-mono truncate max-w-200px mt-0.5"
                     :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'"
                     :title="project.rootPath"
                   >
@@ -485,7 +528,7 @@
 
               <!-- Status Badge -->
               <span
-                class="px-2 py-0.5 rounded-full text-[11px] font-sans font-medium inline-flex items-center gap-1 flex-shrink-0 border leading-none"
+                class="px-2 py-0.5 rounded-full text-xs font-sans font-medium inline-flex items-center gap-1 flex-shrink-0 border leading-none"
                 :class="statusBadgeClass(project.runtime.status)"
                 :title="runtimeStatusTitle(project)"
               >
@@ -503,7 +546,7 @@
               <span
                 v-for="lang in (project.primaryLanguages || [])"
                 :key="lang"
-                class="px-2 py-0.5 rounded text-[10px] font-medium border font-mono"
+                class="px-2 py-0.5 rounded text-xs font-medium border font-mono"
                 :class="themeStore.isDark ? 'bg-[#18181b] text-zinc-300 border-[#27272a]' : 'bg-zinc-100 text-zinc-800 border-zinc-200'"
               >
                 {{ lang }}
@@ -511,7 +554,7 @@
               <span
                 v-for="framework in (project.primaryFrameworks || [])"
                 :key="framework"
-                class="px-2 py-0.5 rounded text-[10px] font-medium border font-mono"
+                class="px-2 py-0.5 rounded text-xs font-medium border font-mono"
                 :class="themeStore.isDark ? 'bg-[#27272a] text-zinc-200 border-[#3f3f46]' : 'bg-zinc-200 text-zinc-900 border-zinc-300'"
               >
                 {{ framework }}
@@ -519,7 +562,7 @@
               <span
                 v-for="tag in (project.tags || [])"
                 :key="tag"
-                class="px-2 py-0.5 rounded text-[10px] border"
+                class="px-2 py-0.5 rounded text-xs border"
                 :class="themeStore.isDark ? 'bg-[#18181b] text-zinc-400 border-[#27272a]' : 'bg-zinc-50 text-zinc-600 border-zinc-200'"
               >
                 #{{ tag }}
@@ -532,13 +575,18 @@
             class="pt-3.5 mt-4 border-t flex items-center justify-between text-xs transition-colors"
             :class="themeStore.isDark ? 'border-[#1f1f23] text-zinc-400' : 'border-zinc-100 text-zinc-500'"
           >
-            <div class="flex items-center gap-2 text-[11px] font-medium">
+            <div class="flex items-center gap-2 text-xs font-medium">
               <span :class="themeStore.isDark ? 'text-zinc-300' : 'text-zinc-700'">{{ project.moduleCount || 0 }} 模块</span>
               <span>•</span>
               <span :class="themeStore.isDark ? 'text-zinc-300' : 'text-zinc-700'">{{ project.serviceCount || 0 }} 服务</span>
             </div>
 
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2" @click.stop>
+              <ProjectOrganizationActions
+                mode="actions-only"
+                :project="project"
+              />
+              <div class="h-3.5 w-px mx-0.5 bg-zinc-200 dark:bg-zinc-800 flex-shrink-0" />
               <n-button
                 size="tiny"
                 quaternary
@@ -569,15 +617,15 @@
         <table class="w-full min-w-[1000px] text-left text-xs border-collapse table-fixed">
           <thead>
             <tr
-              class="border-b text-[11px] font-medium"
+              class="border-b text-xs font-medium"
               :class="themeStore.isDark ? 'bg-[#18181b] border-[#27272a] text-zinc-400' : 'bg-zinc-50 border-zinc-200 text-zinc-600'"
             >
-              <th class="py-3 px-4 w-[22%]">工程名称</th>
-              <th class="py-3 px-4 w-[22%]">本地路径</th>
+              <th class="py-3 px-4 w-[21%]">工程名称</th>
+              <th class="py-3 px-4 w-[21%]">本地路径</th>
               <th class="py-3 px-4 w-[13%]">技术生态</th>
               <th class="py-3 px-4 w-[13%]">架构规模</th>
-              <th class="py-3 px-4 w-[18%]">运行状态</th>
-              <th class="py-3 px-4 w-[12%] text-right">操作</th>
+              <th class="py-3 px-4 w-[16%]">运行状态</th>
+              <th class="py-3 px-4 w-[16%] text-right">操作</th>
             </tr>
           </thead>
           <tbody
@@ -588,19 +636,22 @@
               v-for="project in pagedProjects"
               :key="project.id"
               class="transition-colors cursor-pointer"
-              :class="themeStore.isDark ? 'hover:bg-[#18181c]' : 'hover:bg-zinc-50'"
+              :class="[
+                selectedIds.includes(project.id)
+                  ? (themeStore.isDark ? 'bg-emerald-950/20 hover:bg-emerald-950/30' : 'bg-emerald-50/35 hover:bg-emerald-50/50')
+                  : (themeStore.isDark ? 'hover:bg-[#18181c]' : 'hover:bg-zinc-50'),
+              ]"
               @click="navigateToProject(project.id)"
             >
               <!-- Project Name & Avatar -->
               <td class="py-3.5 px-4 truncate">
-                <ProjectOrganizationActions :project="project" :selected="selectedIds.includes(project.id)" @select="selectProject(project.id, $event)" />
                 <div class="flex items-center gap-2.5 min-w-0">
-                  <div
-                    class="w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs flex-shrink-0 border font-mono"
-                    :class="themeStore.isDark ? 'bg-[#18181b] border-[#27272a] text-white' : 'bg-zinc-100 border-zinc-200 text-zinc-900'"
-                  >
-                    {{ (project.name || 'P').slice(0, 2).toUpperCase() }}
-                  </div>
+                  <ProjectAvatarCheckbox
+                    size="sm"
+                    :project="project"
+                    :selected="selectedIds.includes(project.id)"
+                    @select="selectProject(project.id, $event)"
+                  />
                   <span class="font-bold text-xs truncate" :class="themeStore.isDark ? 'text-white' : 'text-zinc-950'">
                     {{ project.name }}
                   </span>
@@ -608,7 +659,7 @@
               </td>
 
               <!-- Path -->
-              <td class="py-3.5 px-4 font-mono text-[11px] truncate" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'" :title="project.rootPath">
+              <td class="py-3.5 px-4 font-mono text-xs truncate" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'" :title="project.rootPath">
                 {{ project.rootPath }}
               </td>
 
@@ -618,7 +669,7 @@
                   <span
                     v-for="lang in (project.primaryLanguages || []).slice(0, 3)"
                     :key="lang"
-                    class="px-1.5 py-0.5 rounded text-[11px] font-mono border leading-none"
+                    class="px-1.5 py-0.5 rounded text-xs font-mono border leading-none"
                     :class="themeStore.isDark ? 'bg-[#18181b] text-zinc-300 border-[#27272a]' : 'bg-zinc-100 text-zinc-800 border-zinc-200'"
                   >
                     {{ lang }}
@@ -626,7 +677,7 @@
                   <span
                     v-for="fw in (project.primaryFrameworks || []).slice(0, 2)"
                     :key="fw"
-                    class="px-1.5 py-0.5 rounded text-[11px] font-mono border leading-none"
+                    class="px-1.5 py-0.5 rounded text-xs font-mono border leading-none"
                     :class="themeStore.isDark ? 'bg-[#27272a] text-zinc-200 border-[#3f3f46]' : 'bg-zinc-200 text-zinc-900 border-zinc-300'"
                   >
                     {{ fw }}
@@ -642,7 +693,7 @@
               <!-- Status -->
               <td class="py-3.5 px-4">
                 <span
-                  class="px-2 py-0.5 rounded-full text-[11px] font-mono font-medium inline-flex items-center gap-1 border leading-none"
+                  class="px-2 py-0.5 rounded-full text-xs font-mono font-medium inline-flex items-center gap-1 border leading-none"
                   :class="statusBadgeClass(project.runtime.status)"
                   :title="runtimeStatusTitle(project)"
                 >
@@ -655,9 +706,14 @@
                 <UnresolvedNotice compact :project-id="project.id" :count="runnerStore.getUnresolvedCount(project.id)" />
               </td>
 
-              <!-- Actions -->
+              <!-- Actions: Star + Archive | Remove + Enter -->
               <td class="py-3.5 px-4 text-right">
-                <div class="flex items-center justify-end gap-2" @click.stop>
+                <div class="flex items-center justify-end gap-1.5" @click.stop>
+                  <ProjectOrganizationActions
+                    mode="actions-only"
+                    :project="project"
+                  />
+                  <div class="h-3.5 w-px mx-1 bg-zinc-200 dark:bg-zinc-800 flex-shrink-0" />
                   <n-button
                     size="tiny"
                     quaternary
@@ -697,8 +753,10 @@
 <script setup lang="ts">
 import UnresolvedNotice from '../components/UnresolvedNotice.vue';
 import ProjectOrganizationActions from '../components/ProjectOrganizationActions.vue';
+import ProjectAvatarCheckbox from '../components/ProjectAvatarCheckbox.vue';
 import { matchesOrganization, compareLastRun, runOrganizationBatch } from '../utils/project-organization.js';
 import { ref, computed, nextTick, watch, onMounted, onUnmounted } from 'vue';
+import type { SelectInst } from 'naive-ui';
 import { useRouter } from 'vue-router';
 import { dialog, message } from '../utils/discrete.js';
 import { useProjectStore } from '../stores/projectStore.js';
@@ -752,10 +810,42 @@ async function handleManualRefresh() {
 }
 
 const searchQuery = ref('');
-const organizationScope = ref('active');
+const organizationScope = ref('all');
 const onlyFavorites = ref(false);
 const selectedTags = ref<string[]>([]);
 const tagOptions = computed(() => [...new Set(projectStore.projects.flatMap(p => p.tags))].sort().map(tag => ({label:tag,value:tag})));
+
+const isTagFilterOpen = ref(false);
+const tagSelectRef = ref<SelectInst | null>(null);
+let wasTagFilterOpenOnMouseDown = false;
+
+function handleTagSelectShowChange(show: boolean) {
+  isTagFilterOpen.value = show;
+  if (!show) {
+    wasTagFilterOpenOnMouseDown = false;
+  }
+}
+
+function handleTagSelectMouseDown(e: MouseEvent) {
+  const target = e.target as HTMLElement | null;
+  if (target?.closest('.n-tag__close, .n-base-close, .n-base-clear')) {
+    wasTagFilterOpenOnMouseDown = false;
+    return;
+  }
+  wasTagFilterOpenOnMouseDown = isTagFilterOpen.value;
+}
+
+function handleTagSelectClick(e: MouseEvent) {
+  const target = e.target as HTMLElement | null;
+  if (target?.closest('.n-tag__close, .n-base-close, .n-base-clear')) {
+    return;
+  }
+  if (wasTagFilterOpenOnMouseDown) {
+    isTagFilterOpen.value = false;
+    wasTagFilterOpenOnMouseDown = false;
+    tagSelectRef.value?.blurInput();
+  }
+}
 const selectedIds = ref<string[]>([]);
 const bulkBusy = ref(false);
 const bulkCancel = ref(false);
@@ -772,7 +862,15 @@ async function organizeSelected(patch: UpdateProjectInput) {
     await runOrganizationBatch(selected, () => bulkCancel.value,
       item => window.codehelm.projects.update(item.id, patch),
       (item, status) => { bulkResults.value.push({...item,status}); });
-  } finally { bulkBusy.value = false; selectedIds.value = []; await projectStore.fetchProjects(); }
+  } finally {
+    bulkBusy.value = false;
+    selectedIds.value = [];
+    await projectStore.fetchProjects();
+    const successCount = bulkResults.value.filter((r) => r.status === '已完成').length;
+    if (successCount > 0) {
+      message.success(`批量整理完成：成功 ${successCount} / ${bulkTotal.value}`);
+    }
+  }
 }
 
 // Persist overview filters across route navigation
@@ -1126,6 +1224,15 @@ const currentPage = ref(1);
 const pageBounds = computed(() => getPageBounds(sortedProjects.value.length, currentPage.value, 24));
 const pagedProjects = computed(() => sortedProjects.value.slice(pageBounds.value.start, pageBounds.value.end));
 
+function toggleSelectPage() {
+  if (bulkBusy.value) return;
+  if (selectedIds.value.length > 0) {
+    selectedIds.value = [];
+  } else {
+    selectedIds.value = pagedProjects.value.map((p) => p.id);
+  }
+}
+
 watch([activeFilter, onlyRunning, searchQuery, sortBy, organizationScope, onlyFavorites, selectedTags], () => {
   currentPage.value = 1;
   nextTick(() => { if (projectListRef.value) projectListRef.value.scrollTop = 0; });
@@ -1220,4 +1327,33 @@ function statusBadgeClass(status?: string) {
 .animate-refresh-spin {
   animation: refresh-spin 650ms cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
+
+/* Option A: Micro-Spring Press & Pop on Select/Cancel toggle button */
+:deep(.n-button.btn-select-toggle) {
+  --n-ripple-duration: 0s !important;
+  --n-ripple-color: transparent !important;
+  --n-wave-opacity: 0 !important;
+  transition: transform 120ms cubic-bezier(0.34, 1.56, 0.64, 1), background-color 150ms ease, color 150ms ease, border-color 150ms ease !important;
+  will-change: transform;
+  user-select: none !important;
+}
+
+:deep(.n-button.btn-select-toggle:active) {
+  transform: scale(0.95) !important;
+  transition-duration: 70ms !important;
+}
+
+/* Completely suppress Naive UI water wave ripple effect */
+:deep(.n-button.btn-select-toggle .n-base-wave),
+:deep(.n-button.btn-select-toggle .n-base-wave--active),
+:deep(.n-button.btn-cancel-selection .n-base-wave),
+:deep(.n-button.btn-cancel-selection .n-base-wave--active) {
+  display: none !important;
+  opacity: 0 !important;
+  animation: none !important;
+  box-shadow: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
 </style>

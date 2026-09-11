@@ -12,7 +12,7 @@
           </h1>
           <span
             v-if="runnerStore.runningCount > 0"
-            class="text-[11px] font-medium px-2.5 py-0.5 rounded-full border flex items-center gap-1.5 shadow-2xs"
+            class="text-xs font-medium px-2.5 py-0.5 rounded-full border flex items-center gap-1.5 shadow-2xs"
             :class="themeStore.isDark ? 'bg-emerald-950/60 text-emerald-300 border-emerald-500/40' : 'bg-emerald-50 text-emerald-700 border-emerald-300'"
           >
             <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 pulsing-dot-active flex-shrink-0" />
@@ -20,7 +20,7 @@
           </span>
           <span
             v-else
-            class="text-[11px] font-medium px-2.5 py-0.5 rounded-full border"
+            class="text-xs font-medium px-2.5 py-0.5 rounded-full border"
             :class="themeStore.isDark ? 'bg-[#18181b] text-zinc-400 border-[#27272a]' : 'bg-zinc-100 text-zinc-600 border-zinc-200'"
           >
             服务空闲中
@@ -28,7 +28,7 @@
 
           <span
             v-if="stderrLogsCount > 0"
-            class="text-[11px] font-sans font-medium px-2.5 py-0.5 rounded-full border flex items-center gap-1.5 shadow-2xs select-none"
+            class="text-xs font-sans font-medium px-2.5 py-0.5 rounded-full border flex items-center gap-1.5 shadow-2xs select-none"
             :class="themeStore.isDark
               ? 'bg-rose-950/40 text-rose-300 border-rose-800/80'
               : 'bg-rose-50 text-rose-700 border-rose-200'"
@@ -102,7 +102,7 @@
               @click="handleSelectProject('ALL')"
             >
               <span>全部项目</span>
-              <span class="font-mono text-[10px] opacity-75">({{ displayedLogsSource.length }})</span>
+              <span class="font-mono text-xs opacity-75">({{ displayedLogsSource.length }})</span>
             </button>
 
             <button
@@ -120,7 +120,7 @@
                 :class="runnerStore.getProjectState(p.id).runningCount > 0 ? 'bg-emerald-400 pulsing-dot-active' : 'bg-zinc-600'"
               />
               <span class="truncate max-w-[130px]">{{ p.name }}</span>
-              <span class="font-mono text-[10px] opacity-75">
+              <span class="font-mono text-xs opacity-75">
                 ({{ getProjectLogCount(p.id) }})
               </span>
             </button>
@@ -135,7 +135,7 @@
           </div>
 
           <div
-            class="flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-[11px] font-sans font-medium"
+            class="flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-xs font-sans font-medium"
             :class="isAnyServiceActive
               ? 'bg-emerald-950/50 border-emerald-800/80 text-emerald-300'
               : 'bg-[#18181b] border-[#27272a] text-zinc-500'"
@@ -164,7 +164,7 @@
               @click="selectedServiceFilter = 'ALL'"
             >
               <span>全部服务</span>
-              <span class="font-mono text-[10px] opacity-80">({{ projectScopedTotalLogs }})</span>
+              <span class="font-mono text-xs opacity-80">({{ projectScopedTotalLogs }})</span>
             </button>
 
             <button
@@ -178,14 +178,14 @@
               @click="selectedServiceFilter = svc"
             >
               <span>{{ svc }}</span>
-              <span class="font-mono text-[10px] opacity-75">
+              <span class="font-mono text-xs opacity-75">
                 ({{ getServiceLogCount(svc) }})
               </span>
             </button>
           </div>
 
           <!-- Stream Level Filter (ALL / OUT / ERR) -->
-          <div class="flex items-center gap-0.5 bg-[#18181b] p-0.5 rounded-lg border border-[#27272a] font-mono text-[11px]">
+          <div class="flex items-center gap-0.5 bg-[#18181b] p-0.5 rounded-lg border border-[#27272a] font-mono text-xs">
             <button
               type="button"
               class="px-2 py-1 rounded transition-colors cursor-pointer select-none font-semibold"
@@ -215,7 +215,7 @@
               @click="selectedStreamFilter = 'stderr'"
             >
               <span>ERR</span>
-              <span v-if="filteredStderrCount > 0" class="text-[10px]">({{ filteredStderrCount }})</span>
+              <span v-if="filteredStderrCount > 0" class="text-xs">({{ filteredStderrCount }})</span>
             </button>
           </div>
 
@@ -371,7 +371,7 @@
           <!-- Project Tag (when in ALL projects mode) -->
           <span
             v-if="selectedProjectFilter === 'ALL' && getEntryProjectName(entry)"
-            class="text-zinc-400 text-[10px] bg-[#14141c] px-1.5 py-0.5 rounded flex-shrink-0 select-none border border-[#27272a] font-sans truncate max-w-[120px] leading-none"
+            class="text-zinc-400 text-xs bg-[#14141c] px-1.5 py-0.5 rounded flex-shrink-0 select-none border border-[#27272a] font-sans truncate max-w-[120px] leading-none"
             :title="getEntryProjectName(entry)"
           >
             {{ getEntryProjectName(entry) }}
@@ -379,14 +379,14 @@
 
           <!-- Service Name Capsule -->
           <span
-            class="text-zinc-200 font-medium text-[11px] bg-[#1a1a22] px-2 py-0.5 rounded-md flex-shrink-0 select-none border border-zinc-700/80 font-sans leading-none"
+            class="text-zinc-200 font-medium text-xs bg-[#1a1a22] px-2 py-0.5 rounded-md flex-shrink-0 select-none border border-zinc-700/80 font-sans leading-none"
           >
             {{ entry.serviceName }}
           </span>
 
           <!-- Stream Type Badge (ERR / OUT) -->
           <span
-            class="text-[10px] font-bold px-1.5 py-0.5 rounded flex-shrink-0 select-none uppercase font-mono leading-none"
+            class="text-xs font-bold px-1.5 py-0.5 rounded flex-shrink-0 select-none uppercase font-mono leading-none"
             :class="entry.stream === 'stderr' ? 'bg-rose-950 text-rose-300 border border-rose-800' : 'text-zinc-500'"
           >
             {{ entry.stream === 'stderr' ? 'ERR' : 'OUT' }}

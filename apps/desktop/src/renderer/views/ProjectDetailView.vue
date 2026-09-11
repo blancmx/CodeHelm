@@ -1,5 +1,5 @@
 <template>
-  <div class="flex-1 flex flex-col h-full overflow-hidden p-6" v-if="projectStore.currentProject">
+  <div class="flex-1 min-h-0 flex flex-col h-full overflow-hidden p-6" v-if="projectStore.currentProject">
     <!-- Top Header -->
     <header
       class="flex items-center justify-between pb-5 border-b flex-shrink-0 transition-colors duration-200"
@@ -149,11 +149,22 @@
     </p>
 
     <!-- Main Tabs -->
-    <div class="flex-1 overflow-hidden pt-3 flex flex-col">
+    <div class="flex-1 min-h-0 overflow-hidden pt-3 flex flex-col">
       <ProfileSelector :project-id="props.id" :profiles="profiles" :selected-id="editingProfile?.id" :dirty="profileDirty" :running="!!effectiveRun" @select="selectProfile" @changed="reloadProfiles" />
-      <n-tabs type="line" animated v-model:value="activeMainTab" class="h-full flex flex-col">
+      <n-tabs
+        v-model:value="activeMainTab"
+        type="line"
+        animated
+        class="flex-1 min-h-0 flex flex-col"
+        pane-wrapper-class="flex-1 min-h-0"
+      >
         <!-- Tab 1: 概览 (Overview) -->
-        <n-tab-pane name="overview" tab="项目概览" class="h-full overflow-y-auto">
+        <n-tab-pane
+          name="overview"
+          tab="项目概览"
+          class="h-full overflow-y-auto [scrollbar-gutter:stable]"
+          data-testid="project-overview-pane"
+        >
           <div class="space-y-4 pt-2 pb-6">
             <!-- Project Description & Key Highlights from README -->
             <div
@@ -170,7 +181,7 @@
                     </h3>
                     <span
                       v-if="readmeSummary.hasReadme"
-                      class="text-[10px] font-mono px-1.5 py-0.5 rounded border font-medium leading-none"
+                      class="text-xs font-mono px-1.5 py-0.5 rounded border font-medium leading-none"
                       :class="themeStore.isDark ? 'bg-[#18181b] text-zinc-400 border-[#27272a]' : 'bg-zinc-100 text-zinc-600 border-zinc-200'"
                     >
                       README.md
@@ -184,7 +195,7 @@
 
               <!-- Main Features List extracted from README -->
               <div v-if="readmeSummary.features && readmeSummary.features.length > 0" class="mt-3.5">
-                <div class="text-[11px] font-medium mb-2.5 flex items-center gap-1.5" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
+                <div class="text-xs font-medium mb-2.5 flex items-center gap-1.5" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
                   <IconZap :size="12" />
                   <span>主要功能与核心亮点</span>
                 </div>
@@ -253,6 +264,7 @@
               class="border rounded-xl p-5 transition-all"
               :class="themeStore.isDark ? 'bg-[#121216] border-[#27272a]' : 'bg-white border-zinc-200 shadow-sm'"
               v-if="activeProfile"
+              data-testid="project-overview-profile-card"
             >
               <div
                 class="flex items-center justify-between pb-3 border-b transition-colors"
@@ -285,7 +297,7 @@
                     <span class="w-2 h-2 rounded-full" :class="getServiceStatus(service.id).status === 'RUNNING' ? 'bg-emerald-400 pulsing-dot-active' : 'bg-zinc-400'" />
                     <div class="min-w-0">
                       <div class="text-xs font-bold truncate" :class="themeStore.isDark ? 'text-white' : 'text-zinc-950'">{{ service.name }}</div>
-                      <div class="text-[11px] font-mono truncate" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">$ {{ service.executable }} {{ service.args.join(' ') }}</div>
+                      <div class="text-xs font-mono truncate" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">$ {{ service.executable }} {{ service.args.join(' ') }}</div>
                     </div>
                   </div>
                   <span
@@ -384,22 +396,22 @@
                     <div class="flex items-start justify-between">
                       <div>
                         <h4 class="font-bold text-sm" :class="themeStore.isDark ? 'text-white' : 'text-zinc-950'">{{ tech.name }}</h4>
-                        <span class="text-[10px] uppercase tracking-wider" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
+                        <span class="text-xs uppercase tracking-wider" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
                           {{ categoryLabel(tech.category) }}
                         </span>
                       </div>
                       <span
-                        class="px-2 py-0.5 rounded-md text-[11px] font-medium border inline-flex items-center gap-1 leading-none select-none font-sans"
+                        class="px-2 py-0.5 rounded-md text-xs font-medium border inline-flex items-center gap-1 leading-none select-none font-sans"
                         :class="themeStore.isDark ? 'bg-[#18181b] text-zinc-300 border-[#27272a]' : 'bg-zinc-100 text-zinc-700 border-zinc-200'"
                       >
                         <span class="font-semibold">{{ Math.round(tech.confidence * 100) }}%</span>
-                        <span class="text-[11px] opacity-90">置信度</span>
+                        <span class="text-xs opacity-90">置信度</span>
                       </span>
                     </div>
 
                     <!-- Evidence list with Vector Outline Icon -->
                     <div
-                      class="mt-3.5 space-y-1.5 text-[11px] border rounded-lg p-2.5"
+                      class="mt-3.5 space-y-1.5 text-xs border rounded-lg p-2.5"
                       :class="themeStore.isDark ? 'bg-[#18181b] border-[#27272a]' : 'bg-zinc-50 border-zinc-200'"
                     >
                       <div
@@ -410,7 +422,7 @@
                       >
                         <IconFileText :size="13" class="text-zinc-400 flex-shrink-0" />
                         <span class="truncate">{{ ev.filePath }}</span>
-                        <span class="text-[10px] flex-shrink-0" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-400'">({{ ev.detail }})</span>
+                        <span class="text-xs flex-shrink-0" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-400'">({{ ev.detail }})</span>
                       </div>
                     </div>
                   </div>
@@ -468,14 +480,14 @@
                         <td class="py-2.5 font-sans font-semibold" :class="themeStore.isDark ? 'text-white' : 'text-zinc-950'">
                           {{ ep.name }}
                         </td>
-                        <td class="py-2.5 text-[11px]">
+                        <td class="py-2.5 text-xs">
                           <a :href="ep.url" target="_blank" class="hover:underline flex items-center gap-1 w-max" :class="themeStore.isDark ? 'text-blue-400' : 'text-blue-600'">
                             <span>{{ ep.url }}</span>
                             <IconExternalLink :size="11" />
                           </a>
                         </td>
                         <td class="py-2.5">
-                          <span class="px-2 py-0.5 rounded-md text-[11px] font-semibold border flex items-center gap-1.5 w-max leading-none" :class="themeStore.isDark ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-emerald-50 text-emerald-700 border-emerald-200'">
+                          <span class="px-2 py-0.5 rounded-md text-xs font-semibold border flex items-center gap-1.5 w-max leading-none" :class="themeStore.isDark ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-emerald-50 text-emerald-700 border-emerald-200'">
                             <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 pulsing-dot-active flex-shrink-0" />
                             <span class="leading-none">{{ ep.statusCode || 200 }} 就绪</span>
                           </span>
@@ -540,14 +552,14 @@
                             {{ service.name }}
                           </span>
                           <span
-                            class="border px-2 py-0.5 rounded text-[11px] font-medium uppercase leading-none"
+                            class="border px-2 py-0.5 rounded text-xs font-medium uppercase leading-none"
                             :class="themeStore.isDark ? 'bg-[#27272a] text-zinc-300 border-[#3f3f46]' : 'bg-white text-zinc-600 border-zinc-200'"
                           >
                             {{ service.type }}
                           </span>
                           <!-- Status badge -->
                           <span
-                            class="px-2 py-0.5 rounded-md text-[11px] font-sans font-bold tracking-wider uppercase inline-flex items-center gap-1.5 leading-none select-none shadow-2xs"
+                            class="px-2 py-0.5 rounded-md text-xs font-sans font-bold tracking-wider uppercase inline-flex items-center gap-1.5 leading-none select-none shadow-2xs"
                             :class="statusBadgeClass(getServiceStatus(service.id).status)"
                           >
                             <span
@@ -556,13 +568,13 @@
                             />
                             <span class="leading-none">{{ serviceStatusLabel(getServiceStatus(service.id).status) }}</span>
                           </span>
-                          <span v-if="getServiceStatus(service.id).pid" class="text-[11px] font-mono" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
+                          <span v-if="getServiceStatus(service.id).pid" class="text-xs font-mono" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
                             PID: {{ getServiceStatus(service.id).pid }}
                           </span>
                         </div>
 
                         <!-- Command preview -->
-                        <div class="text-[11px] font-mono mt-1.5 flex items-center gap-3 truncate" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
+                        <div class="text-xs font-mono mt-1.5 flex items-center gap-3 truncate" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
                           <span :class="themeStore.isDark ? 'text-zinc-300' : 'text-zinc-700'">$ {{ service.executable }} {{ service.args.join(' ') }}</span>
                           <span
                             v-if="service.port"
@@ -580,7 +592,7 @@
                       <button
                         v-if="service.port && getServiceStatus(service.id).status === 'RUNNING'"
                         type="button"
-                        class="group h-6 px-2 rounded-md border text-[11px] font-sans font-medium inline-flex items-center gap-1 transition-all duration-200 cursor-pointer select-none"
+                        class="group h-6 px-2 rounded-md border text-xs font-sans font-medium inline-flex items-center gap-1 transition-all duration-200 cursor-pointer select-none"
                         :class="themeStore.isDark ? 'bg-[#18181b] hover:bg-[#27272a] text-zinc-200 border-[#3f3f46]' : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border-zinc-300'"
                         @click="openBrowser(service.type === 'backend' ? `http://localhost:${service.port}/docs` : `http://localhost:${service.port}`)"
                       >
@@ -591,7 +603,7 @@
                       <button
                         v-if="getServiceStatus(service.id).status === 'RUNNING'"
                         type="button"
-                        class="group h-6 px-2 rounded-md border text-[11px] font-sans font-medium inline-flex items-center gap-1 transition-all duration-200 cursor-pointer select-none"
+                        class="group h-6 px-2 rounded-md border text-xs font-sans font-medium inline-flex items-center gap-1 transition-all duration-200 cursor-pointer select-none"
                         :class="themeStore.isDark ? 'bg-[#18181b] hover:bg-[#27272a] text-zinc-300 border-[#3f3f46]' : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-700 border-zinc-300'"
                         title="重启此服务进程"
                         @click="handleRestartSingleService(service.id)"
@@ -603,7 +615,7 @@
                       <button
                         v-if="getServiceStatus(service.id).status === 'RUNNING' || getServiceStatus(service.id).status === 'STARTING'"
                         type="button"
-                        class="group h-6 px-2 rounded-md border text-[11px] font-sans font-semibold inline-flex items-center gap-1 transition-all duration-200 cursor-pointer select-none bg-rose-500/10 hover:bg-rose-500/20 active:scale-95 text-rose-600 dark:text-rose-400 border-rose-500/30 hover:border-rose-500/60"
+                        class="group h-6 px-2 rounded-md border text-xs font-sans font-semibold inline-flex items-center gap-1 transition-all duration-200 cursor-pointer select-none bg-rose-500/10 hover:bg-rose-500/20 active:scale-95 text-rose-600 dark:text-rose-400 border-rose-500/30 hover:border-rose-500/60"
                         title="终止此服务进程"
                         @click="handleStopSingleService(service.id)"
                       >
@@ -683,16 +695,16 @@
                           {{ service.name }}
                         </span>
                         <span
-                          class="border px-1.5 py-0.5 rounded text-[11px] leading-none"
+                          class="border px-1.5 py-0.5 rounded text-xs leading-none"
                           :class="themeStore.isDark ? 'bg-[#27272a] text-zinc-400 border-transparent' : 'bg-white text-zinc-500 border-zinc-200'"
                         >
                           {{ service.type }}
                         </span>
-                        <span v-if="service.dependsOn?.length" class="text-[11px] text-zinc-400 font-mono">
+                        <span v-if="service.dependsOn?.length" class="text-xs text-zinc-400 font-mono">
                           依赖: [{{ service.dependsOn.join(', ') }}]
                         </span>
                       </div>
-                      <div class="text-[11px] font-mono mt-1" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
+                      <div class="text-xs font-mono mt-1" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
                         $ {{ service.executable }} {{ service.args.join(' ') }} (cwd: ./{{ service.cwdRelative || '' }})
                       </div>
                     </div>
@@ -700,7 +712,7 @@
 
                   <div class="flex items-center gap-3">
                     <div class="flex items-center gap-1.5">
-                      <span class="text-[11px] whitespace-nowrap" :class="themeStore.isDark ? 'text-zinc-300' : 'text-zinc-700'">
+                      <span class="text-xs whitespace-nowrap" :class="themeStore.isDark ? 'text-zinc-300' : 'text-zinc-700'">
                         自定义端口
                       </span>
                       <n-input-number

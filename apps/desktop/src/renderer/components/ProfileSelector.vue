@@ -2,7 +2,24 @@
   <section class="profile-selector" :class="{ light: !theme.isDark }" aria-label="运行方案管理">
     <div class="profile-toolbar">
       <label for="selected-profile">运行方案</label>
-      <select id="selected-profile" aria-label="当前运行方案" :value="selectedId ?? ''" :disabled="dirty || busy" @change="emit('select', ($event.target as HTMLSelectElement).value)">
+      <n-select
+        class="profile-select"
+        :value="selectedId ?? ''"
+        :options="profileOptions"
+        :disabled="dirty || busy"
+        size="small"
+        placeholder="选择运行方案"
+        @update:value="handleSelect"
+      />
+      <select
+        id="selected-profile"
+        aria-label="当前运行方案"
+        :value="selectedId ?? ''"
+        :disabled="dirty || busy"
+        class="hidden-accessible-select"
+        tabindex="-1"
+        @change="emit('select', ($event.target as HTMLSelectElement).value)"
+      >
         <option v-if="!profiles.length" value="">尚无方案</option>
         <option v-for="profile in profiles" :key="profile.id" :value="profile.id">{{ profile.name }}{{ profile.isDefault ? ' · 默认' : '' }}</option>
       </select>
@@ -26,7 +43,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import type { RunProfileDto } from '@codehelm/contracts';
 import { useThemeStore } from '../stores/themeStore.js';
 import { displayIpcError } from '../utils/ipc-error.js';
@@ -35,6 +52,21 @@ const emit = defineEmits<{ select: [id: string]; changed: [id?: string] }>();
 const theme = useThemeStore();
 const show = ref(false), busy = ref(false), name = ref(''), error = ref('');
 const action = ref<'create' | 'copy' | 'remove'>('create');
+
+const profileOptions = computed(() => {
+  if (!props.profiles.length) {
+    return [{ label: '尚无方案', value: '' }];
+  }
+  return props.profiles.map(profile => ({
+    label: `${profile.name}${profile.isDefault ? ' · 默认' : ''}`,
+    value: profile.id
+  }));
+});
+
+function handleSelect(id: string) {
+  emit('select', id);
+}
+
 function open(value: typeof action.value) {
   action.value = value; error.value = '';
   name.value = value === 'copy' ? `${props.profiles.find(p => p.id === props.selectedId)?.name ?? '方案'} 副本`.slice(0, 100) : '新运行方案';
@@ -59,11 +91,22 @@ async function submit() {
 <style scoped>
 .profile-selector { margin-bottom: 12px; padding: 12px 16px; border: 1px solid #27272a; border-radius: 12px; background: #121216; color: #e4e4e7; }
 .profile-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 13px; }
-select { flex: 1; min-width: 160px; max-width: 440px; padding: 6px 10px; border: 1px solid #52525b; border-radius: 6px; background: #18181b; color: inherit; }
-select:focus-visible, .discard:focus-visible { outline: 2px solid #a1a1aa; outline-offset: 2px; }
-select:disabled { opacity: .6; }
+.profile-select { flex: 1; min-width: 160px; max-width: 440px; }
+.hidden-accessible-select {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+.discard:focus-visible { outline: 2px solid #a1a1aa; outline-offset: 2px; }
 .profile-hint { margin-top: 8px; font-size: 12px; line-height: 1.6; }
 .discard { text-decoration: underline; cursor: pointer; }
 .light { background: white; color: #27272a; border-color: #d4d4d8; }
-.light select { background: #fafafa; border-color: #a1a1aa; }
 </style>
