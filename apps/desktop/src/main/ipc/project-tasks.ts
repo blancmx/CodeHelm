@@ -1,4 +1,5 @@
 import { Worker } from 'node:worker_threads';
+import { withExecutionReadBudget } from './execution-input-reader.js';
 import path from 'node:path';
 import { generateId, normalizePath } from '@codehelm/shared';
 import { BatchImportInputSchema, WorkspaceScanInputSchema } from '@codehelm/contracts';
@@ -92,9 +93,17 @@ export class ProjectTasks {
 
   async stopForPath(rootPath: string): Promise<void> {
     const normalize = (value: string) => process.platform === 'win32' ? normalizePath(value).toLowerCase() : normalizePath(value);
-    if (this.active?.inputs.some((input) => normalize(input.rootPath) === normalize(rootPath))) {
-      await this.cancel(this.active.state.taskId);
-    }
+    const task = this.active;
+    if (!task) return;
+    const matches = task.inputs.some(input => normalize(input.rootPath) === normalize(rootPath))
+      || await withExecutionReadBudget(async budget => {
+        const target = normalize(await budget.physical(rootPath));
+        for (const input of task.inputs) {
+          if (normalize(await budget.physical(input.rootPath)) === target) return true;
+        }
+        return false;
+      });
+    if (matches && this.active === task) await this.cancel(task.state.taskId);
   }
 
   async stopActive(): Promise<void> {

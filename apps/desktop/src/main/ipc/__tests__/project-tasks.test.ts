@@ -151,9 +151,11 @@ describe('workspace discovery and import task integration', () => {
 
   it('stops a planned import before a project is removed and cleans up on renderer close', async () => {
     const first = await project('first'); const second = await project('second');
+    const alias = path.join(root, 'directory-alias');
+    await fs.symlink(root, alias, 'junction');
     const existing = await jobs.wait(jobs.startImport({ projects: [{ rootPath: second }] }).taskId);
     analysisCode = 'while(true){}';
-    const { taskId } = jobs.startImport({ projects: [{ rootPath: first }, { rootPath: second }] });
+    const { taskId } = jobs.startImport({ projects: [{ rootPath: first }, { rootPath: path.join(alias, 'second') }] });
     await vi.waitFor(() => expect(workers).toHaveLength(2));
     await invoke(IpcChannels.PROJECTS_REMOVE, existing.results[0].project!.id);
     expect((await jobs.wait(taskId)).status).toBe('cancelled');
