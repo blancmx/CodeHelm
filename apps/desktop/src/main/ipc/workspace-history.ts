@@ -6,6 +6,10 @@ import { ProjectRepository } from '@codehelm/database';
 import type { DiscoveredProjectDto, SavedWorkspace, WorkspaceInventory, WorkspaceScanInput, WorkspaceEntry } from '@codehelm/contracts';
 
 const canonical = (value: string) => process.platform === 'win32' ? value.replace(/\\/g, '/').toLowerCase() : value.replace(/\\/g, '/');
+function physicalRoot(root: string): string {
+  try { return fs.realpathSync.native(root); }
+  catch { return root; } // An unavailable workspace retains its last known association.
+}
 const keyFor = (root: string) => `workspace-v02:${createHash('sha256').update(canonical(root)).digest('hex')}`;
 interface StoredWorkspace extends SavedWorkspace { baseline?: WorkspaceInventory; baselineRules?: string; candidates?: string[]; pendingChanges?: Record<string, { files: string[]; since: string }> }
 
@@ -20,8 +24,10 @@ export class WorkspaceHistory {
     const managed = new Map(new ProjectRepository(this.db).list().map(project => [canonical(project.rootPath), project.id]));
     return rows.map(row => {
       const { baseline: _baseline, baselineRules: _rules, candidates: _candidates, pendingChanges: _pending, ...visible } = JSON.parse(row.value) as StoredWorkspace;
+      const physical = physicalRoot(visible.rootPath);
       visible.entries = visible.entries.map(entry => {
-        const projectId = managed.get(canonical(path.resolve(visible.rootPath, entry.relativePath)));
+        const projectId = managed.get(canonical(path.resolve(physical, entry.relativePath)))
+          ?? managed.get(canonical(path.resolve(visible.rootPath, entry.relativePath)));
         return { ...entry, projectId, status: entry.status === 'new' || entry.status === 'managed' ? projectId ? 'managed' : 'new' : entry.status };
       });
       return visible;
@@ -36,6 +42,7 @@ export class WorkspaceHistory {
     const repository = new ProjectRepository(this.db);
     const projects = repository.list();
     const managed = new Map(projects.map(project => [canonical(project.rootPath), project.id]));
+    const physical = physicalRoot(input.rootPath);
     const currentPaths = discovered.map(item => item.relativePath.replace(/\\/g, '/'));
     const allPaths = new Set([...currentPaths, ...(old?.candidates ?? [])]);
     const current = new Set(currentPaths);
@@ -44,7 +51,7 @@ export class WorkspaceHistory {
     const pendingChanges: NonNullable<StoredWorkspace['pendingChanges']> = {};
     for (const relativePath of allPaths) {
       const absolute = path.resolve(input.rootPath, relativePath);
-      const projectId = managed.get(canonical(absolute));
+      const projectId = managed.get(canonical(path.resolve(physical, relativePath))) ?? managed.get(canonical(absolute));
       const prefix = relativePath === '.' ? '' : `${relativePath}/`;
       const related = (file: string) => file.startsWith(prefix);
       const files = new Set([...Object.keys(old?.baseline?.files ?? {}), ...Object.keys(inventory.files)].filter(related));
