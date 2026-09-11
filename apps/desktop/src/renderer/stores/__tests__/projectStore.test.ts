@@ -1,8 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
+import { reactive } from 'vue';
 import { useProjectStore } from '../projectStore.js';
 
 describe('project list read state', () => {
+  it('passes cloneable tags across the desktop bridge', async () => {
+    const update = vi.fn(async (_id, patch) => { structuredClone(patch); return null; });
+    vi.stubGlobal('window', { codehelm: { projects: { update } } });
+    await useProjectStore().updateProject('project', {tags:reactive(['work','v02'])});
+    expect(update).toHaveBeenCalledWith('project',{tags:['work','v02']});
+  });
   beforeEach(() => {
     setActivePinia(createPinia());
     vi.spyOn(console, 'error').mockImplementation(() => undefined);

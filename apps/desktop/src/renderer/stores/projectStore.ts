@@ -4,6 +4,7 @@ import type {
   ImportProjectInput,
   DiscoveredProjectDto,
   ProjectDto,
+  UpdateProjectInput,
   ProjectSummaryDto,
 } from '@codehelm/contracts';
 
@@ -113,11 +114,11 @@ export const useProjectStore = defineStore('project', () => {
     }
   }
 
-  async function updateProject(id: string, patch: Partial<ProjectDto>) {
+  async function updateProject(id: string, patch: UpdateProjectInput) {
     if (window.codehelm?.projects?.update) {
-      const updated = await window.codehelm.projects.update(id, patch);
+      const updated = await window.codehelm.projects.update(id, JSON.parse(JSON.stringify(patch)) as UpdateProjectInput);
       if (updated) {
-        currentProject.value = updated;
+        if (currentProject.value?.id === id) currentProject.value = updated;
         await fetchProjects();
       }
       return updated;

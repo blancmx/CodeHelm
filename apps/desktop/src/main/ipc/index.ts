@@ -5,7 +5,7 @@ import { registerProjectHandlers } from './project-handlers.js';
 import { registerProfileHandlers } from './profile-handlers.js';
 import { registerDiagnosticHandlers } from './diagnostic-handlers.js';
 import { registerAnalysisHandlers } from './analysis-handlers.js';
-import { registerRunnerHandlers, assertProfileRemovable } from './runner-handlers.js';
+import { registerRunnerHandlers, assertProfileRemovable, invalidateProfileApproval } from './runner-handlers.js';
 import { registerSettingsHandlers } from './settings-handlers.js';
 import { registerHistoryHandlers } from './history-handlers.js';
 import { app } from 'electron';
@@ -40,7 +40,7 @@ export async function registerAllIpcHandlers(db: DatabaseInstance, handle: Regis
     appPath: app.getAppPath(),
     executablePath: app.getPath('exe'),
   }), () => getAppSettings(db));
-  registerProjectHandlers(handle, db);
+  registerProjectHandlers(handle, db, analysisTasks, assertProfileRemovable, invalidateProfileApproval);
   registerProfileHandlers(handle, db, assertProfileRemovable);
   registerDiagnosticHandlers(handle, db);
   registerRuntimeProbeHandlers(handle, db);

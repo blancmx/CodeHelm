@@ -5,6 +5,7 @@ import type { Database as DatabaseInstance } from 'better-sqlite3';
 import {
   IpcChannels,
   ImportProjectInputSchema,
+  UpdateProjectInputSchema,
 } from '@codehelm/contracts';
 import {
   ProjectRepository,
@@ -18,6 +19,8 @@ import path from 'node:path';
 import { getProjectTasks } from './project-task-service.js';
 import { getAnalysisTasks } from './analysis-service.js';
 import type { AnalysisTasks } from './analysis-tasks.js';
+import { ProjectRelocation } from './project-relocation.js';
+import { z } from 'zod';
 
 const DEFAULT_FILE_TREE_DEPTH = 5;
 const MAX_FILE_TREE_DEPTH = 5;
@@ -59,10 +62,20 @@ async function readDirectoryEntries(directoryPath: string): Promise<fs.Dirent[]>
   return entries;
 }
 
-export function registerProjectHandlers(handle: RegisterIpcHandler, db: DatabaseInstance, tasks: AnalysisTasks = getAnalysisTasks(db)) {
+export function registerProjectHandlers(handle: RegisterIpcHandler, db: DatabaseInstance, tasks: AnalysisTasks = getAnalysisTasks(db), assertIdle: (id: string) => void = () => {}, invalidateApproval: (id: string) => void = () => {}) {
   const projectRepo = new ProjectRepository(db);
   handle(IpcChannels.PROJECTS_WORKSPACES, () => new WorkspaceHistory(db).list());
   const jobs = getProjectTasks(db, tasks);
+  const relocation = new ProjectRelocation(db, assertIdle, invalidateApproval);
+  handle(IpcChannels.PROJECTS_PREVIEW_RELOCATION, (_event, id, rootPath) => relocation.preview(z.string().uuid().parse(id), z.string().min(1).max(32768).parse(rootPath)));
+  handle(IpcChannels.PROJECTS_RELOCATE, async (_event, rawId, rawToken) => {
+    const id = z.string().uuid().parse(rawId);
+    const token = z.string().uuid().parse(rawToken);
+    const project = projectRepo.findById(id);
+    if (project) await jobs.stopForPath(project.rootPath);
+    await tasks.cancelProject(id);
+    return relocation.commit(id, token);
+  });
   const owners = new WeakSet<Electron.WebContents>();
   const trackOwner = (event: Electron.IpcMainInvokeEvent) => {
     if (owners.has(event.sender)) return;
@@ -140,20 +153,18 @@ export function registerProjectHandlers(handle: RegisterIpcHandler, db: Database
     return { success: true };
   });
 
-  handle(IpcChannels.PROJECTS_UPDATE, async (_event, id: string, patch: any) => {
+  handle(IpcChannels.PROJECTS_UPDATE, async (_event, id: string, rawPatch: unknown) => {
+    z.string().uuid().parse(id);
+    const patch = UpdateProjectInputSchema.parse(rawPatch);
     const project = projectRepo.findById(id);
-    if (patch.rootPath && project) {
-      await jobs.stopForPath(project.rootPath);
-      await tasks.cancelProject(id);
-    }
     if (!project) return null;
     if (patch.name) project.name = patch.name;
-    if (patch.rootPath) project.rootPath = normalizePath(patch.rootPath);
-    if (patch.tags) project.tags = patch.tags;
+    if (patch.tags) project.tags = [...new Set(patch.tags)];
 
-    db.prepare('UPDATE projects SET name = ?, root_path = ?, tags = ?, updated_at = ? WHERE id = ?').run(
+    db.prepare('UPDATE projects SET name = ?, favorite = ?, archived = ?, tags = ?, updated_at = ? WHERE id = ?').run(
       project.name,
-      project.rootPath,
+      Number(patch.favorite ?? project.favorite ?? false),
+      Number(patch.archived ?? project.archived ?? false),
       JSON.stringify(project.tags),
       new Date().toISOString(),
       id

@@ -40,6 +40,8 @@ const activeInstallerProcesses = new Set<ChildProcess>();
 const activeExecutionReads = new Set<AbortController>();
 let runnerShutdownRequested = false;
 const busyProfiles = new Map<string, number>();
+const executionApprovals = new ExecutionApprovalGuard();
+export function invalidateProfileApproval(id: string): void { executionApprovals.invalidate(id); }
 
 export function assertProfileRemovable(id: string): void {
   if (busyProfiles.has(id) || orchestrator.getActiveSessions().some(run => run.runProfileId === id)) {
@@ -103,7 +105,6 @@ export async function registerRunnerHandlers(handle: RegisterIpcHandler, db: Dat
   const recovered = await recoverInterruptedSessions(sessionRepo);
   console.log('[Runner] Reconciled historical sessions:', recovered);
   orchestrator.setSessionPersistence(session => sessionRepo.save(session));
-  const executionApprovals = new ExecutionApprovalGuard();
   const activeExecutions = new ExecutionSlotGuard();
 
   handle(IpcChannels.RUNNER_GET_STATE, () => {

@@ -665,6 +665,8 @@ export function setupBrowserMock() {
 
   const mockApi: CodeHelmApi = {
     projects: {
+      async previewRelocation() { throw new Error('路径修复需要在桌面端核对真实目录'); },
+      async relocate() { throw new Error('路径修复需要在桌面端核对真实目录'); },
       async workspaces() { return []; },
       async startScan() { throw new Error('浏览器预览不执行本地扫描，请使用 CodeHelm 桌面端'); },
       async startImport() { throw new Error('浏览器预览不执行本地导入，请使用 CodeHelm 桌面端'); },

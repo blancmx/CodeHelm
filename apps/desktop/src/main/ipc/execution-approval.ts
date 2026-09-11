@@ -199,6 +199,10 @@ function sameContext(left: ExecutionApprovalContext, right: ExecutionApprovalCon
 }
 
 export class ExecutionApprovalGuard {
+  invalidate(profileId: string): void {
+    this.approvals.delete(profileId);
+    this.invalidateIssuedApprovals(profileId);
+  }
   private readonly approvals = new Map<string, ApprovalRecord>();
   private readonly issuedApprovals = new Map<string, IssuedApproval>();
   private readonly now: () => number;

@@ -5,7 +5,7 @@ import path from 'node:path';
 import Database from 'better-sqlite3';
 import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { createDatabase } from '../db.js';
+import { createDatabase, DATABASE_SCHEMA_VERSION } from '../db.js';
 import { BackupManager } from '../backup-management.js';
 import { createVerifiedDatabaseBackup,hashFile } from '../startup-protection.js';
 let root:string,db:Database.Database,manager:BackupManager;
@@ -85,7 +85,7 @@ it('preflights an older schema and clears unreadable secrets only in the candida
   const old=new Database(saved.databasePath);old.pragma('user_version=2');old.close();
   const meta=JSON.parse(fs.readFileSync(saved.manifestPath,'utf8'));meta.schemaVersion=2;meta.sha256=await hashFile(saved.databasePath);fs.writeFileSync(saved.manifestPath,JSON.stringify(meta));
   const preview=await manager.prepare(id,()=>{throw new Error('cannot decrypt');});
-  expect(preview).toMatchObject({schemaVersion:2,targetSchemaVersion:3,unreadableSecrets:1});
+  expect(preview).toMatchObject({schemaVersion:2,targetSchemaVersion:DATABASE_SCHEMA_VERSION,unreadableSecrets:1});
   expect((db.prepare('SELECT env_json FROM service_configs').get() as {env_json:string}).env_json).toContain('foreign-machine-value');
   await manager.restore(preview.token,db);
   expect(JSON.parse((db.prepare('SELECT env_json FROM service_configs').get() as {env_json:string}).env_json)).toEqual([{key:'TOKEN',value:'',isSecret:true,required:true}]);

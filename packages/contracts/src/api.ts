@@ -4,6 +4,8 @@ import type {
   BatchImportInput,
   DiscoveredProjectDto,
   ProjectDto,
+  UpdateProjectInput,
+  RelocationPreview,
   ProjectSummaryDto,
   SelectedDirectoryDto,
   FileTreeNodeDto,
@@ -51,7 +53,9 @@ export interface CodeHelmApi {
     list(): Promise<ProjectSummaryDto[]>;
     get(id: string): Promise<ProjectDto | null>;
     remove(id: string): Promise<void>;
-    update(id: string, patch: Partial<ProjectDto>): Promise<ProjectDto | null>;
+    update(id: string, patch: UpdateProjectInput): Promise<ProjectDto | null>;
+    previewRelocation(id: string, rootPath: string): Promise<RelocationPreview>;
+    relocate(id: string, token: string): Promise<ProjectDto>;
     getFileTree(rootPath: string, options?: { maxDepth?: number }): Promise<FileTreeNodeDto[]>;
     getReadmeSummary(rootPath: string): Promise<ReadmeSummaryDto>;
   };

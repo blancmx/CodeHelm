@@ -135,6 +135,7 @@
         >
           <div class="min-h-0 overflow-hidden">
             <p v-if="session.servicesTruncated" role="status" class="text-xs my-2 text-amber-600">本次会话共 {{ session.serviceCount }} 条服务记录，此处仅显示前 200 条；会话日志仍可查询全部服务的已保存输出。</p>
+            <p class="text-xs my-2 break-all">项目路径（旧记录可能为升级时补录）：{{ session.projectRootPath || '未知（旧版未记录）' }}</p>
             <p class="text-xs my-2">会话开始：{{ formatTime(session.startedAt) }} · 会话结束：{{ session.stoppedAt ? formatTime(session.stoppedAt) : '未知（未记录）' }} · 配置保存时间：{{ session.profileUpdatedAt ? formatTime(session.profileUpdatedAt) : '未知（旧版未记录）' }}</p>
             <n-button size="small" class="mb-2" @click="openLogs(session)">查看会话日志</n-button>
             <p v-if="session.status === 'INTERRUPTED'" class="text-xs text-amber-600 dark:text-amber-400 mb-3 pl-6">

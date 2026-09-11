@@ -9,8 +9,8 @@ export class SessionRepository {
   /** One transaction per lifecycle snapshot; never store environment or command arguments. */
   save(session: RunSession): void {
     this.db.transaction(() => {
-      this.db.prepare(`INSERT INTO run_sessions (id,project_id,run_profile_id,status,started_at,stopped_at,profile_name,profile_updated_at)
-        VALUES (@id,@projectId,@runProfileId,@status,@startedAt,@stoppedAt,@profileName,@profileUpdatedAt)
+      this.db.prepare(`INSERT INTO run_sessions (id,project_id,run_profile_id,status,started_at,stopped_at,profile_name,profile_updated_at,project_root_path)
+        VALUES (@id,@projectId,@runProfileId,@status,@startedAt,@stoppedAt,@profileName,@profileUpdatedAt,(SELECT root_path FROM projects WHERE id=@projectId))
         ON CONFLICT(id) DO UPDATE SET status=excluded.status, stopped_at=excluded.stopped_at`)
         .run({ ...session, stoppedAt: session.stoppedAt ?? null, profileName: session.profileName ?? null, profileUpdatedAt: session.profileUpdatedAt ?? null });
       const saveService = this.db.prepare(`INSERT INTO service_sessions
@@ -45,6 +45,7 @@ export class SessionRepository {
     return {
       id: row.id, projectId: row.project_id, runProfileId: row.run_profile_id,
       profileName: row.profile_name ?? undefined, profileUpdatedAt: row.profile_updated_at ?? undefined,
+      projectRootPath: row.project_root_path ?? undefined,
       ...(count === undefined ? {} : { serviceCount: count, servicesTruncated: count > services.length }),
       status: row.status, startedAt: row.started_at, stoppedAt: row.stopped_at ?? undefined,
       services: services.map((s): ServiceSession => ({

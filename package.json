@@ -19,7 +19,7 @@
     "verify:release": "node apps/desktop/scripts/verify-release-artifacts.mjs dist-release/win-unpacked/resources",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "pnpm -r run typecheck && tsc -p tsconfig.e2e.json",
-    "test": "vitest run --exclude e2e/**",
+    "test": "vitest run --exclude e2e/** --exclude test-results/**",
     "test:watch": "vitest",
     "test:e2e": "pnpm build && playwright test --config=playwright.config.ts",
     "test:e2e:built": "playwright test --config=playwright.config.ts",

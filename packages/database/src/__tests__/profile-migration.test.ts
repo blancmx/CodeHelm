@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { SCHEMA_SQL } from '../schema.js';
-import { createDatabase } from '../db.js';
+import { createDatabase, DATABASE_SCHEMA_VERSION } from '../db.js';
 import { ProfileRepository } from '../repositories/profile-repository.js';
 import { SessionRepository } from '../repositories/session-repository.js';
 
@@ -21,7 +21,7 @@ it('migrates v2 profiles and history, repairs duplicate defaults and reopens wit
     profile.run('a', 'project', 'Original A', 1, 'old', 'old'); profile.run('b', 'project', 'B', 1, 'old', 'old');
     db.prepare('INSERT INTO run_sessions(id,project_id,run_profile_id,status,started_at) VALUES (?,?,?,?,?)').run('run', 'project', 'a', 'STOPPED', 'old');
     db.close(); db = createDatabase(file);
-    expect(db.pragma('user_version', { simple: true })).toBe(3);
+    expect(db.pragma('user_version', { simple: true })).toBe(DATABASE_SCHEMA_VERSION);
     expect(new ProfileRepository(db).findByProjectId('project').filter(p => p.isDefault)).toHaveLength(1);
     expect(() => db.prepare('UPDATE run_profiles SET is_default=1 WHERE id=?').run('b')).toThrow('UNIQUE');
     new ProfileRepository(db).remove('a');

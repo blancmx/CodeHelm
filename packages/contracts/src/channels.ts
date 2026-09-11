@@ -18,6 +18,8 @@ export const IpcChannels = {
   PROJECTS_GET: 'codehelm:projects:get',
   PROJECTS_REMOVE: 'codehelm:projects:remove',
   PROJECTS_UPDATE: 'codehelm:projects:update',
+  PROJECTS_PREVIEW_RELOCATION: 'codehelm:projects:preview-relocation',
+  PROJECTS_RELOCATE: 'codehelm:projects:relocate',
   PROJECTS_GET_FILE_TREE: 'codehelm:projects:get-file-tree',
   PROJECTS_GET_README: 'codehelm:projects:get-readme',
 

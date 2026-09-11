@@ -8,6 +8,8 @@ CREATE TABLE IF NOT EXISTS projects (
   color TEXT,
   icon TEXT,
   tags TEXT NOT NULL DEFAULT '[]',
+  favorite INTEGER NOT NULL DEFAULT 0,
+  archived INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   last_analyzed_at TEXT,
@@ -89,6 +91,7 @@ CREATE TABLE IF NOT EXISTS run_sessions (
   status TEXT NOT NULL,
   profile_name TEXT,
   profile_updated_at TEXT,
+  project_root_path TEXT,
   started_at TEXT NOT NULL,
   stopped_at TEXT
 );

@@ -11,6 +11,8 @@ interface ProjectRow {
   color: string | null;
   icon: string | null;
   tags: string;
+  favorite: number;
+  archived: number;
   created_at: string;
   updated_at: string;
   last_analyzed_at: string | null;
@@ -68,7 +70,7 @@ export class ProjectRepository {
 
   findByRootPath(rootPath: string): Project | null {
     const normalized = normalizePath(rootPath);
-    const stmt = this.db.prepare('SELECT * FROM projects WHERE root_path = ?');
+    const stmt = this.db.prepare(`SELECT * FROM projects WHERE root_path = ? ${process.platform === 'win32' ? 'COLLATE NOCASE' : ''}`);
     const row = stmt.get(normalized) as ProjectRow | undefined;
     return row ? this.mapRowToProject(row) : null;
   }
@@ -107,6 +109,8 @@ export class ProjectRepository {
       name: r.name,
       rootPath: r.root_path,
       tags: JSON.parse(r.tags || '[]'),
+      favorite: !!r.favorite,
+      archived: !!r.archived,
       color: r.color ?? undefined,
       icon: r.icon ?? undefined,
       primaryLanguages: r.primary_language ? [r.primary_language] : [],
@@ -133,6 +137,8 @@ export class ProjectRepository {
       color: row.color ?? undefined,
       icon: row.icon ?? undefined,
       tags: JSON.parse(row.tags || '[]'),
+      favorite: !!row.favorite,
+      archived: !!row.archived,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
       lastAnalyzedAt: row.last_analyzed_at ?? undefined,

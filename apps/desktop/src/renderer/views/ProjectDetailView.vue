@@ -27,37 +27,7 @@
                 <IconCopy :size="13" class="text-zinc-400 group-hover:text-zinc-200" />
               </div>
 
-              <!-- Inline Path Editor Popover -->
-              <n-popover trigger="click" v-model:show="isEditPathOpen" placement="bottom-start">
-                <template #trigger>
-                  <button
-                    class="p-1 rounded-md border text-zinc-400 hover:text-white transition-colors cursor-pointer"
-                    :class="themeStore.isDark ? 'bg-[#18181b] hover:bg-[#27272a] border-[#27272a]' : 'bg-white hover:bg-zinc-100 border-zinc-200 text-zinc-600'"
-                    title="自定义/修正真实项目绝对物理路径"
-                    @click="initEditPath"
-                  >
-                    <IconEdit :size="13" />
-                  </button>
-                </template>
-                <div class="p-2.5 space-y-2.5 w-360px">
-                  <div class="text-xs font-bold" :class="themeStore.isDark ? 'text-white' : 'text-zinc-950'">
-                    修改项目物理根路径
-                  </div>
-                  <n-input
-                    v-model:value="editingPathInput"
-                    size="small"
-                    placeholder="输入真实的绝对物理路径..."
-                    class="font-mono text-xs"
-                    @keyup.enter="handleSavePath"
-                  />
-                  <div class="flex justify-end gap-2 pt-0.5">
-                    <n-button size="tiny" secondary @click="isEditPathOpen = false">取消</n-button>
-                    <n-button size="tiny" type="primary" :loading="isSavingPath" :disabled="!editingPathInput.trim()" @click="handleSavePath">
-                      保存修改
-                    </n-button>
-                  </div>
-                </div>
-              </n-popover>
+              <ProjectPathRepair :project="projectStore.currentProject" @relocated="onRelocated" />
             </div>
           </div>
           <div class="flex items-center gap-3 text-xs mt-1" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
@@ -167,6 +137,7 @@
         </template>
       </div>
     </header>
+    <ProjectTags :project="projectStore.currentProject" />
 
 
 
@@ -805,6 +776,8 @@
 </template>
 
 <script setup lang="ts">
+import ProjectPathRepair from '../components/ProjectPathRepair.vue';
+import ProjectTags from '../components/ProjectTags.vue';
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import { ENVIRONMENT_PREFLIGHT_ERROR } from '@codehelm/contracts';
 import AnalysisChanges from '../components/AnalysisChanges.vue';
@@ -1154,31 +1127,10 @@ function getServiceStatus(serviceId: string) {
   return { status: profilePresentation.value.historical ? 'IDLE' as ProcessStatus : 'STOPPED' as ProcessStatus };
 }
 
-const isEditPathOpen = ref(false);
-const editingPathInput = ref('');
-const isSavingPath = ref(false);
-
-function initEditPath() {
-  editingPathInput.value = projectStore.currentProject?.rootPath || '';
-  isEditPathOpen.value = true;
-}
-
-async function handleSavePath() {
-  if (!projectStore.currentProject || !editingPathInput.value.trim()) return;
-  try {
-    isSavingPath.value = true;
-    const newPath = editingPathInput.value.trim().replace(/\\/g, '/');
-    await projectStore.updateProject(projectStore.currentProject.id, {
-      rootPath: newPath,
-    });
-    isEditPathOpen.value = false;
-    message.success('项目根路径已更新并保存');
-    await loadData();
-  } catch (err: any) {
-    message.error(err.message || '更新路径失败');
-  } finally {
-    isSavingPath.value = false;
-  }
+async function onRelocated() {
+  message.success('新位置已绑定，正在重新分析；运行方案需要重新确认');
+  await loadData();
+  await analysis.start();
 }
 
 function copyRootPath() {

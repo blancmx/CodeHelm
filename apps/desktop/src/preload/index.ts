@@ -24,6 +24,8 @@ const api: CodeHelmApi = {
     get: (id) => ipcRenderer.invoke(IpcChannels.PROJECTS_GET, id),
     remove: (id) => ipcRenderer.invoke(IpcChannels.PROJECTS_REMOVE, id),
     update: (id, patch) => ipcRenderer.invoke(IpcChannels.PROJECTS_UPDATE, id, toIpcPayload(patch)),
+    previewRelocation: (id, rootPath) => ipcRenderer.invoke(IpcChannels.PROJECTS_PREVIEW_RELOCATION, id, rootPath),
+    relocate: (id, token) => ipcRenderer.invoke(IpcChannels.PROJECTS_RELOCATE, id, token),
     getFileTree: (rootPath, options) =>
       ipcRenderer.invoke(IpcChannels.PROJECTS_GET_FILE_TREE, rootPath, toIpcPayload(options)),
     getReadmeSummary: (rootPath) =>

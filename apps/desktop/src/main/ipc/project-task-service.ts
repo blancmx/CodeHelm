@@ -22,6 +22,7 @@ export function getProjectTasks(db: DatabaseInstance, analysis: AnalysisTasks = 
   tasks = new ProjectTasks(analysis, async (input, signal) => {
     const stat = await fs.lstat(input.rootPath);
     if (!stat.isDirectory() || stat.isSymbolicLink()) throw new Error(`项目目录不可用或为链接：${input.rootPath}`);
+    input = { ...input, rootPath: await fs.realpath(input.rootPath) };
     if (signal.aborted) throw new Error('已停止导入');
     const existing = projects.findByRootPath(input.rootPath);
     if (existing) {

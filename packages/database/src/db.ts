@@ -4,7 +4,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { SCHEMA_SQL } from './schema.js';
 
-export const DATABASE_SCHEMA_VERSION = 3;
+export const DATABASE_SCHEMA_VERSION = 4;
 
 /** Low-level initializer. Desktop startup must use openProtectedDatabase first. */
 export function createDatabase(dbFilePath: string, options: { fileMustExist?: boolean } = {}): DatabaseInstance {
@@ -24,6 +24,10 @@ export function createDatabase(dbFilePath: string, options: { fileMustExist?: bo
     // A failed upgrade must not leave a partially initialized schema.
     db.transaction(() => {
       db.exec(SCHEMA_SQL);
+      const projectColumns = db.prepare('PRAGMA table_info(projects)').all() as Array<{ name: string }>;
+      for (const name of ['favorite', 'archived']) {
+        if (!projectColumns.some(c => c.name === name)) db.exec(`ALTER TABLE projects ADD COLUMN ${name} INTEGER NOT NULL DEFAULT 0`);
+      }
       const serviceColumns = db.prepare('PRAGMA table_info(service_configs)').all() as Array<{ name: string }>;
       if (!serviceColumns.some((column) => column.name === 'port_mode')) {
         db.exec("ALTER TABLE service_configs ADD COLUMN port_mode TEXT NOT NULL DEFAULT 'auto'");
@@ -35,6 +39,8 @@ export function createDatabase(dbFilePath: string, options: { fileMustExist?: bo
       const profileColumns = db.prepare('PRAGMA table_info(run_profiles)').all() as Array<{ name: string }>;
       if (!profileColumns.some(c => c.name === 'deleted_at')) db.exec('ALTER TABLE run_profiles ADD COLUMN deleted_at TEXT');
       const runColumns = db.prepare('PRAGMA table_info(run_sessions)').all() as Array<{ name: string }>;
+      if (!runColumns.some(c => c.name === 'project_root_path')) db.exec('ALTER TABLE run_sessions ADD COLUMN project_root_path TEXT');
+      db.exec('UPDATE run_sessions SET project_root_path=(SELECT root_path FROM projects WHERE id=project_id) WHERE project_root_path IS NULL');
       if (!runColumns.some(c => c.name === 'profile_name')) db.exec('ALTER TABLE run_sessions ADD COLUMN profile_name TEXT');
       if (!runColumns.some(c => c.name === 'profile_updated_at')) db.exec('ALTER TABLE run_sessions ADD COLUMN profile_updated_at TEXT');
       // Older sessions have no historical name; capture the available name once.

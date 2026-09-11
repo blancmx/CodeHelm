@@ -43,6 +43,7 @@ export interface ServiceSession {
 export type RunSessionStatus = 'STARTING' | 'RUNNING' | 'STOPPING' | 'STOPPED' | 'PARTIAL_FAILED' | 'FAILED' | 'INTERRUPTED';
 
 export interface RunSession {
+  projectRootPath?: string;
   id: string;
   projectId: string;
   runProfileId: string;

@@ -42,6 +42,8 @@ export const DiscoveredProjectDtoSchema = z.object({
 export type DiscoveredProjectDto = z.infer<typeof DiscoveredProjectDtoSchema>;
 
 export const ProjectDtoSchema = z.object({
+  favorite: z.boolean().optional(),
+  archived: z.boolean().optional(),
   id: z.string().uuid(),
   name: z.string(),
   rootPath: z.string(),
@@ -86,6 +88,8 @@ export const ProjectTaskDtoSchema = ProjectTaskProgressDtoSchema.extend({
 export type ProjectTaskDto = z.infer<typeof ProjectTaskDtoSchema>;
 
 export const ProjectSummaryDtoSchema = z.object({
+  favorite: z.boolean().optional(),
+  archived: z.boolean().optional(),
   id: z.string().uuid(),
   name: z.string(),
   rootPath: z.string(),
@@ -103,6 +107,21 @@ export const ProjectSummaryDtoSchema = z.object({
   recommendedRunCommand: z.string().optional(),
 });
 export type ProjectSummaryDto = z.infer<typeof ProjectSummaryDtoSchema>;
+
+export const UpdateProjectInputSchema = z.object({
+  name: z.string().trim().min(1).max(200).optional(),
+  tags: z.array(z.string().trim().min(1).max(40)).max(30).optional(),
+  favorite: z.boolean().optional(),
+  archived: z.boolean().optional(),
+}).strict();
+export type UpdateProjectInput = z.infer<typeof UpdateProjectInputSchema>;
+export interface RelocationPreview {
+  token: string;
+  oldPath: string;
+  newPath: string;
+  manifests: { path: string; sha256: string }[];
+  directories: string[];
+}
 
 export const SelectedDirectoryDtoSchema = z.object({
   path: z.string(),

@@ -96,6 +96,64 @@ test.afterEach(async ({}, testInfo) => {
   if (closeError !== undefined) throw closeError;
 });
 
+// eslint-disable-next-line no-empty-pattern
+test('organizes projects across restart and repairs a moved project through reviewed UI', async ({}, testInfo) => {
+  const original = path.join(fixtureRoot,'fixture-project');
+  const project = await page!.evaluate(rootPath => window.codehelm.projects.import({rootPath,name:'V02-007 整理验收',tags:['work','web']}),original);
+  await page!.getByRole('button',{name:'刷新项目列表与实时状态'}).click();
+  await page!.getByRole('button',{name:'收藏 V02-007 整理验收',exact:true}).click();
+  await page!.getByRole('checkbox',{name:'仅收藏',exact:true}).check();
+  await page!.getByLabel('组合标签').click();
+  await page!.getByText('work',{exact:true}).click();
+  await page!.getByText('web',{exact:true}).click();
+  await page!.keyboard.press('Escape');
+  await expect(page!.getByText('V02-007 整理验收',{exact:true})).toBeVisible();
+  await page!.getByRole('button',{name:'归档',exact:true}).click();
+  await expect(page!.getByText('V02-007 整理验收',{exact:true})).toHaveCount(0);
+  await page!.getByLabel('归档范围').click();
+  await page!.getByText('已归档',{exact:true}).click();
+  await expect(page!.getByText('V02-007 整理验收',{exact:true})).toBeVisible();
+  await page!.screenshot({path:testInfo.outputPath('organization-dark.png'),animations:'disabled'});
+  await app!.close();app=undefined;
+  const environment={...process.env};delete environment.ELECTRON_RUN_AS_NODE;delete environment.VITE_DEV_SERVER_URL;
+  app=await electron.launch({executablePath:electronExecutable,args:launchArgs,cwd:desktopRoot,env:{...environment,CODEHELM_USER_DATA_DIR:path.join(fixtureRoot,'user-data'),CODEHELM_VALIDATION_WINDOW:'0'}});
+  page=await app.firstWindow();await page.waitForLoadState('domcontentloaded');
+  expect(await page.evaluate(id=>window.codehelm.projects.get(id),project.id)).toMatchObject({favorite:true,archived:true,tags:['work','web']});
+  await page.evaluate(id=>{location.hash=`/projects/${id}`;},project.id);
+  await page.getByRole('textbox',{name:'新标签',exact:true}).fill('v02');
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Escape');
+  await page.getByRole('button',{name:'保存标签',exact:true}).click();
+  await expect.poll(async()=>(await page!.evaluate(id=>window.codehelm.projects.get(id),project.id))?.tags).toEqual(['work','web','v02']);
+  await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows()[0].setBounds({width:960,height:600}));
+  const moved=path.join(fixtureRoot,'移动后的 中文项目');
+  await fs.rename(original,moved);
+  await page.getByRole('button',{name:'修复项目路径'}).click();
+  await page.getByRole('textbox',{name:'新项目路径'}).fill(moved);
+  await page.getByRole('button',{name:'核对新位置'}).click();
+  await expect(page.getByText('package.json',{exact:true})).toBeVisible();
+  await page.getByRole('checkbox',{name:'我已核对，这是原项目的新位置'}).check();
+  await page.screenshot({path:testInfo.outputPath('relocation-preview.png'),animations:'disabled'});
+  await page.getByRole('button',{name:'确认绑定并重新分析'}).click();
+  await expect.poll(async()=>{
+    const saved=await page!.evaluate(id=>window.codehelm.projects.get(id),project.id);
+    return saved?.rootPath.includes('移动后的 中文项目') && !!saved.lastAnalyzedAt;
+  }).toBe(true);
+  await expect.poll(async()=>(await page!.evaluate(id=>window.codehelm.analysis.getTask(id),project.id))?.status).toBe('completed');
+  await page.evaluate(()=>{location.hash='/settings';});
+  await page.getByRole('button',{name:'明亮模式',exact:true}).click();
+  await page.evaluate(()=>{location.hash='/';});
+  await page.getByLabel('归档范围').click();await page.getByText('已归档',{exact:true}).click();
+  await page.getByRole('button',{name:'选择本页',exact:true}).click();
+  await page.getByRole('button',{name:'批量取消归档',exact:true}).click();
+  await expect(page.getByRole('status').filter({hasText:'批量整理'})).toContainText('成功 1 / 1');
+  await page.getByLabel('归档范围').click();await page.getByText('未归档',{exact:true}).click();
+  await expect(page.getByText('V02-007 整理验收',{exact:true}).first()).toBeVisible();
+  await page.screenshot({path:testInfo.outputPath('organization-light.png'),animations:'disabled'});
+  await page.evaluate(id=>window.codehelm.projects.remove(id),project.id);
+  expect(await fs.readFile(path.join(moved,'package.json'),'utf8')).toContain('codehelm-e2e-fixture');
+});
+
 test('persists settings and completes an approved managed-service lifecycle', async () => {
   await expect(page!).toHaveTitle(/CodeHelm/);
   await expect(page!.getByRole('heading', { name: '项目总览' })).toBeVisible();
@@ -167,6 +225,8 @@ test('persists settings and completes an approved managed-service lifecycle', as
   expect(started.status).toBe('RUNNING');
   expect(started.services).toHaveLength(1);
   expect(started.services[0]?.status).toBe('RUNNING');
+  await page!.evaluate(id => window.codehelm.projects.update(id,{archived:true}), imported.id);
+  expect((await page!.evaluate(() => window.codehelm.runner.getState())).activeSessions.some(run => run.id === started.id)).toBe(true);
   await expect.poll(() => page!.evaluate(() => {
     return window.__codehelmE2eLogs?.join('') ?? '';
   })).toContain('CODEHELM_E2E_SERVICE_READY');
@@ -437,7 +497,7 @@ test('migrates the released v0.1 schema and preserves a usable pre-upgrade snaps
   await expect(page.getByRole('list',{name:'数据库备份列表'})).toContainText('schema 2');
   await page.screenshot({path:testInfo.outputPath('upgrade-v010.png'),animations:'disabled'});
   await app.close();app=undefined;page=undefined;
-  const upgraded=new DB(filename,{readonly:true});expect(upgraded.pragma('user_version',{simple:true})).toBe(3);upgraded.close();
+  const upgraded=new DB(filename,{readonly:true});expect(upgraded.pragma('user_version',{simple:true})).toBe(4);upgraded.close();
   const directories=await fs.readdir(path.join(userData,'backups'));
   const snapshot=new DB(path.join(userData,'backups',directories.find(id=>!id.startsWith('.'))!,'codehelm.sqlite'),{readonly:true});
   expect(snapshot.pragma('user_version',{simple:true})).toBe(2);

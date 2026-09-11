@@ -7,6 +7,8 @@ export interface Project {
   color?: string;
   icon?: string;
   tags: string[];
+  favorite?: boolean;
+  archived?: boolean;
   createdAt: string;
   updatedAt: string;
   lastAnalyzedAt?: string;
@@ -14,6 +16,8 @@ export interface Project {
 }
 
 export interface ProjectSummary {
+  favorite?: boolean;
+  archived?: boolean;
   id: string;
   name: string;
   rootPath: string;

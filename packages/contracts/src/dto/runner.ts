@@ -50,6 +50,7 @@ export const RunSessionDtoSchema = z.object({
   projectId: z.string().uuid(),
   runProfileId: z.string().uuid(),
   profileName: z.string().optional(),
+  projectRootPath: z.string().optional(),
   profileUpdatedAt: z.string().optional(),
   serviceCount: z.number().optional(),
   servicesTruncated: z.boolean().optional(),

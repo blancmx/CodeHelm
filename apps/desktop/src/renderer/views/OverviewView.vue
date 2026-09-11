@@ -143,6 +143,22 @@
       </div>
     </div>
 
+    <div v-if="projectStore.hasLoadedProjects" class="flex flex-wrap items-center gap-3 pt-3 flex-shrink-0" aria-label="项目整理筛选">
+      <n-select v-model:value="organizationScope" class="w-32" aria-label="归档范围" :options="[{label:'未归档',value:'active'},{label:'已归档',value:'archived'},{label:'全部项目',value:'all'}]" />
+      <n-checkbox v-model:checked="onlyFavorites">仅收藏</n-checkbox>
+      <n-select v-model:value="selectedTags" multiple clearable filterable class="w-64" aria-label="组合标签" placeholder="标签（同时满足）" :options="tagOptions" />
+      <n-button size="small" :disabled="bulkBusy" @click="selectedIds = pagedProjects.map(p => p.id)">选择本页</n-button>
+      <n-button size="small" :disabled="bulkBusy || !selectedIds.length" @click="selectedIds = []">清除选择</n-button>
+      <span class="text-xs">已选 {{ selectedIds.length }}</span>
+      <n-button size="small" :disabled="bulkBusy || !selectedIds.length" @click="organizeSelected({favorite:true})">批量收藏</n-button>
+      <n-button size="small" :disabled="bulkBusy || !selectedIds.length" @click="organizeSelected({archived:true})">批量归档</n-button>
+      <n-button size="small" :disabled="bulkBusy || !selectedIds.length" @click="organizeSelected({archived:false})">批量取消归档</n-button>
+      <n-button v-if="bulkBusy" size="small" @click="bulkCancel = true">停止后续操作</n-button>
+    </div>
+    <details v-if="bulkResults.length" class="text-xs py-2 flex-shrink-0 max-h-32 overflow-auto" :open="bulkBusy">
+      <summary role="status">批量整理：成功 {{ bulkResults.filter(r => r.status === '已完成').length }} / {{ bulkTotal }}，{{ bulkBusy ? '处理中' : '已结束' }}</summary>
+      <p v-for="result in bulkResults" :key="result.id">{{ result.name }}：{{ result.status }}</p>
+    </details>
     <!-- Quick Filter Tabs, Sorting & View Mode Switcher -->
     <div v-if="projectStore.hasLoadedProjects" class="flex items-center justify-between pt-3 pb-2 flex-shrink-0 gap-3">
       <!-- Left: Dynamic Ecosystem Tabs & Independent Running Toggle -->
@@ -335,7 +351,7 @@
         </div>
         <!-- Empty State: only after a successful database read -->
         <div
-          v-else-if="filteredProjects.length === 0 && !searchQuery.trim() && activeFilter === 'ALL' && !onlyRunning"
+          v-else-if="projectStore.projects.length === 0"
           key="empty-state"
           class="flex-1 flex flex-col items-center justify-center text-center max-w-lg mx-auto py-8 my-auto"
         >
@@ -440,6 +456,7 @@
         >
           <div>
             <!-- Top Card Info -->
+            <ProjectOrganizationActions :project="project" :selected="selectedIds.includes(project.id)" @select="selectProject(project.id, $event)" />
             <div class="flex items-start justify-between">
               <div class="flex items-center gap-3 min-w-0">
                 <!-- Monogram Avatar -->
@@ -576,6 +593,7 @@
             >
               <!-- Project Name & Avatar -->
               <td class="py-3.5 px-4 truncate">
+                <ProjectOrganizationActions :project="project" :selected="selectedIds.includes(project.id)" @select="selectProject(project.id, $event)" />
                 <div class="flex items-center gap-2.5 min-w-0">
                   <div
                     class="w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs flex-shrink-0 border font-mono"
@@ -678,6 +696,8 @@
 
 <script setup lang="ts">
 import UnresolvedNotice from '../components/UnresolvedNotice.vue';
+import ProjectOrganizationActions from '../components/ProjectOrganizationActions.vue';
+import { matchesOrganization, compareLastRun, runOrganizationBatch } from '../utils/project-organization.js';
 import { ref, computed, nextTick, watch, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { dialog, message } from '../utils/discrete.js';
@@ -697,7 +717,7 @@ import {
   IconList,
   IconChevronDown,
 } from '../components/icons/index.js';
-import type { ProjectSummaryDto } from '@codehelm/contracts';
+import type { ProjectSummaryDto, UpdateProjectInput } from '@codehelm/contracts';
 import { getPageBounds } from '../utils/pagination.js';
 
 const projectStore = useProjectStore();
@@ -732,6 +752,28 @@ async function handleManualRefresh() {
 }
 
 const searchQuery = ref('');
+const organizationScope = ref('active');
+const onlyFavorites = ref(false);
+const selectedTags = ref<string[]>([]);
+const tagOptions = computed(() => [...new Set(projectStore.projects.flatMap(p => p.tags))].sort().map(tag => ({label:tag,value:tag})));
+const selectedIds = ref<string[]>([]);
+const bulkBusy = ref(false);
+const bulkCancel = ref(false);
+const bulkTotal = ref(0);
+const bulkResults = ref<{id:string;name:string;status:string}[]>([]);
+function selectProject(id: string, selected: boolean) {
+  if (bulkBusy.value) return;
+  selectedIds.value = selected ? [...new Set([...selectedIds.value, id])] : selectedIds.value.filter(item => item !== id);
+}
+async function organizeSelected(patch: UpdateProjectInput) {
+  const selected = selectedIds.value.map(id => ({id, name:projectStore.projects.find(p => p.id === id)?.name ?? id}));
+  bulkBusy.value = true; bulkCancel.value = false; bulkTotal.value = selected.length; bulkResults.value = [];
+  try {
+    await runOrganizationBatch(selected, () => bulkCancel.value,
+      item => window.codehelm.projects.update(item.id, patch),
+      (item, status) => { bulkResults.value.push({...item,status}); });
+  } finally { bulkBusy.value = false; selectedIds.value = []; await projectStore.fetchProjects(); }
+}
 
 // Persist overview filters across route navigation
 const savedFilter = sessionStorage.getItem('codehelm_overview_filter') || 'ALL';
@@ -744,8 +786,8 @@ watch(onlyRunning, (val) => {
   sessionStorage.setItem('codehelm_overview_only_running', String(val));
 });
 
-const savedSortBy = (sessionStorage.getItem('codehelm_overview_sort_by') as 'recent' | 'name' | 'services' | 'status') || 'recent';
-const sortBy = ref<'recent' | 'name' | 'services' | 'status'>(savedSortBy);
+const savedSortBy = (sessionStorage.getItem('codehelm_overview_sort_by') as 'recent' | 'lastRun' | 'name' | 'services' | 'status') || 'recent';
+const sortBy = ref<'recent' | 'lastRun' | 'name' | 'services' | 'status'>(savedSortBy);
 
 watch(sortBy, (val) => {
   sessionStorage.setItem('codehelm_overview_sort_by', val);
@@ -854,6 +896,7 @@ onUnmounted(() => {
 });
 
 const sortOptions = [
+  { label: '最近运行', value: 'lastRun' },
   { label: '最近更新', value: 'recent' },
   { label: '名称 (A-Z)', value: 'name' },
   { label: '服务数量', value: 'services' },
@@ -1025,6 +1068,7 @@ const filteredProjects = computed(() => {
 
   return list.filter((p) => {
     if (!p) return false;
+    if (!matchesOrganization(p, organizationScope.value, onlyFavorites.value, selectedTags.value)) return false;
 
     // 1. Independent Running status toggle
     if (onlyRunning.value) {
@@ -1057,6 +1101,7 @@ const filteredProjects = computed(() => {
 
 const sortedProjects = computed(() => {
   const list = [...filteredProjects.value];
+  if (sortBy.value === 'lastRun') return list.sort(compareLastRun);
   if (sortBy.value === 'name') {
     return list.sort((a, b) => a.name.localeCompare(b.name));
   }
@@ -1081,7 +1126,7 @@ const currentPage = ref(1);
 const pageBounds = computed(() => getPageBounds(sortedProjects.value.length, currentPage.value, 24));
 const pagedProjects = computed(() => sortedProjects.value.slice(pageBounds.value.start, pageBounds.value.end));
 
-watch([activeFilter, onlyRunning, searchQuery, sortBy], () => {
+watch([activeFilter, onlyRunning, searchQuery, sortBy, organizationScope, onlyFavorites, selectedTags], () => {
   currentPage.value = 1;
   nextTick(() => { if (projectListRef.value) projectListRef.value.scrollTop = 0; });
 });
