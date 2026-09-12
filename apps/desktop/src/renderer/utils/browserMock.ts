@@ -665,6 +665,7 @@ export function setupBrowserMock() {
 
   const mockApi: CodeHelmApi = {
     projects: {
+      async gitSummary() { return { status: 'git_unavailable' as const, checkedAt: new Date().toISOString(), message: '请在桌面应用中读取本地 Git 状态。' }; },
       async previewRelocation() { throw new Error('路径修复需要在桌面端核对真实目录'); },
       async relocate() { throw new Error('路径修复需要在桌面端核对真实目录'); },
       async workspaces() { return []; },

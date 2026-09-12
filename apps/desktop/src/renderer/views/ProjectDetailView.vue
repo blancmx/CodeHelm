@@ -166,6 +166,7 @@
           data-testid="project-overview-pane"
         >
           <div class="space-y-4 pt-2 pb-6">
+            <ProjectGitSummary :project-id="projectStore.currentProject.id" :root-path="projectStore.currentProject.rootPath" />
             <!-- Project Description & Key Highlights from README -->
             <div
               v-if="readmeSummary"
@@ -790,6 +791,7 @@
 <script setup lang="ts">
 import ProjectPathRepair from '../components/ProjectPathRepair.vue';
 import ProjectTags from '../components/ProjectTags.vue';
+import ProjectGitSummary from '../components/ProjectGitSummary.vue';
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import { ENVIRONMENT_PREFLIGHT_ERROR } from '@codehelm/contracts';
 import AnalysisChanges from '../components/AnalysisChanges.vue';

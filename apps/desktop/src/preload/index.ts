@@ -5,6 +5,7 @@ import { toIpcPayload } from './ipc-payload.js';
 
 const api: CodeHelmApi = {
   projects: {
+    gitSummary: projectId => ipcRenderer.invoke(IpcChannels.PROJECTS_GIT_SUMMARY, projectId),
     workspaces: () => ipcRenderer.invoke(IpcChannels.PROJECTS_WORKSPACES),
     startScan: (input) => ipcRenderer.invoke(IpcChannels.PROJECTS_START_SCAN, toIpcPayload(input)),
     startImport: (input) => ipcRenderer.invoke(IpcChannels.PROJECTS_START_IMPORT, toIpcPayload(input)),

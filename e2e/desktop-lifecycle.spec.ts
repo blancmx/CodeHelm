@@ -143,6 +143,46 @@ test.afterEach(async ({}, testInfo) => {
 });
 
 // eslint-disable-next-line no-empty-pattern
+test('shows local Git summary and refreshes without changing repository files', async ({}, testInfo) => {
+  const projectRoot = path.join(fixtureRoot, 'fixture-project');
+  const git = (await import('../apps/desktop/src/main/ipc/git-summary.js')).findGitExecutable;
+  const executable = await git(projectRoot); expect(executable).toBeTruthy();
+  const run = (args: string[]) => execFileSync(executable!, ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', ...args], { cwd: projectRoot, windowsHide: true, encoding: 'utf8' });
+  run(['init', '-b', 'main']); run(['config', 'core.autocrlf', 'false']); run(['add', '.']); run(['commit', '-m', 'Git 中文摘要']);
+  const project = await page!.evaluate(rootPath => window.codehelm.projects.import({ rootPath, name: 'Git 摘要验收', tags: [] }), projectRoot);
+  const indexFile = path.join(projectRoot, '.git', 'index');
+  const indexBefore = await fs.readFile(indexFile);
+  await page!.evaluate(id => { location.hash = `/projects/${id}`; }, project.id);
+  const card = page!.getByRole('region', { name: '本地 Git 状态' });
+  await expect(card.getByText('main', { exact: true })).toBeVisible();
+  await expect(card).toContainText('0 个路径');
+  await expect(card).toContainText('Git 中文摘要');
+  await fs.writeFile(path.join(projectRoot, '中文 新文件.txt'), 'new file');
+  await expect(card).toContainText('0 个路径');
+  await card.getByRole('button', { name: '刷新 Git 状态' }).click();
+  await expect(card).toContainText('1 个路径');
+  await expect(card).toContainText('未跟踪 1');
+  expect(await fs.readFile(indexFile)).toEqual(indexBefore);
+  expect(await fs.readFile(path.join(projectRoot, '中文 新文件.txt'), 'utf8')).toBe('new file');
+  await app!.evaluate(({ BrowserWindow }) => { const win = BrowserWindow.getAllWindows()[0]; win.setBounds({ width: 960, height: 600 }); win.show(); win.focus(); });
+  await card.scrollIntoViewIfNeeded();
+  await page!.screenshot({ path: testInfo.outputPath('git-summary-960.png'), animations: 'disabled' });
+  await page!.evaluate(() => localStorage.setItem('codehelm_theme', 'light'));
+  await page!.reload();
+  await expect(card).toContainText('1 个路径');
+  await card.scrollIntoViewIfNeeded();
+  await page!.screenshot({ path: testInfo.outputPath('git-summary-light-960.png'), animations: 'disabled' });
+  run(['checkout', '--detach']);
+  await card.getByRole('button', { name: '刷新 Git 状态' }).click();
+  await expect(card).toContainText('分离 HEAD');
+  run(['config', 'filter.unsupported.clean', 'echo should-not-run']);
+  await card.getByRole('button', { name: '刷新 Git 状态' }).click();
+  await expect(card).toContainText('暂不支持');
+  await expect(card).not.toContainText('1 个路径');
+  await expect(page!.getByRole('button', { name: '重新分析', exact: true })).toBeEnabled();
+});
+
+// eslint-disable-next-line no-empty-pattern
 test('imports a portable profile template through reviewed UI and retains it across restart', async ({}, testInfo) => {
   const project = await page!.evaluate(rootPath => window.codehelm.projects.import({ rootPath, name: '模板验收', tags: [] }), path.join(fixtureRoot, 'fixture-project'));
   await page!.evaluate(id => { location.hash = `/projects/${id}`; }, project.id);
@@ -175,7 +215,7 @@ test('imports a portable profile template through reviewed UI and retains it acr
     dialog.showSaveDialog = async () => ({ canceled: false, filePath });
   }, exportFile);
   await page!.getByRole('button', { name: '保存脱敏 JSON 文件' }).click();
-  await expect(page!.getByRole('status')).toContainText('脱敏模板已保存');
+  await expect(page!.getByRole('status').filter({ hasText: '脱敏模板已保存' })).toBeVisible();
   expect(await fs.readFile(exportFile, 'utf8')).toBe(json);
   await app!.close(); app = undefined;
   const environment = { ...process.env }; delete environment.ELECTRON_RUN_AS_NODE; delete environment.VITE_DEV_SERVER_URL;

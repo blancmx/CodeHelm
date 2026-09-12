@@ -1,4 +1,5 @@
 export const IpcChannels = {
+  PROJECTS_GIT_SUMMARY: 'codehelm:projects:git-summary',
   BACKUPS_LIST:'backups:list', BACKUPS_CREATE:'backups:create', BACKUPS_PIN:'backups:pin',
   BACKUPS_POLICY:'backups:policy', BACKUPS_PREPARE:'backups:prepare', BACKUPS_RESTORE:'backups:restore', BACKUPS_OPEN:'backups:open',
   PROJECTS_WORKSPACES: 'projects:workspaces',

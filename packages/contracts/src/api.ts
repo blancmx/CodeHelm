@@ -1,4 +1,5 @@
 import type { RuntimeFamily, RuntimeProbeDto } from './dto/diagnostics.js';
+import type { GitSummaryDto } from './dto/git.js';
 import type { ProfileTemplateInspection, ProfileImportInput, ProfileImportPreview } from './dto/profile-transfer.js';
 import type {
   ImportProjectInput,
@@ -41,6 +42,7 @@ import type { HistoryQuery, HistoryPage, StoredLogQuery, StoredLogPage } from '.
 
 export interface CodeHelmApi {
   projects: {
+    gitSummary(projectId: string): Promise<GitSummaryDto>;
     workspaces(): Promise<SavedWorkspace[]>;
     startScan(input: WorkspaceScanInput): Promise<{ taskId: string }>;
     startImport(input: BatchImportInput): Promise<{ taskId: string }>;

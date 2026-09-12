@@ -2,6 +2,7 @@ import { registerRuntimeProbeHandlers } from './runtime-probe-handlers.js';
 import type { RegisterIpcHandler } from './trusted-ipc.js';
 import type { Database as DatabaseInstance } from 'better-sqlite3';
 import { registerProjectHandlers } from './project-handlers.js';
+import { registerGitSummaryHandlers } from './git-summary-handlers.js';
 import { registerProfileHandlers } from './profile-handlers.js';
 import { registerProfileTransferHandlers } from './profile-transfer.js';
 import { registerDiagnosticHandlers } from './diagnostic-handlers.js';
@@ -42,6 +43,7 @@ export async function registerAllIpcHandlers(db: DatabaseInstance, handle: Regis
     executablePath: app.getPath('exe'),
   }), () => getAppSettings(db));
   registerProjectHandlers(handle, db, analysisTasks, assertProfileRemovable, invalidateProfileApproval);
+  registerGitSummaryHandlers(handle, db);
   registerProfileHandlers(handle, db, assertProfileRemovable);
   registerProfileTransferHandlers(handle, db);
   registerDiagnosticHandlers(handle, db);
