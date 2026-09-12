@@ -47,6 +47,31 @@ describe('persisted settings and desktop execution integration', () => {
     registerAnalysisHandlers(handle, db);
   });
 
+  it('persists only confirmed tray choices and rejects concurrent saves', async () => {
+    expect(getAppSettings(db).closeToTray).toBe(false);
+    let decide!: (value: boolean) => void;
+    const apply = vi.fn(() => new Promise<boolean>(resolve => { decide = resolve; }));
+    registerSettingsHandlers(handle, db, logs, apply);
+    const saving = invoke(IpcChannels.SETTINGS_UPDATE, { closeToTray: true });
+    await expect(invoke(IpcChannels.SETTINGS_UPDATE, { closeToTray: false })).rejects.toThrow('正在保存');
+    decide(false);
+    expect((await saving).closeToTray).toBe(false);
+    const accepted = invoke(IpcChannels.SETTINGS_UPDATE, { closeToTray: true });
+    decide(true);
+    expect((await accepted).closeToTray).toBe(true);
+    expect(getAppSettings(db).closeToTray).toBe(true);
+  });
+
+  it('restores the previous tray behavior without another consent dialog when persistence fails', async () => {
+    await invoke(IpcChannels.SETTINGS_UPDATE, { closeToTray: true });
+    const apply = vi.fn(async (enabled: boolean) => enabled);
+    registerSettingsHandlers(handle, db, logs, apply);
+    db.exec("CREATE TRIGGER reject_settings BEFORE UPDATE ON app_settings BEGIN SELECT RAISE(ABORT, 'disk write failed'); END");
+    await expect(invoke(IpcChannels.SETTINGS_UPDATE, { closeToTray: false })).rejects.toThrow('disk write failed');
+    expect(apply.mock.calls).toEqual([[false], [true, false]]);
+    expect(getAppSettings(db).closeToTray).toBe(true);
+  });
+
   it('rejects foreign callers across the registered project, analysis, and settings entry points', async () => {
     const original = getAppSettings(db);
     event = { ...event, sender: { ...event.sender } };

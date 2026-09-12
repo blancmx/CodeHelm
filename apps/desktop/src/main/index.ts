@@ -18,6 +18,8 @@ import type { Database as DatabaseInstance } from 'better-sqlite3';
 import { IpcChannels } from '@codehelm/contracts';
 import { registerAllIpcHandlers, stopAllRunnerSessions, closeLogStorage, closeAnalysisTasks } from './ipc/index.js';
 import { APP_NAME, WINDOWS_APP_ID, createWindowsAppDetails } from './windows-app-details.js';
+import { TrayController } from './tray-controller.js';
+import { getAppSettings } from './ipc/app-settings.js';
 import { presentMainWindow } from './window-presentation.js';
 import {
   createDatabaseBackupRetentionWarning,
@@ -97,12 +99,7 @@ if (!gotTheLock) {
   console.log('[Main] Another instance is already running. Quitting.');
   app.exit(0);
 } else {
-  app.on('second-instance', () => {
-    if (mainWindow) {
-      if (mainWindow.isMinimized()) mainWindow.restore();
-      mainWindow.focus();
-    }
-  });
+  app.on('second-instance', () => showMainWindow());
 }
 
 process.on('uncaughtException', (err) => {
@@ -115,6 +112,29 @@ process.on('unhandledRejection', (reason) => {
 
 const handleTrustedIpc = createTrustedIpcRegistrar(() => ({ window: mainWindow, renderer: trustedRenderer }));
 const maintenanceGate=new MaintenanceGate();
+
+function showMainWindow() {
+  if (isQuitting || !mainWindow || mainWindow.isDestroyed()) return;
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  presentMainWindow(mainWindow);
+}
+
+let trayController: TrayController | undefined;
+async function applyCloseToTray(enabled: boolean, confirm = true): Promise<boolean> {
+  if (isQuitting || !trayController) throw new Error('应用正在启动或退出，请稍后重试。');
+  if (confirm && enabled && !trayController.enabled) {
+    const choice = await dialog.showMessageBox(mainWindow!, {
+      type: 'question', title: '启用关闭到托盘',
+      message: '关闭窗口后，CodeHelm 和已启动的服务仍会继续运行。',
+      detail: '点击托盘图标可恢复窗口。要停止受管服务并退出，请使用托盘菜单“退出 CodeHelm”。不会自动启动项目。',
+      buttons: ['取消', '启用关闭到托盘'], defaultId: 0, cancelId: 0, noLink: true,
+    });
+    if (isQuitting) throw new Error('应用正在退出。');
+    if (choice.response !== 1) return false;
+  }
+  trayController?.setEnabled(enabled);
+  return enabled;
+}
 
 function registerWindowIpcHandlers() {
   handleTrustedIpc(IpcChannels.WINDOW_MINIMIZE, () => {
@@ -194,6 +214,13 @@ async function createWindow() {
   }
 
   mainWindow.removeMenu();
+  mainWindow.on('close', event => {
+    if (!isQuitting && trayController?.enabled) {
+      event.preventDefault();
+      mainWindow?.hide();
+    }
+  });
+  mainWindow.on('closed', () => { mainWindow = null; trustedRenderer = null; });
 
   mainWindow.on('maximize', () => {
     mainWindow?.webContents.send(IpcChannels.WINDOW_ON_MAXIMIZE_CHANGE, true);
@@ -325,7 +352,7 @@ app.whenReady().then(async () => {
     if (isQuitting) { db.close(); db = null; return; }
     console.log('[Main] Verified startup backup:', opened.backup.manifestPath);
     if (opened.importedLegacy) console.log('[Main] Imported verified legacy snapshot into:', dbPath);
-    await registerAllIpcHandlers(db, maintenanceGate.wrap(handleTrustedIpc));
+    await registerAllIpcHandlers(db, maintenanceGate.wrap(handleTrustedIpc), applyCloseToTray);
     databaseManagement=registerBackupHandlers(handleTrustedIpc,db,backupDirectory,{
       pausePeriodic:async()=>{await databaseBackupController?.stop();databaseBackupController=null;},
       resumePeriodic:()=>{if(!isQuitting&&db&&!databaseBackupController) startBackups();},
@@ -348,6 +375,22 @@ app.whenReady().then(async () => {
   }
 
   await createWindow();
+  if (isQuitting || !db) return;
+  trayController = new TrayController({
+    iconPath: getAppIconPath(), showWindow: showMainWindow,
+    showRunner: () => {
+      showMainWindow();
+      if (!isQuitting && mainWindow && isTrustedRendererUrl(mainWindow.webContents.getURL(), trustedRenderer)) {
+        void mainWindow.webContents.executeJavaScript("location.hash = '/runner'").catch(console.error);
+      }
+    },
+    quit: () => app.quit(),
+  });
+  try { trayController.setEnabled(getAppSettings(db!).closeToTray); }
+  catch (error) {
+    console.error('[Main] Tray unavailable:', error);
+    dialog.showErrorBox('系统托盘不可用', '本次启动仍使用关闭窗口退出。可在设置中重新启用关闭到托盘。');
+  }
   if (startupBackupMaintenance && !startupBackupMaintenance.limitsSatisfied) {
     console.warn('[Main] Verified startup backups remain above retention limits:', startupBackupMaintenance);
     await showBackupRetentionWarning(
@@ -391,9 +434,9 @@ app.whenReady().then(async () => {
   }
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
-    }
+    if (isQuitting) return;
+    if (BrowserWindow.getAllWindows().length === 0) void createWindow();
+    else showMainWindow();
   });
 });
 
@@ -404,9 +447,11 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', (event) => {
-  if (isQuitting) return;
   event.preventDefault();
+  if (isQuitting) return;
   isQuitting = true;
+  maintenanceGate.close();
+  trayController?.dispose();
   void stopAllRunnerSessions()
     .catch((error) => {
       console.error('[Main] Failed to stop runner sessions during quit:', error);

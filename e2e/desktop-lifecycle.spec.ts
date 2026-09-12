@@ -1111,3 +1111,95 @@ test('rechecks a fixed port after approval without stopping the process that occ
     if (server.listening) await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
   }
 });
+
+// eslint-disable-next-line no-empty-pattern
+test('opts into the native tray, preserves a running service and quits through its menu', async ({}, testInfo) => {
+  await page!.evaluate(() => { location.hash = '/settings'; });
+  const checkbox = page!.getByRole('checkbox', { name: '关闭到托盘' });
+  await expect(checkbox).not.toBeChecked();
+  await app!.evaluate(({ dialog, Tray }) => {
+    dialog.showMessageBox = async () => ({ response: 0, checkboxChecked: false });
+    const original = Tray.prototype.setContextMenu;
+    Tray.prototype.setContextMenu = function(menu) {
+      (globalThis as any).__e2eTray = this;
+      (globalThis as any).__e2eTrayMenu = menu;
+      return original.call(this, menu);
+    };
+  });
+  await checkbox.check();
+  await page!.getByRole('button', { name: '保存设置' }).click();
+  await expect(checkbox).not.toBeChecked();
+  expect((await page!.evaluate(() => window.codehelm.settings.get())).closeToTray).toBe(false);
+  await app!.evaluate(({ dialog }) => {
+    dialog.showMessageBox = async (...args: any[]) => {
+      const options = args[args.length - 1];
+      if (!('message' in options) || !options.message.includes('继续运行')) throw new Error('Missing tray consent');
+      return { response: 1, checkboxChecked: false };
+    };
+  });
+  await checkbox.check();
+  await page!.getByRole('button', { name: '保存设置' }).click();
+  await expect.poll(() => page!.evaluate(async () => (await window.codehelm.settings.get()).closeToTray)).toBe(true);
+  await checkbox.scrollIntoViewIfNeeded();
+  await page!.screenshot({ path: testInfo.outputPath('tray-settings-dark.png') });
+  await page!.getByRole('button', { name: '明亮模式' }).click();
+  await checkbox.scrollIntoViewIfNeeded();
+  await page!.screenshot({ path: testInfo.outputPath('tray-settings-light.png') });
+  const project = await page!.evaluate(rootPath => window.codehelm.projects.import({ rootPath, name: 'Tray lifecycle', tags: [] }), path.join(fixtureRoot, 'fixture-project'));
+  const profile = await page!.evaluate(({ projectId, executable, script }) => window.codehelm.profiles.save({
+    projectId, name: 'Tray service', isDefault: true, failurePolicy: 'block_dependents',
+    services: [{ id: 'tray-service', runProfileId: '', name: 'Tray managed service', type: 'tool', moduleRelativePath: '.',
+      executable, args: [script], cwdRelative: '.', env: [], healthCheck: { type: 'none' }, dependsOn: [], enabled: true,
+      source: 'manual', startTimeoutMs: 5000, stopTimeoutMs: 5000 }],
+  }), { projectId: project.id, executable: process.execPath, script: managedService });
+  const reviewOpened = app!.waitForEvent('window');
+  const pending = page!.evaluate(id => window.codehelm.runner.confirmExecution(id, 'start', 'light'), profile.id);
+  const review = await reviewOpened;
+  await review.getByRole('button', { name: '确认并启动' }).click();
+  const token = await pending;
+  const started = await page!.evaluate(({ id, token }) => window.codehelm.runner.start(id, token), { id: profile.id, token });
+  const pid = started.services[0].pid!;
+  expect(started.status).toBe('RUNNING');
+  const windowId = await app!.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].id);
+  await page!.evaluate(() => {
+    (window as any).__trayLogEvents = 0;
+    (window as any).__trayUnsubscribe = window.codehelm.runner.onLogs(() => { (window as any).__trayLogEvents++; });
+  });
+  for (let cycle = 0; cycle < 3; cycle++) {
+    await page!.evaluate(() => window.codehelm.window.close());
+    expect(await app!.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isVisible())).toBe(false);
+    expect((await page!.evaluate(() => window.codehelm.runner.getState())).activeSessions[0].id).toBe(started.id);
+    await app!.evaluate(() => { (globalThis as any).__e2eTray.emit('click'); });
+    expect(await app!.evaluate(({ BrowserWindow }) => ({ id: BrowserWindow.getAllWindows()[0].id, visible: BrowserWindow.getAllWindows()[0].isVisible() }))).toEqual({ id: windowId, visible: true });
+  }
+  await page!.evaluate(() => window.codehelm.window.close());
+  const hiddenLogEvents = await page!.evaluate(() => (window as any).__trayLogEvents);
+  await expect.poll(() => page!.evaluate(() => (window as any).__trayLogEvents)).toBeGreaterThan(hiddenLogEvents);
+  await app!.evaluate(({ app }) => { app.emit('second-instance', {}, [], '', {}); });
+  expect(await app!.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isVisible())).toBe(true);
+  await app!.evaluate(() => { (globalThis as any).__e2eTrayMenu.items.find((item: any) => item.label === '查看运行状态').click(); });
+  await expect(page!.getByRole('heading', { name: '全局运行中心' })).toBeVisible();
+  await expect(page!.locator('span').filter({ hasText: /^Tray managed service$/ })).toBeVisible();
+  const closed = app!.waitForEvent('close');
+  await app!.evaluate(() => {
+    setTimeout(() => {
+      const quit = (globalThis as any).__e2eTrayMenu.items.find((item: any) => item.label === '退出 CodeHelm');
+      quit.click(); quit.click();
+    }, 50);
+  });
+  await closed; app = undefined; page = undefined;
+  await expect.poll(() => { try { process.kill(pid, 0); return true; } catch { return false; } }).toBe(false);
+  const environment = { ...process.env }; delete environment.ELECTRON_RUN_AS_NODE; delete environment.VITE_DEV_SERVER_URL;
+  app = await electron.launch({ executablePath: electronExecutable, args: launchArgs, cwd: desktopRoot,
+    env: { ...environment, CODEHELM_USER_DATA_DIR: path.join(fixtureRoot, 'user-data'), CODEHELM_VALIDATION_WINDOW: '0' } });
+  page = await app.firstWindow(); await page.waitForLoadState('domcontentloaded');
+  expect((await page.evaluate(() => window.codehelm.settings.get())).closeToTray).toBe(true);
+  expect((await page.evaluate(() => window.codehelm.runner.getState())).activeSessions).toHaveLength(0);
+  await page.evaluate(() => window.codehelm.window.close());
+  expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isVisible())).toBe(false);
+  await page.evaluate(() => window.codehelm.settings.update({ closeToTray: false }));
+  expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isVisible())).toBe(true);
+  const defaultClosed = app.waitForEvent('close');
+  await app.evaluate(({ BrowserWindow }) => { setTimeout(() => BrowserWindow.getAllWindows()[0].close(), 50); });
+  await defaultClosed; app = undefined; page = undefined;
+});

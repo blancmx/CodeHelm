@@ -107,6 +107,16 @@
         </div>
       </div>
 
+      <section aria-label="窗口与托盘" class="border rounded-xl p-5 space-y-3"
+        :class="themeStore.isDark ? 'bg-[#121216] border-[#27272a] text-zinc-300' : 'bg-white border-zinc-200 text-zinc-700'">
+        <h3 class="text-sm font-bold">窗口与托盘</h3>
+        <label class="flex items-center gap-3 text-sm cursor-pointer">
+          <input v-model="settings.closeToTray" type="checkbox" :disabled="!loaded || saving" />
+          关闭到托盘
+        </label>
+        <p class="text-xs leading-relaxed">默认关闭窗口会退出应用。启用并保存后，关闭按钮仅隐藏窗口，已启动的服务继续运行。点击托盘图标恢复窗口；选择托盘菜单“退出 CodeHelm”会停止受管服务并退出。不会自动启动项目。</p>
+      </section>
+
       <!-- 2-Column Grid: Scanner Budget & Log Lifecycle -->
       <div class="grid grid-cols-1 md:grid-cols-2 gap-5 relative z-20">
         <!-- Section 1: 扫描与分析预算 with Vector Icons -->
@@ -261,6 +271,7 @@ import {
 const themeStore = useThemeStore();
 
 const settings = reactive({
+  closeToTray: false,
   maxScanFiles: 50000,
   maxLogRetentionDays: 14,
   maxLogRetentionMb: 500,
@@ -298,6 +309,7 @@ async function refreshLogStatus() {
 onMounted(async () => {
   try {
     const data = await window.codehelm.settings.get();
+    settings.closeToTray = data.closeToTray;
     settings.maxScanFiles = data.maxScanFiles;
     settings.maxLogRetentionDays = data.maxLogRetentionDays;
     settings.maxLogRetentionMb = data.maxLogRetentionMb;
@@ -316,10 +328,11 @@ async function handleSave() {
   saving.value = true;
   try {
     const updated = await window.codehelm.settings.update({ ...settings });
+    settings.closeToTray = updated.closeToTray;
     settings.maxScanFiles = updated.maxScanFiles;
     settings.maxLogRetentionDays = updated.maxLogRetentionDays;
     settings.maxLogRetentionMb = updated.maxLogRetentionMb;
-    message.success('设置已保存：扫描下次任务生效，日志策略下一轮检查生效');
+    message.success('设置已保存：窗口行为立即生效，扫描与日志策略在下一次任务或检查生效');
   } catch (error) {
     message.error('保存设置失败：' + errorText(error));
   } finally { saving.value = false; }

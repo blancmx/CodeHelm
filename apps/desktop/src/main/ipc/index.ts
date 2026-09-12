@@ -34,7 +34,7 @@ export async function closeLogStorage(): Promise<void> {
 
 export { stopAllRunnerSessions } from './runner-handlers.js';
 
-export async function registerAllIpcHandlers(db: DatabaseInstance, handle: RegisterIpcHandler) {
+export async function registerAllIpcHandlers(db: DatabaseInstance, handle: RegisterIpcHandler, applyCloseToTray?: (enabled: boolean, confirm?: boolean) => Promise<boolean>) {
   analysisTasks = getAnalysisTasks(db);
   projectTasks = getProjectTasks(db, analysisTasks);
   logs = new LogStorage(resolveLogDirectory({
@@ -50,7 +50,7 @@ export async function registerAllIpcHandlers(db: DatabaseInstance, handle: Regis
   registerRuntimeProbeHandlers(handle, db);
   registerAnalysisHandlers(handle, db);
   await registerRunnerHandlers(handle, db, logs);
-  registerSettingsHandlers(handle, db, logs);
+  registerSettingsHandlers(handle, db, logs, applyCloseToTray);
   registerHistoryHandlers(handle, db, logs);
   logs.start();
 }

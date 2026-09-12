@@ -1488,6 +1488,7 @@ export function setupBrowserMock() {
           maxScanFiles: 50000,
           maxLogRetentionDays: 14,
           maxLogRetentionMb: 500,
+          closeToTray: false,
           enableAnonymousTelemetry: false,
         };
       },

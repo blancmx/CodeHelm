@@ -6,6 +6,7 @@ export const AppSettingsDtoSchema = z.object({
   maxScanFiles: z.number().int().min(1000).max(50000).default(50000),
   maxLogRetentionDays: z.number().int().min(1).max(90).default(14),
   maxLogRetentionMb: z.number().int().min(50).max(5000).default(500),
+  closeToTray: z.boolean().default(false),
   enableAnonymousTelemetry: z.boolean().default(false),
 });
 export type AppSettingsDto = z.infer<typeof AppSettingsDtoSchema>;
