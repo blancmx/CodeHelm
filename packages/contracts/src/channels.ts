@@ -32,6 +32,11 @@ export const IpcChannels = {
 
   // Run Profiles
   PROFILES_SAVE: 'codehelm:profiles:save',
+  PROFILES_EXPORT_TEMPLATE: 'codehelm:profiles:export-template',
+  PROFILES_SAVE_TEMPLATE_FILE: 'codehelm:profiles:save-template-file',
+  PROFILES_INSPECT_TEMPLATE: 'codehelm:profiles:inspect-template',
+  PROFILES_PREVIEW_IMPORT: 'codehelm:profiles:preview-import',
+  PROFILES_IMPORT_TEMPLATE: 'codehelm:profiles:import-template',
   PROFILES_LIST: 'codehelm:profiles:list',
   PROFILES_GET: 'codehelm:profiles:get',
   PROFILES_COPY: 'codehelm:profiles:copy',

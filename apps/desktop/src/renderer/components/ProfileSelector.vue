@@ -26,6 +26,7 @@
       <n-button size="small" :disabled="dirty || busy" @click="open('create')">新建方案</n-button>
       <n-button size="small" :disabled="dirty || busy || !selectedId" @click="open('copy')">复制方案</n-button>
       <n-button size="small" :disabled="dirty || busy || !selectedId || running" @click="open('remove')">删除方案</n-button>
+      <ProfileTransfer :project-id="projectId" :selected-id="selectedId" :disabled="dirty || busy" @changed="emit('changed', $event)" />
     </div>
     <p v-if="dirty" class="profile-hint">有未保存修改，请先保存或 <button class="discard" @click="emit('select', selectedId!)">放弃修改</button> 后切换方案。</p>
     <p v-if="running" class="profile-hint">此方案正在运行，修改仅在下次启动生效。停止会话后可删除方案。</p>
@@ -44,6 +45,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
+import ProfileTransfer from './ProfileTransfer.vue';
 import type { RunProfileDto } from '@codehelm/contracts';
 import { useThemeStore } from '../stores/themeStore.js';
 import { displayIpcError } from '../utils/ipc-error.js';

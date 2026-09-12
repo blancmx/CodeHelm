@@ -21,7 +21,8 @@ const mainEntry = path.join(desktopRoot, 'dist-electron', 'main', 'index.js');
 const managedService = path.join(repositoryRoot, 'e2e', 'fixtures', 'managed-service.cjs');
 const requireFromDesktop = createRequire(path.join(desktopRoot, 'package.json'));
 const electronExecutable = process.env.CODEHELM_E2E_EXECUTABLE || requireFromDesktop('electron') as string;
-const launchArgs=process.env.CODEHELM_E2E_EXECUTABLE ? [] : [mainEntry];
+const launchArgs=[...(process.env.CODEHELM_E2E_EXECUTABLE ? [] : [mainEntry]),
+  ...(process.env.CODEHELM_E2E_SOFTWARE_RENDERING === '1' ? ['--disable-gpu'] : [])];
 if(process.env.CI && ['CODEHELM_E2E_PYTHON','CODEHELM_E2E_JAVA','CODEHELM_E2E_CSC'].some(name=>!process.env[name])) {
   throw new Error('CI requires Python, Java and CSC fixture paths; required desktop coverage must not silently skip.');
 }
@@ -139,6 +140,48 @@ test.afterEach(async ({}, testInfo) => {
   }
   await fs.rm(resolved, { recursive: true, force: true });
   if (closeError !== undefined) throw closeError;
+});
+
+// eslint-disable-next-line no-empty-pattern
+test('imports a portable profile template through reviewed UI and retains it across restart', async ({}, testInfo) => {
+  const project = await page!.evaluate(rootPath => window.codehelm.projects.import({ rootPath, name: '模板验收', tags: [] }), path.join(fixtureRoot, 'fixture-project'));
+  await page!.evaluate(id => { location.hash = `/projects/${id}`; }, project.id);
+  await app!.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setBounds({ width: 960, height: 600 }));
+  await page!.getByRole('button', { name: '导入 / 导出模板' }).click();
+  await page!.getByRole('button', { name: '使用 Node 通用模板' }).click();
+  await page!.getByRole('button', { name: '校验模板', exact: true }).click();
+  await expect(page!.getByRole('button', { name: '预览新方案' })).toBeDisabled();
+  await page!.getByLabel('ENTRY_FILE', { exact: true }).fill('service.cjs');
+  await page!.getByRole('button', { name: '预览新方案' }).click();
+  await expect(page!.getByRole('region', { name: '导入差异预览' })).toBeVisible();
+  await page!.getByRole('checkbox', { name: '已核对目标项目与新增服务' }).check();
+  await page!.getByRole('button', { name: '确认导入为新方案' }).scrollIntoViewIfNeeded();
+  await app!.evaluate(({ BrowserWindow }) => { const window = BrowserWindow.getAllWindows()[0]; window.show(); window.focus(); });
+  await page!.bringToFront();
+  await page!.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+  await page!.screenshot({ path: testInfo.outputPath('template-preview-960.png'), animations: 'disabled' });
+  await page!.getByRole('button', { name: '确认导入为新方案' }).click();
+  await expect(page!.getByText('运行配置模板', { exact: true })).toHaveCount(0);
+  const imported = (await page!.evaluate(id => window.codehelm.profiles.list(id), project.id)).find(p => p.name === 'Node 服务模板 导入')!;
+  expect(imported.services[0].args).toEqual(['service.cjs']);
+  expect(imported.userConfirmedAt).toBeUndefined();
+  expect((await page!.evaluate(() => window.codehelm.runner.getState())).activeSessions).toHaveLength(0);
+  await page!.getByRole('button', { name: '导入 / 导出模板' }).click();
+  await page!.getByRole('button', { name: '导出当前方案' }).click();
+  const json = await page!.getByRole('textbox', { name: '模板 JSON', exact: true }).inputValue();
+  expect(json).toContain('{{SERVICE_1_ARG_1}}'); expect(json).not.toContain('service.cjs');
+  const exportFile = path.join(fixtureRoot, 'exported-template.json');
+  await app!.evaluate(({ dialog }, filePath) => {
+    dialog.showSaveDialog = async () => ({ canceled: false, filePath });
+  }, exportFile);
+  await page!.getByRole('button', { name: '保存脱敏 JSON 文件' }).click();
+  await expect(page!.getByRole('status')).toContainText('脱敏模板已保存');
+  expect(await fs.readFile(exportFile, 'utf8')).toBe(json);
+  await app!.close(); app = undefined;
+  const environment = { ...process.env }; delete environment.ELECTRON_RUN_AS_NODE; delete environment.VITE_DEV_SERVER_URL;
+  app = await electron.launch({ executablePath: electronExecutable, args: launchArgs, cwd: desktopRoot, env: { ...environment, CODEHELM_USER_DATA_DIR: path.join(fixtureRoot, 'user-data'), CODEHELM_VALIDATION_WINDOW: '0' } });
+  page = await app.firstWindow(); await page.waitForLoadState('domcontentloaded');
+  expect(await page.evaluate(id => window.codehelm.profiles.get(id), imported.id)).toMatchObject({ name: imported.name, services: [{ args: ['service.cjs'] }] });
 });
 
 // eslint-disable-next-line no-empty-pattern

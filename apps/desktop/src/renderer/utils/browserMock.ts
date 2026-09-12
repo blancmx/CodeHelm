@@ -1118,6 +1118,11 @@ export function setupBrowserMock() {
     },
 
     profiles: {
+      async exportTemplate() { throw new Error('请在桌面应用中导出配置模板。'); },
+      async saveTemplateFile() { throw new Error('请在桌面应用中导出配置模板。'); },
+      async inspectTemplate() { throw new Error('请在桌面应用中导入配置模板。'); },
+      async previewImport() { throw new Error('请在桌面应用中导入配置模板。'); },
+      async importTemplate() { throw new Error('请在桌面应用中导入配置模板。'); },
       async copy() { throw new Error('请在桌面应用中管理运行方案。'); },
       async remove() { throw new Error('请在桌面应用中管理运行方案。'); },
       async save(input) {

@@ -1,4 +1,5 @@
 import type { RuntimeFamily, RuntimeProbeDto } from './dto/diagnostics.js';
+import type { ProfileTemplateInspection, ProfileImportInput, ProfileImportPreview } from './dto/profile-transfer.js';
 import type {
   ImportProjectInput,
   BatchImportInput,
@@ -69,6 +70,11 @@ export interface CodeHelmApi {
     onProgress(listener: (event: AnalysisTaskDto) => void): Unsubscribe;
   };
   profiles: {
+    exportTemplate(id: string): Promise<string>;
+    saveTemplateFile(id: string): Promise<boolean>;
+    inspectTemplate(text: string): Promise<ProfileTemplateInspection>;
+    previewImport(input: ProfileImportInput): Promise<ProfileImportPreview>;
+    importTemplate(token: string): Promise<RunProfileDto>;
     save(input: SaveRunProfileInput): Promise<RunProfileDto>;
     list(projectId: string): Promise<RunProfileDto[]>;
     get(id: string): Promise<RunProfileDto | null>;

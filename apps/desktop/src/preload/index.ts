@@ -46,6 +46,11 @@ const api: CodeHelmApi = {
     },
   },
   profiles: {
+    exportTemplate: id => ipcRenderer.invoke(IpcChannels.PROFILES_EXPORT_TEMPLATE, id),
+    saveTemplateFile: id => ipcRenderer.invoke(IpcChannels.PROFILES_SAVE_TEMPLATE_FILE, id),
+    inspectTemplate: text => ipcRenderer.invoke(IpcChannels.PROFILES_INSPECT_TEMPLATE, text),
+    previewImport: input => ipcRenderer.invoke(IpcChannels.PROFILES_PREVIEW_IMPORT, toIpcPayload(input)),
+    importTemplate: token => ipcRenderer.invoke(IpcChannels.PROFILES_IMPORT_TEMPLATE, token),
     save: (input) => ipcRenderer.invoke(IpcChannels.PROFILES_SAVE, toIpcPayload(input)),
     list: (projectId) => ipcRenderer.invoke(IpcChannels.PROFILES_LIST, projectId),
     get: (id) => ipcRenderer.invoke(IpcChannels.PROFILES_GET, id),
