@@ -81,9 +81,44 @@
     <form class="history-filters" @submit.prevent="searchHistory">
       <label>方案名称<input v-model="profileFilter" aria-label="历史方案名称" maxlength="100" /></label>
       <label>服务名称<input v-model="serviceFilter" aria-label="历史服务名称" maxlength="100" /></label>
-      <label>会话状态<select v-model="statusFilter" aria-label="历史会话状态"><option value="">全部状态</option><option v-for="(label,status) in statusLabels" :key="status" :value="status">{{ label }}</option></select></label>
-      <label>开始时间下限<input v-model="fromFilter" type="datetime-local" aria-label="会话开始时间下限" /></label>
-      <label>开始时间上限<input v-model="toFilter" type="datetime-local" aria-label="会话开始时间上限" /></label>
+      <label>
+        会话状态
+        <n-select
+          v-model:value="statusFilter"
+          size="small"
+          class="history-status-select"
+          aria-label="历史会话状态"
+          :options="statusOptions"
+        />
+      </label>
+      <label>
+        开始时间下限
+        <n-date-picker
+          v-model:formatted-value="fromFilter"
+          value-format="yyyy-MM-dd HH:mm"
+          format="yyyy-MM-dd HH:mm"
+          type="datetime"
+          size="small"
+          clearable
+          class="history-time-picker"
+          aria-label="会话开始时间下限"
+          placeholder="选择开始时间"
+        />
+      </label>
+      <label>
+        开始时间上限
+        <n-date-picker
+          v-model:formatted-value="toFilter"
+          value-format="yyyy-MM-dd HH:mm"
+          format="yyyy-MM-dd HH:mm"
+          type="datetime"
+          size="small"
+          clearable
+          class="history-time-picker"
+          aria-label="会话开始时间上限"
+          placeholder="选择结束时间"
+        />
+      </label>
       <n-button size="small" attr-type="submit" :loading="historyLoading">检索会话</n-button>
     </form>
     <p v-if="historyError" role="alert" class="text-rose-500 mt-3 text-sm">{{ historyError }}</p>
@@ -221,7 +256,7 @@ function toggleSession(id: string) {
   expandedSessionIds.value = next;
 }
 
-const profileFilter=ref(''),serviceFilter=ref(''),statusFilter=ref(''),fromFilter=ref(''),toFilter=ref('');
+const profileFilter=ref(''),serviceFilter=ref(''),statusFilter=ref(''),fromFilter=ref<string|null>(null),toFilter=ref<string|null>(null);
 const historyLoading=ref(false),historyError=ref('');
 const historyPage=ref<HistoryPage>({sessions:[]});
 const cursors=ref<Array<HistoryQuery['cursor']>>([undefined]),cursorIndex=ref(0);
@@ -294,6 +329,11 @@ const statusLabels: Record<string, string> = {
   PARTIAL_FAILED: '部分失败',
 };
 
+const statusOptions = [
+  { label: '全部状态', value: '' },
+  ...Object.entries(statusLabels).map(([value, label]) => ({ label, value })),
+];
+
 const recoveryLabels: Record<string, string> = {
   'not-running': '原 PID 当前不存在；不据此判断其子进程状态',
   'identity-match': 'PID 与创建时间匹配，但未接管；请人工检查遗留进程',
@@ -307,8 +347,9 @@ const formatTime = (value: string) => Number.isFinite(Date.parse(value)) ? new D
 <style scoped>
 .history-filters { display:flex; flex-wrap:wrap; align-items:end; gap:10px; margin-top:16px; }
 .history-filters label { display:flex; flex-direction:column; gap:4px; font-size:12px; }
-.history-filters input,.history-filters select { background:transparent; border:1px solid #71717a; border-radius:6px; padding:5px 8px; max-width:185px; }
+.history-filters input { background:transparent; border:1px solid #71717a; border-radius:6px; padding:5px 8px; max-width:185px; }
+.history-status-select { width: 175px; }
+.history-time-picker { width: 175px; }
 .history-filters input { color-scheme:dark; }
-:global(.light) .history-filters input { color-scheme:light; }
-.history-filters select option { color:#18181b; }
+html.light .history-filters input { color-scheme:light; }
 </style>

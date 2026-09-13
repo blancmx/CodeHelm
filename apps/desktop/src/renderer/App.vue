@@ -486,6 +486,10 @@ button, input, select, textarea {
   -moz-osx-font-smoothing: auto;
 }
 
+.font-mono {
+  font-family: ui-monospace, "Cascadia Code", "Fira Code", "JetBrains Mono", Consolas, Menlo, Monaco, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", monospace;
+}
+
 html.light,
 html.light body,
 html.light #app {

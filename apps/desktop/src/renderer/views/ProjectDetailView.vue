@@ -1,145 +1,169 @@
 <template>
-  <div class="flex-1 min-h-0 flex flex-col h-full overflow-hidden p-6" v-if="projectStore.currentProject">
+  <div class="flex-1 min-h-0 flex flex-col h-full overflow-hidden">
+    <div class="flex-1 min-h-0 flex flex-col h-full overflow-hidden p-6" v-if="projectStore.currentProject && projectStore.currentProject.id === props.id">
     <!-- Top Header -->
     <header
-      class="flex items-center justify-between pb-5 border-b flex-shrink-0 transition-colors duration-200"
+      class="pb-4 border-b flex-shrink-0 transition-colors duration-200 space-y-2.5"
       :class="themeStore.isDark ? 'border-[#27272a]' : 'border-zinc-200'"
     >
-      <div class="flex items-center gap-4 min-w-0">
-        <n-button quaternary circle size="small" @click="$router.push('/')" title="返回项目列表">
-          <template #icon>
-            <IconArrowLeft :size="16" />
-          </template>
-        </n-button>
-        <div class="min-w-0">
-          <div class="flex items-center gap-2.5">
-            <h2 class="text-xl font-bold tracking-tight truncate" :class="themeStore.isDark ? 'text-white' : 'text-zinc-950'">
-              {{ projectStore.currentProject.name }}
-            </h2>
-            <div class="flex items-center gap-1.5">
-              <div
-                class="flex items-center gap-1.5 border px-2.5 py-1 rounded-lg text-xs font-mono cursor-pointer transition-colors group"
-                :class="themeStore.isDark ? 'bg-[#18181b] hover:bg-[#27272a] border-[#27272a] text-zinc-300' : 'bg-zinc-100 hover:bg-zinc-200 border-zinc-200 text-zinc-700'"
-                @click="copyRootPath"
-                title="点击复制完整路径"
-              >
-                <span class="truncate max-w-320px">{{ projectStore.currentProject.rootPath }}</span>
-                <IconCopy :size="13" class="text-zinc-400 group-hover:text-zinc-200" />
-              </div>
+      <div class="flex items-center justify-between gap-4 min-w-0">
+        <div class="flex items-center gap-4 min-w-0">
+          <n-button quaternary circle size="small" @click="$router.push('/')" title="返回项目列表">
+            <template #icon>
+              <IconArrowLeft :size="16" />
+            </template>
+          </n-button>
+          <div class="min-w-0">
+            <div class="flex items-center gap-2.5">
+              <h2 class="text-xl font-bold tracking-tight truncate" :class="themeStore.isDark ? 'text-white' : 'text-zinc-950'">
+                {{ projectStore.currentProject.name }}
+              </h2>
+              <div class="flex items-center gap-1.5 min-w-0">
+                <div
+                  class="flex items-center gap-1.5 border px-2.5 py-1 rounded-lg text-xs font-mono cursor-pointer transition-colors group min-w-0"
+                  :class="themeStore.isDark ? 'bg-[#18181b] hover:bg-[#27272a] border-[#27272a] text-zinc-300' : 'bg-zinc-100 hover:bg-zinc-200 border-zinc-200 text-zinc-700'"
+                  @click="copyRootPath"
+                  title="点击复制完整路径"
+                >
+                  <span class="truncate max-w-160px sm:max-w-220px md:max-w-280px">{{ projectStore.currentProject.rootPath }}</span>
+                  <IconCopy :size="13" class="text-zinc-400 group-hover:text-zinc-200 flex-shrink-0" />
+                </div>
 
-              <ProjectPathRepair :project="projectStore.currentProject" @relocated="onRelocated" />
+                <ProjectPathRepair :project="projectStore.currentProject" @relocated="onRelocated" class="flex-shrink-0" />
+              </div>
             </div>
           </div>
-          <div class="flex items-center gap-3 text-xs mt-1" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
-            <span>导入时间: {{ formatTime(projectStore.currentProject.createdAt) }}</span>
-            <span v-if="latestSnapshot?.completedAt">
-              • 最近分析: {{ formatTime(latestSnapshot.completedAt) }}
-            </span>
-          </div>
         </div>
-      </div>
 
-      <div class="flex items-center gap-2.5 flex-shrink-0">
-        <n-button
-          type="default"
-          secondary
-          size="small"
-          :loading="isAnalyzing"
-          @click="handleStartAnalysis"
-        >
-          <template #icon>
-            <IconRefresh :size="14" />
-          </template>
-          {{ isAnalyzing ? '分析中...' : '重新分析' }}
-        </n-button>
-
-        <n-button v-if="isAnalyzing" size="small" :disabled="!canCancelAnalysis" @click="analysis.cancel">
-          {{ analysisTask?.status === 'cancelling' ? '正在取消…' : '取消分析' }}
-        </n-button>
-
-        <template v-if="isAnyServiceRunning">
-          <!-- Compact Quick Access: Dropdown if multiple endpoints, single button if one -->
-          <n-dropdown
-            v-if="runningServicesWithPort.length > 1"
-            trigger="click"
-            :options="quickAccessDropdownOptions"
-            @select="handleQuickAccessSelect"
+        <div class="flex items-center gap-2.5 flex-shrink-0">
+          <n-button
+            type="default"
+            secondary
+            size="small"
+            :loading="isAnalyzing"
+            @click="handleStartAnalysis"
           >
+            <template #icon>
+              <IconRefresh :size="14" />
+            </template>
+            {{ isAnalyzing ? '分析中...' : '重新分析' }}
+          </n-button>
+
+          <n-button v-if="isAnalyzing" size="small" :disabled="!canCancelAnalysis" @click="analysis.cancel">
+            {{ analysisTask?.status === 'cancelling' ? '正在取消…' : '取消分析' }}
+          </n-button>
+
+          <template v-if="isAnyServiceRunning">
+            <!-- Compact Quick Access: Dropdown if multiple endpoints, single button if one -->
+            <n-dropdown
+              v-if="runningServicesWithPort.length > 1"
+              trigger="click"
+              :options="quickAccessDropdownOptions"
+              @select="handleQuickAccessSelect"
+            >
+              <n-button
+                type="primary"
+                size="small"
+                class="font-semibold shadow-xs"
+              >
+                <template #icon>
+                  <IconExternalLink :size="14" />
+                </template>
+                <span>快捷访问 ({{ runningServicesWithPort.length }}) ▾</span>
+              </n-button>
+            </n-dropdown>
+
             <n-button
+              v-else-if="runningServicesWithPort.length === 1"
               type="primary"
               size="small"
               class="font-semibold shadow-xs"
+              @click="openBrowser(runningServicesWithPort[0].url)"
             >
               <template #icon>
                 <IconExternalLink :size="14" />
               </template>
-              <span>快捷访问 ({{ runningServicesWithPort.length }}) ▾</span>
+              {{ runningServicesWithPort[0].label }}
             </n-button>
-          </n-dropdown>
 
-          <n-button
-            v-else-if="runningServicesWithPort.length === 1"
-            type="primary"
-            size="small"
-            class="font-semibold shadow-xs"
-            @click="openBrowser(runningServicesWithPort[0].url)"
-          >
-            <template #icon>
-              <IconExternalLink :size="14" />
-            </template>
-            {{ runningServicesWithPort[0].label }}
-          </n-button>
+            <button
+              type="button"
+              class="group h-7.5 px-3 rounded-lg border text-xs font-sans font-semibold inline-flex items-center gap-1.5 transition-all duration-200 cursor-pointer select-none relative overflow-hidden bg-rose-500/10 hover:bg-rose-500/20 active:scale-95 text-rose-600 dark:text-rose-400 border-rose-500/30 hover:border-rose-500/60 shadow-2xs"
+              title="停止当前项目的所有运行中服务"
+              @click="handleStopSession"
+            >
+              <IconSquare
+                :size="13"
+                stroke-width="2"
+                class="text-rose-600 dark:text-rose-400 fill-transparent group-hover:fill-current transition-all duration-200 group-hover:scale-90 flex-shrink-0"
+              />
+              <span class="leading-none">停止服务</span>
+            </button>
+          </template>
 
-          <button
-            type="button"
-            class="group h-7.5 px-3 rounded-lg border text-xs font-sans font-semibold inline-flex items-center gap-1.5 transition-all duration-200 cursor-pointer select-none relative overflow-hidden bg-rose-500/10 hover:bg-rose-500/20 active:scale-95 text-rose-600 dark:text-rose-400 border-rose-500/30 hover:border-rose-500/60 shadow-2xs"
-            title="停止当前项目的所有运行中服务"
-            @click="handleStopSession"
-          >
-            <IconSquare
-              :size="13"
-              stroke-width="2"
-              class="text-rose-600 dark:text-rose-400 fill-transparent group-hover:fill-current transition-all duration-200 group-hover:scale-90 flex-shrink-0"
-            />
-            <span class="leading-none">停止服务</span>
-          </button>
-        </template>
+          <template v-else>
+            <!-- Compact Profile Dropdown -->
+            <n-dropdown
+              v-if="profiles.length > 1"
+              trigger="click"
+              :options="headerProfileDropdownOptions"
+              @select="selectProfile"
+            >
+              <n-button
+                size="small"
+                secondary
+                class="text-xs px-2 font-medium"
+                :disabled="profileDirty || isLaunching"
+                title="点击切换当前启动方案"
+              >
+                <span class="truncate max-w-24">{{ activeProfile?.name || '方案' }}</span>
+                <span class="text-xs opacity-60 ml-0.5">▾</span>
+              </n-button>
+            </n-dropdown>
 
-        <template v-else>
-          <n-button
-            type="primary"
-            secondary
-            size="small"
-            class="font-semibold"
-            :loading="isLaunching"
-            :disabled="isLaunching || !activeProfile || activeProfile.services.filter((s) => s.enabled).length === 0"
-            @click="handleLaunchClick('install')"
-          >
-            <template #icon>
-              <IconZap :size="14" />
-            </template>
-            装依赖并运行
-          </n-button>
+            <n-button
+              type="primary"
+              secondary
+              size="small"
+              class="font-semibold"
+              :loading="isLaunching"
+              :disabled="isLaunching || !activeProfile || activeProfile.services.filter((s) => s.enabled).length === 0"
+              @click="handleLaunchClick('install')"
+            >
+              <template #icon>
+                <IconZap :size="14" />
+              </template>
+              装依赖并运行
+            </n-button>
 
-          <n-button
-            type="primary"
-            size="small"
-            class="font-semibold shadow-sm"
-            :loading="isLaunching"
-            :disabled="isLaunching || !activeProfile || activeProfile.services.filter((s) => s.enabled).length === 0"
-            @click="handleLaunchClick('start')"
-          >
-            <template #icon>
-              <IconPlay :size="14" />
-            </template>
-            一键启动方案
-          </n-button>
-        </template>
+            <n-button
+              type="primary"
+              size="small"
+              class="font-semibold shadow-sm"
+              :loading="isLaunching"
+              :disabled="isLaunching || !activeProfile || activeProfile.services.filter((s) => s.enabled).length === 0"
+              @click="handleLaunchClick('start')"
+            >
+              <template #icon>
+                <IconPlay :size="14" />
+              </template>
+              一键启动方案
+            </n-button>
+          </template>
+        </div>
+      </div>
+
+      <!-- Header Subrow: Import Time / Analysis Info on left, ProjectTags on right -->
+      <div class="flex items-center justify-between gap-4 text-xs pt-1 flex-wrap">
+        <div class="flex items-center gap-3" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
+          <span>导入时间: {{ formatTime(projectStore.currentProject.createdAt) }}</span>
+          <span v-if="latestSnapshot?.completedAt">
+            • 最近分析: {{ formatTime(latestSnapshot.completedAt) }}
+          </span>
+        </div>
+        <ProjectTags :project="projectStore.currentProject" />
       </div>
     </header>
-    <ProjectTags :project="projectStore.currentProject" />
-
-
 
     <div v-if="analysisTask?.status === 'failed'" role="alert" class="my-3 p-3 rounded-lg border border-rose-500/40 text-rose-500 text-sm flex-shrink-0">
       {{ analysisTask.errorMessage || analysisTask.stage }}
@@ -148,9 +172,66 @@
       已取消分析，保留上一次成功结果。
     </p>
 
+    <!-- Skeleton when page data is still loading -->
+    <div v-if="!isPageReady" class="flex-1 min-h-0 overflow-hidden pt-2 flex flex-col gap-4">
+      <!-- Tabs Bar Skeleton -->
+      <div class="flex items-center gap-6 border-b pb-2 flex-shrink-0" :class="themeStore.isDark ? 'border-[#27272a]' : 'border-zinc-200'">
+        <div class="h-6 w-20 bg-zinc-200/60 dark:bg-zinc-800/60 rounded animate-pulse" />
+        <div class="h-6 w-18 bg-zinc-200/40 dark:bg-zinc-800/40 rounded animate-pulse" />
+        <div class="h-6 w-18 bg-zinc-200/40 dark:bg-zinc-800/40 rounded animate-pulse" />
+        <div class="h-6 w-18 bg-zinc-200/40 dark:bg-zinc-800/40 rounded animate-pulse" />
+        <div class="h-6 w-18 bg-zinc-200/40 dark:bg-zinc-800/40 rounded animate-pulse" />
+      </div>
+
+      <!-- Overview Cards Skeleton -->
+      <div class="space-y-4 pt-2 pb-6 overflow-hidden">
+        <!-- 3 Stat Metrics Skeleton -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div
+            class="border rounded-xl p-5"
+            :class="themeStore.isDark ? 'bg-[#121216] border-[#27272a]' : 'bg-white border-zinc-200 shadow-sm'"
+          >
+            <div class="h-3.5 w-20 bg-zinc-200/60 dark:bg-zinc-800/60 rounded animate-pulse" />
+            <div class="h-6 w-32 bg-zinc-200/60 dark:bg-zinc-800/60 rounded mt-3 animate-pulse" />
+            <div class="h-3 w-24 bg-zinc-200/40 dark:bg-zinc-800/40 rounded mt-2 animate-pulse" />
+          </div>
+          <div
+            class="border rounded-xl p-5"
+            :class="themeStore.isDark ? 'bg-[#121216] border-[#27272a]' : 'bg-white border-zinc-200 shadow-sm'"
+          >
+            <div class="h-3.5 w-20 bg-zinc-200/60 dark:bg-zinc-800/60 rounded animate-pulse" />
+            <div class="h-6 w-28 bg-zinc-200/60 dark:bg-zinc-800/60 rounded mt-3 animate-pulse" />
+            <div class="h-3 w-36 bg-zinc-200/40 dark:bg-zinc-800/40 rounded mt-2 animate-pulse" />
+          </div>
+          <div
+            class="border rounded-xl p-5"
+            :class="themeStore.isDark ? 'bg-[#121216] border-[#27272a]' : 'bg-white border-zinc-200 shadow-sm'"
+          >
+            <div class="h-3.5 w-20 bg-zinc-200/60 dark:bg-zinc-800/60 rounded animate-pulse" />
+            <div class="h-6 w-24 bg-zinc-200/60 dark:bg-zinc-800/60 rounded mt-3 animate-pulse" />
+            <div class="h-3 w-32 bg-zinc-200/40 dark:bg-zinc-800/40 rounded mt-2 animate-pulse" />
+          </div>
+        </div>
+
+        <!-- Git Status Skeleton -->
+        <div
+          class="border rounded-xl p-4"
+          :class="themeStore.isDark ? 'bg-[#121216] border-[#27272a]' : 'bg-white border-zinc-200 shadow-sm'"
+        >
+          <div class="flex items-center justify-between">
+            <div class="h-4 w-24 bg-zinc-200/60 dark:bg-zinc-800/60 rounded animate-pulse" />
+            <div class="h-7 w-24 bg-zinc-200/40 dark:bg-zinc-800/40 rounded-lg animate-pulse" />
+          </div>
+          <div class="space-y-2 mt-4">
+            <div class="h-3.5 w-3/4 bg-zinc-200/40 dark:bg-zinc-800/40 rounded animate-pulse" />
+            <div class="h-3.5 w-1/2 bg-zinc-200/40 dark:bg-zinc-800/40 rounded animate-pulse" />
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Main Tabs -->
-    <div class="flex-1 min-h-0 overflow-hidden pt-3 flex flex-col">
-      <ProfileSelector :project-id="props.id" :profiles="profiles" :selected-id="editingProfile?.id" :dirty="profileDirty" :running="!!effectiveRun" @select="selectProfile" @changed="reloadProfiles" />
+    <div v-else class="flex-1 min-h-0 overflow-hidden pt-2 flex flex-col">
       <n-tabs
         v-model:value="activeMainTab"
         type="line"
@@ -166,7 +247,6 @@
           data-testid="project-overview-pane"
         >
           <div class="space-y-4 pt-2 pb-6">
-            <ProjectGitSummary :project-id="projectStore.currentProject.id" :root-path="projectStore.currentProject.rootPath" />
             <!-- Project Description & Key Highlights from README -->
             <div
               v-if="readmeSummary"
@@ -259,6 +339,9 @@
                 </div>
               </div>
             </div>
+
+            <!-- Git Status Summary -->
+            <ProjectGitSummary :project-id="projectStore.currentProject.id" :root-path="projectStore.currentProject.rootPath" />
 
             <!-- Profile Overview Quick Card -->
             <div
@@ -642,6 +725,7 @@
         <n-tab-pane name="config" tab="启动配置" class="h-full overflow-y-auto">
           <AnalysisChanges :project-id="props.id" :snapshot-id="latestSnapshot?.id" :dirty="JSON.stringify(editingProfile) !== JSON.stringify(profiles.find(item => item.id === editingProfile?.id) ?? null)" @applied="loadData" />
           <div class="space-y-4 pt-2 pb-6">
+            <ProfileSelector :project-id="props.id" :profiles="profiles" :selected-id="editingProfile?.id" :dirty="profileDirty" :running="!!effectiveRun" @select="selectProfile" @changed="reloadProfiles" />
             <div
               class="border rounded-xl p-5 transition-all"
               :class="themeStore.isDark ? 'bg-[#121216] border-[#27272a]' : 'bg-white border-zinc-200 shadow-sm'"
@@ -786,6 +870,37 @@
       @cancel="analysis.cancel()"
     />
   </div>
+
+  <div v-else class="flex-1 min-h-0 flex flex-col h-full overflow-hidden p-6" data-testid="project-detail-loading">
+    <!-- Header skeleton -->
+    <header class="pb-4 border-b flex-shrink-0 space-y-2.5" :class="themeStore.isDark ? 'border-[#27272a]' : 'border-zinc-200'">
+      <div class="flex items-center justify-between gap-4">
+        <div class="flex items-center gap-4">
+          <div class="w-7 h-7 rounded-full bg-zinc-200/60 dark:bg-zinc-800/60 animate-pulse" />
+          <div class="h-6 w-48 bg-zinc-200/60 dark:bg-zinc-800/60 rounded animate-pulse" />
+        </div>
+        <div class="flex items-center gap-2">
+          <div class="h-7 w-20 bg-zinc-200/60 dark:bg-zinc-800/60 rounded-lg animate-pulse" />
+          <div class="h-7 w-28 bg-zinc-200/60 dark:bg-zinc-800/60 rounded-lg animate-pulse" />
+        </div>
+      </div>
+      <div class="h-4 w-72 bg-zinc-200/40 dark:bg-zinc-800/40 rounded animate-pulse" />
+    </header>
+    <!-- Content skeleton -->
+    <div class="flex-1 min-h-0 overflow-hidden pt-4 flex flex-col gap-4">
+      <div class="flex items-center gap-6 border-b pb-2" :class="themeStore.isDark ? 'border-[#27272a]' : 'border-zinc-200'">
+        <div class="h-6 w-20 bg-zinc-200/60 dark:bg-zinc-800/60 rounded animate-pulse" />
+        <div class="h-6 w-18 bg-zinc-200/40 dark:bg-zinc-800/40 rounded animate-pulse" />
+        <div class="h-6 w-18 bg-zinc-200/40 dark:bg-zinc-800/40 rounded animate-pulse" />
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
+        <div class="h-28 border rounded-xl p-5" :class="themeStore.isDark ? 'bg-[#121216] border-[#27272a]' : 'bg-white border-zinc-200 shadow-sm'" />
+        <div class="h-28 border rounded-xl p-5" :class="themeStore.isDark ? 'bg-[#121216] border-[#27272a]' : 'bg-white border-zinc-200 shadow-sm'" />
+        <div class="h-28 border rounded-xl p-5" :class="themeStore.isDark ? 'bg-[#121216] border-[#27272a]' : 'bg-white border-zinc-200 shadow-sm'" />
+      </div>
+    </div>
+  </div>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -905,7 +1020,11 @@ const editModalVisible = ref(false);
 const selectedServiceToEdit = ref<ServiceConfigDto | null>(null);
 const analysisModalVisible = ref(false);
 
+const isPageReady = ref(false);
+let loadDataRequestId = 0;
+
 onMounted(async () => {
+  isPageReady.value = false;
   analysis.subscribe();
   await analysis.restore();
   await loadData();
@@ -914,11 +1033,19 @@ onMounted(async () => {
 
 onUnmounted(() => {
   analysis.dispose();
+  isPageReady.value = false;
 });
 
 watch(
   () => props.id,
-  async () => {
+  async (newId, oldId) => {
+    if (newId !== oldId) {
+      isPageReady.value = false;
+      latestSnapshot.value = null;
+      readmeSummary.value = null;
+      profiles.value = [];
+      editingProfile.value = null;
+    }
     analysis.reset();
     await analysis.restore();
     activeMainTab.value = typeof route?.query?.tab === 'string' ? route.query.tab : 'overview';
@@ -928,23 +1055,53 @@ watch(
 );
 
 async function loadData() {
-  await runnerStore.fetchState();
-  await projectStore.loadProjectDetail(props.id);
+  const currentRequestId = ++loadDataRequestId;
+  const currentProjectId = props.id;
 
-  if (projectStore.currentProject?.rootPath && window.codehelm?.projects?.getReadmeSummary) {
-    try {
-      readmeSummary.value = await window.codehelm.projects.getReadmeSummary(projectStore.currentProject.rootPath);
-    } catch {
-      readmeSummary.value = null;
+  try {
+    const cachedProject = projectStore.projects.find((p) => p.id === currentProjectId);
+    const cachedRootPath = cachedProject?.rootPath;
+
+    const [, , snapshotRes, profilesRes, readmeRes] = await Promise.allSettled([
+      runnerStore.fetchState(),
+      projectStore.loadProjectDetail(currentProjectId),
+      window.codehelm?.analysis ? window.codehelm.analysis.getLatest(currentProjectId) : Promise.resolve(null),
+      window.codehelm?.profiles ? window.codehelm.profiles.list(currentProjectId) : Promise.resolve([]),
+      cachedRootPath && window.codehelm?.projects?.getReadmeSummary
+        ? window.codehelm.projects.getReadmeSummary(cachedRootPath)
+        : Promise.resolve(null),
+    ]);
+
+    if (currentRequestId !== loadDataRequestId || props.id !== currentProjectId) return;
+
+    if (snapshotRes.status === 'fulfilled') {
+      latestSnapshot.value = snapshotRes.value;
     }
-  }
 
-  if (window.codehelm?.analysis) {
-    latestSnapshot.value = await window.codehelm.analysis.getLatest(props.id);
-  }
+    if (profilesRes.status === 'fulfilled' && profilesRes.value) {
+      profiles.value = profilesRes.value;
+      const targetId = editingProfile.value?.id;
+      selectProfile(
+        profiles.value.find((p) => p.id === targetId)?.id ??
+        profiles.value.find((p) => p.isDefault)?.id ??
+        profiles.value[0]?.id ??
+        ''
+      );
+    }
 
-  if (window.codehelm?.profiles) {
-    await reloadProfiles(editingProfile.value?.id);
+    if (readmeRes.status === 'fulfilled' && readmeRes.value) {
+      readmeSummary.value = readmeRes.value;
+    } else if (projectStore.currentProject?.rootPath && window.codehelm?.projects?.getReadmeSummary) {
+      try {
+        readmeSummary.value = await window.codehelm.projects.getReadmeSummary(projectStore.currentProject.rootPath);
+      } catch {
+        readmeSummary.value = null;
+      }
+    }
+  } finally {
+    if (currentRequestId === loadDataRequestId && props.id === currentProjectId) {
+      isPageReady.value = true;
+    }
   }
 }
 
@@ -952,9 +1109,18 @@ function selectProfile(id: string) {
   editingProfile.value = JSON.parse(JSON.stringify(profiles.value.find(profile => profile.id === id) ?? null));
 }
 async function reloadProfiles(id?: string) {
-  profiles.value = await window.codehelm.profiles.list(props.id);
-  selectProfile(profiles.value.find(profile => profile.id === id)?.id ?? profiles.value.find(profile => profile.isDefault)?.id ?? profiles.value[0]?.id ?? '');
+  if (window.codehelm?.profiles) {
+    profiles.value = await window.codehelm.profiles.list(props.id);
+    selectProfile(profiles.value.find(profile => profile.id === id)?.id ?? profiles.value.find(profile => profile.isDefault)?.id ?? profiles.value[0]?.id ?? '');
+  }
 }
+const headerProfileDropdownOptions = computed(() => {
+  return profiles.value.map((profile) => ({
+    label: `${profile.name}${profile.isDefault ? ' (默认)' : ''}`,
+    key: profile.id,
+  }));
+});
+
 const profileDirty = computed(() => JSON.stringify(editingProfile.value) !== JSON.stringify(profiles.value.find(profile => profile.id === editingProfile.value?.id) ?? null));
 const profileErrors = computed(() => editingProfile.value ? validateProfileServices(editingProfile.value.services) : []);
 const failureOptions = [

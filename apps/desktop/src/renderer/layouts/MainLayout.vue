@@ -116,16 +116,16 @@
               </span>
             </div>
 
-            <!-- Collapsed Float Badge: Positioned at outside square top-right corner, 100% round and unclipped -->
+            <!-- Collapsed Float Badge: Positioned at outside square top-right corner, refined 14px mini badge -->
             <span
               v-if="projectStore.projects.length"
-              class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full text-xs font-mono font-bold flex items-center justify-center border shadow-xs z-20 select-none leading-none"
+              class="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] px-1 rounded-full text-[10px] font-sans font-semibold tabular-nums flex items-center justify-center border shadow-2xs z-20 select-none leading-none tracking-tight"
               :class="[
                 sidebarStore.isCollapsed ? 'opacity-100 scale-100' : 'opacity-0 scale-50 pointer-events-none',
                 themeStore.isDark ? 'bg-[#27272a] text-white border-[#3f3f46]' : 'bg-zinc-200 text-zinc-900 border-zinc-300'
               ]"
             >
-              {{ projectStore.projects.length }}
+              {{ projectStore.projects.length > 99 ? '99+' : projectStore.projects.length }}
             </span>
           </router-link>
 
@@ -169,16 +169,16 @@
               </div>
             </div>
 
-            <!-- Collapsed Float Badge: Positioned at outside square top-right corner, 100% round and unclipped -->
+            <!-- Collapsed Float Badge: Positioned at outside square top-right corner, refined 14px mini badge -->
             <span
               v-if="runnerStore.runningCount > 0"
-              class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full text-xs font-mono font-bold flex items-center justify-center border shadow-xs z-20 select-none leading-none"
+              class="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] px-1 rounded-full text-[10px] font-sans font-semibold tabular-nums flex items-center justify-center border shadow-2xs z-20 select-none leading-none tracking-tight"
               :class="[
                 sidebarStore.isCollapsed ? 'opacity-100 scale-100' : 'opacity-0 scale-50 pointer-events-none',
                 themeStore.isDark ? 'bg-white text-black border-zinc-200' : 'bg-black text-white border-zinc-800'
               ]"
             >
-              {{ runnerStore.runningCount }}
+              {{ runnerStore.runningCount > 99 ? '99+' : runnerStore.runningCount }}
             </span>
           </router-link>
 
@@ -223,10 +223,10 @@
               </div>
             </div>
 
-            <!-- Collapsed Float Badge: Positioned at outside square top-right corner, 100% round and unclipped -->
+            <!-- Collapsed Float Badge: Positioned at outside square top-right corner, refined 14px mini badge -->
             <span
               v-if="stderrLogsCount > 0 || (runnerStore.runningCount > 0 && runnerStore.logs.length > 0)"
-              class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full text-xs font-mono font-bold flex items-center justify-center border shadow-xs z-20 select-none leading-none"
+              class="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] px-1 rounded-full text-[10px] font-sans font-semibold tabular-nums flex items-center justify-center border shadow-2xs z-20 select-none leading-none tracking-tight"
               :class="[
                 sidebarStore.isCollapsed ? 'opacity-100 scale-100' : 'opacity-0 scale-50 pointer-events-none',
                 stderrLogsCount > 0
@@ -234,7 +234,7 @@
                   : (themeStore.isDark ? 'bg-[#27272a] text-white border-[#3f3f46]' : 'bg-zinc-200 text-zinc-900 border-zinc-300')
               ]"
             >
-              {{ stderrLogsCount > 0 ? stderrLogsCount : runnerStore.logs.length }}
+              {{ stderrLogsCount > 0 ? (stderrLogsCount > 99 ? '99+' : stderrLogsCount) : (runnerStore.logs.length > 99 ? '99+' : runnerStore.logs.length) }}
             </span>
           </router-link>
         </nav>
@@ -275,13 +275,15 @@
       </div>
     </aside>
 
-    <!-- Main Content Area: route changes mount directly; page-local controls own motion. -->
+    <!-- Main Content Area: Plan A Push & Depth Transition -->
     <main
-      class="flex-1 h-full min-w-0 flex flex-col overflow-hidden transition-all duration-200 rounded-tl-2xl border-t border-l shadow-2xs"
+      class="flex-1 h-full min-w-0 flex flex-col overflow-hidden transition-all duration-200 rounded-tl-2xl border-t border-l shadow-2xs relative"
       :class="themeStore.isDark ? 'bg-[#09090b] border-[#27272a]' : 'bg-[#fafafa] border-[#e4e4e7]'"
     >
-      <router-view v-slot="{ Component, route }">
-        <component :is="Component" :key="route.path" />
+      <router-view v-slot="{ Component, route: currentRoute }">
+        <transition :name="transitionName" mode="out-in">
+          <component :is="Component" :key="currentRoute.path" class="h-full w-full flex-1 min-h-0 flex flex-col overflow-hidden" />
+        </transition>
       </router-view>
     </main>
 
@@ -293,6 +295,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import { useProjectStore } from '../stores/projectStore.js';
 import { useRunnerStore } from '../stores/runnerStore.js';
 import { useThemeStore } from '../stores/themeStore.js';
@@ -328,6 +331,31 @@ watch(
   () => projectStore.searchModalVisible,
   (val) => {
     searchModalVisible.value = val;
+  }
+);
+
+const route = useRoute();
+const transitionName = ref('page-fade');
+
+watch(
+  () => route.path,
+  (toPath, fromPath) => {
+    if (!fromPath) {
+      transitionName.value = 'page-fade';
+      return;
+    }
+    // Entering a project detail page (Overview -> ProjectDetail)
+    if (toPath.startsWith('/projects/') && !fromPath.startsWith('/projects/')) {
+      transitionName.value = 'page-slide-forward';
+    }
+    // Returning from project detail page (ProjectDetail -> Overview)
+    else if (fromPath.startsWith('/projects/') && !toPath.startsWith('/projects/')) {
+      transitionName.value = 'page-slide-backward';
+    }
+    // Switching other primary tabs
+    else {
+      transitionName.value = 'page-fade';
+    }
   }
 );
 
@@ -372,4 +400,69 @@ onUnmounted(() => {
   will-change: width;
 }
 
+/* ============================================================
+   Plan A: Push & Depth Transition (Entering Project: Overview -> ProjectDetail)
+   Leaving view: scales slightly into depth (scale 0.98) and fades out (100ms)
+   Entering view: slides in from right (translateX 18px), scales 0.99 -> 1, and fades in (220ms)
+   ============================================================ */
+.page-slide-forward-leave-active {
+  transition: opacity 100ms ease, transform 100ms cubic-bezier(0.16, 1, 0.3, 1) !important;
+  will-change: opacity, transform;
+}
+.page-slide-forward-leave-to {
+  opacity: 0 !important;
+  transform: scale(0.98) !important;
+}
+
+.page-slide-forward-enter-active {
+  transition: opacity 220ms cubic-bezier(0.16, 1, 0.3, 1), transform 220ms cubic-bezier(0.16, 1, 0.3, 1) !important;
+  will-change: opacity, transform;
+}
+.page-slide-forward-enter-from {
+  opacity: 0 !important;
+  transform: translateX(18px) scale(0.99) !important;
+}
+
+/* ============================================================
+   Plan A: Push & Depth Transition (Returning: ProjectDetail -> Overview)
+   Leaving view: slides back to the right (translateX 18px) and fades out (100ms)
+   Entering view: re-emerges from depth (scale 0.98 -> 1) and fades in (220ms)
+   ============================================================ */
+.page-slide-backward-leave-active {
+  transition: opacity 100ms ease, transform 100ms cubic-bezier(0.16, 1, 0.3, 1) !important;
+  will-change: opacity, transform;
+}
+.page-slide-backward-leave-to {
+  opacity: 0 !important;
+  transform: translateX(18px) scale(0.99) !important;
+}
+
+.page-slide-backward-enter-active {
+  transition: opacity 220ms cubic-bezier(0.16, 1, 0.3, 1), transform 220ms cubic-bezier(0.16, 1, 0.3, 1) !important;
+  will-change: opacity, transform;
+}
+.page-slide-backward-enter-from {
+  opacity: 0 !important;
+  transform: scale(0.98) !important;
+}
+
+/* ============================================================
+   Page Fade (Default Tab Transitions: Overview <-> Runner <-> Console <-> Settings)
+   ============================================================ */
+.page-fade-leave-active {
+  transition: opacity 80ms ease !important;
+  will-change: opacity;
+}
+.page-fade-leave-to {
+  opacity: 0 !important;
+}
+
+.page-fade-enter-active {
+  transition: opacity 160ms cubic-bezier(0.16, 1, 0.3, 1), transform 160ms cubic-bezier(0.16, 1, 0.3, 1) !important;
+  will-change: opacity, transform;
+}
+.page-fade-enter-from {
+  opacity: 0 !important;
+  transform: scale(0.995) !important;
+}
 </style>

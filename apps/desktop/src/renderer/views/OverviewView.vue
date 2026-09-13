@@ -11,10 +11,16 @@
             项目总览
           </h2>
           <span
-            class="text-xs border px-2.5 py-0.5 rounded-full font-mono font-medium"
+            class="text-xs border px-2.5 py-0.5 rounded-full font-sans font-medium inline-flex items-center gap-1 select-none leading-none"
             :class="themeStore.isDark ? 'bg-[#18181b] text-zinc-300 border-[#27272a]' : 'bg-zinc-100 text-zinc-800 border-zinc-200'"
           >
-            {{ projectStore.hasLoadedProjects ? `${projectStore.projects.length} 个工程` : '项目数待读取' }}
+            <template v-if="projectStore.hasLoadedProjects">
+              <span class="font-semibold tabular-nums">{{ projectStore.projects.length }}</span>
+              <span>个工程</span>
+            </template>
+            <template v-else>
+              项目数待读取
+            </template>
           </span>
         </div>
         <p class="text-xs mt-1" :class="themeStore.isDark ? 'text-zinc-400' : 'text-zinc-500'">
@@ -145,7 +151,23 @@
 
     <div v-if="projectStore.hasLoadedProjects" class="flex flex-wrap items-center gap-3 pt-3 flex-shrink-0" aria-label="项目整理筛选">
       <n-select v-model:value="organizationScope" class="w-32" aria-label="归档范围" :options="[{label:'全部项目',value:'all'},{label:'未归档',value:'active'},{label:'已归档',value:'archived'}]" />
-      <n-checkbox v-model:checked="onlyFavorites">仅收藏</n-checkbox>
+      <button
+        type="button"
+        role="checkbox"
+        :aria-checked="onlyFavorites"
+        aria-label="仅收藏"
+        :title="onlyFavorites ? '当前仅显示收藏项目（点击取消）' : '仅显示收藏项目'"
+        class="btn-favorite-filter font-sans select-none"
+        :class="{ 'is-active': onlyFavorites }"
+        @click="onlyFavorites = !onlyFavorites"
+      >
+        <IconStar
+          :size="14"
+          :filled="onlyFavorites"
+          class="btn-favorite-filter-icon"
+        />
+        <span class="btn-favorite-filter-label">收藏</span>
+      </button>
       <n-select
         ref="tagSelectRef"
         v-model:value="selectedTags"
@@ -181,17 +203,63 @@
       >
         <div v-if="selectedIds.length > 0" class="flex items-center gap-2 will-change-transform">
           <span
-            class="text-xs font-mono font-medium px-2 py-0.5 rounded border"
+            class="text-xs font-sans font-medium px-2 py-0.5 rounded border inline-flex items-center gap-1 leading-none"
             :class="themeStore.isDark
               ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
               : 'bg-emerald-50 text-emerald-600 border-emerald-200'"
           >
-            已选 {{ selectedIds.length }}
+            <span>已选</span>
+            <span class="font-semibold tabular-nums">{{ selectedIds.length }}</span>
           </span>
-          <n-button size="small" :disabled="bulkBusy" @click="organizeSelected({favorite:true})">批量收藏</n-button>
-          <n-button size="small" :disabled="bulkBusy" @click="organizeSelected({archived:true})">批量归档</n-button>
-          <n-button size="small" :disabled="bulkBusy" @click="organizeSelected({archived:false})">批量取消归档</n-button>
-          <n-button v-if="bulkBusy" size="small" @click="bulkCancel = true">停止后续操作</n-button>
+          <!-- 批量收藏 / 批量取消收藏 切换按钮 -->
+          <button
+            type="button"
+            :disabled="bulkBusy"
+            :aria-label="isAllSelectedFavorite ? '批量取消收藏' : '批量收藏'"
+            class="btn-batch-action btn-batch-star"
+            :class="{ 'is-active': isAllSelectedFavorite }"
+            @click="organizeSelected({ favorite: !isAllSelectedFavorite })"
+          >
+            <IconStar
+              :size="14"
+              :filled="isAllSelectedFavorite"
+              class="btn-batch-icon btn-batch-icon-star"
+              :class="{
+                'is-active': isAllSelectedFavorite,
+                'is-animating': isBatchStarActivating,
+              }"
+            />
+            <Transition name="batch-btn-text" mode="out-in">
+              <span :key="isAllSelectedFavorite ? 'unfav' : 'fav'" class="batch-btn-label">
+                {{ isAllSelectedFavorite ? '批量取消收藏' : '批量收藏' }}
+              </span>
+            </Transition>
+          </button>
+
+          <!-- 批量归档 / 批量取消归档 切换按钮 -->
+          <button
+            type="button"
+            :disabled="bulkBusy"
+            :aria-label="isAllSelectedArchived ? '批量取消归档' : '批量归档'"
+            class="btn-batch-action btn-batch-archive"
+            :class="{ 'is-active': isAllSelectedArchived }"
+            @click="organizeSelected({ archived: !isAllSelectedArchived })"
+          >
+            <IconArchive
+              :size="14"
+              :filled="isAllSelectedArchived"
+              class="btn-batch-icon btn-batch-icon-archive"
+              :class="{
+                'is-active': isAllSelectedArchived,
+                'is-animating': isBatchArchiveActivating,
+              }"
+            />
+            <Transition name="batch-btn-text" mode="out-in">
+              <span :key="isAllSelectedArchived ? 'unarchive' : 'archive'" class="batch-btn-label">
+                {{ isAllSelectedArchived ? '批量取消归档' : '批量归档' }}
+              </span>
+            </Transition>
+          </button>
         </div>
       </transition>
     </div>
@@ -693,7 +761,7 @@
               <!-- Status -->
               <td class="py-3.5 px-4">
                 <span
-                  class="px-2 py-0.5 rounded-full text-xs font-mono font-medium inline-flex items-center gap-1 border leading-none"
+                  class="px-2 py-0.5 rounded-full text-xs font-sans font-medium inline-flex items-center gap-1 border leading-none"
                   :class="statusBadgeClass(project.runtime.status)"
                   :title="runtimeStatusTitle(project)"
                 >
@@ -774,6 +842,8 @@ import {
   IconGrid,
   IconList,
   IconChevronDown,
+  IconStar,
+  IconArchive,
 } from '../components/icons/index.js';
 import type { ProjectSummaryDto, UpdateProjectInput } from '@codehelm/contracts';
 import { getPageBounds } from '../utils/pagination.js';
@@ -851,6 +921,50 @@ const bulkBusy = ref(false);
 const bulkCancel = ref(false);
 const bulkTotal = ref(0);
 const bulkResults = ref<{id:string;name:string;status:string}[]>([]);
+
+const selectedProjects = computed(() => {
+  return projectStore.projects.filter((p) => selectedIds.value.includes(p.id));
+});
+
+const isAllSelectedFavorite = computed(() => {
+  if (selectedProjects.value.length === 0) return false;
+  return selectedProjects.value.every((p) => !!p.favorite);
+});
+
+const isAllSelectedArchived = computed(() => {
+  if (selectedProjects.value.length === 0) return false;
+  return selectedProjects.value.every((p) => !!p.archived);
+});
+
+const isBatchStarActivating = ref(false);
+const isBatchArchiveActivating = ref(false);
+
+function triggerBatchStarAnimation() {
+  isBatchStarActivating.value = true;
+  setTimeout(() => {
+    isBatchStarActivating.value = false;
+  }, 480);
+}
+
+function triggerBatchArchiveAnimation() {
+  isBatchArchiveActivating.value = true;
+  setTimeout(() => {
+    isBatchArchiveActivating.value = false;
+  }, 440);
+}
+
+watch(isAllSelectedFavorite, (newVal, oldVal) => {
+  if (!oldVal && newVal) {
+    triggerBatchStarAnimation();
+  }
+});
+
+watch(isAllSelectedArchived, (newVal, oldVal) => {
+  if (!oldVal && newVal) {
+    triggerBatchArchiveAnimation();
+  }
+});
+
 function selectProject(id: string, selected: boolean) {
   if (bulkBusy.value) return;
   selectedIds.value = selected ? [...new Set([...selectedIds.value, id])] : selectedIds.value.filter(item => item !== id);
@@ -864,8 +978,8 @@ async function organizeSelected(patch: UpdateProjectInput) {
       (item, status) => { bulkResults.value.push({...item,status}); });
   } finally {
     bulkBusy.value = false;
-    selectedIds.value = [];
     await projectStore.fetchProjects();
+    selectedIds.value = selectedIds.value.filter(id => projectStore.projects.some(p => p.id === id));
     const successCount = bulkResults.value.filter((r) => r.status === '已完成').length;
     if (successCount > 0) {
       message.success(`批量整理完成：成功 ${successCount} / ${bulkTotal.value}`);
@@ -1354,6 +1468,341 @@ function statusBadgeClass(status?: string) {
   box-shadow: none !important;
   visibility: hidden !important;
   pointer-events: none !important;
+}
+
+/* Star Pill Toggle Button for Favorite Filter */
+.btn-favorite-filter {
+  height: 32px;
+  min-width: 68px;
+  padding: 0 10px;
+  border-radius: 8px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", sans-serif !important;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  user-select: none;
+  cursor: pointer;
+  outline: none;
+  border: 1px solid transparent;
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+  box-sizing: border-box;
+}
+
+.btn-favorite-filter:active {
+  transform: scale(0.97);
+  transition: transform 70ms ease;
+}
+
+.btn-favorite-filter-label {
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+html.light .btn-favorite-filter {
+  background-color: #f4f4f5;
+  border-color: #e4e4e7;
+  color: #52525b;
+}
+html.light .btn-favorite-filter:hover {
+  background-color: #e4e4e7;
+  border-color: #d4d4d8;
+  color: #27272a;
+}
+html.light .btn-favorite-filter.is-active {
+  background-color: #fffbeb;
+  border-color: #fcd34d;
+  color: #78350f;
+  font-weight: 500;
+}
+html.light .btn-favorite-filter.is-active:hover {
+  background-color: #fef3c7;
+  border-color: #fbbf24;
+}
+
+html.dark .btn-favorite-filter {
+  background-color: #141418;
+  border-color: #27272a;
+  color: #a1a1aa;
+}
+html.dark .btn-favorite-filter:hover {
+  background-color: #1e1e24;
+  border-color: #3f3f46;
+  color: #e4e4e7;
+}
+html.dark .btn-favorite-filter.is-active {
+  background-color: rgba(245, 158, 11, 0.15);
+  border-color: rgba(251, 191, 36, 0.35);
+  color: #fcd34d;
+  font-weight: 500;
+}
+html.dark .btn-favorite-filter.is-active:hover {
+  background-color: rgba(245, 158, 11, 0.22);
+  border-color: rgba(251, 191, 36, 0.55);
+}
+
+.btn-favorite-filter-icon {
+  flex-shrink: 0;
+  transition: color 150ms ease;
+}
+
+html.light .btn-favorite-filter .btn-favorite-filter-icon {
+  color: #71717a;
+}
+html.light .btn-favorite-filter.is-active .btn-favorite-filter-icon {
+  color: #f59e0b;
+}
+
+html.dark .btn-favorite-filter .btn-favorite-filter-icon {
+  color: #71717a;
+}
+html.dark .btn-favorite-filter.is-active .btn-favorite-filter-icon {
+  color: #fbbf24;
+}
+
+/* =========================================================
+   Native Batch Organization Action Buttons (No Naive UI Wave)
+   ========================================================= */
+
+.btn-batch-action {
+  height: 28px;
+  min-width: 116px;
+  padding: 0 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  user-select: none;
+  cursor: pointer;
+  outline: none;
+  border: 1px solid transparent;
+  transition: transform 120ms cubic-bezier(0.34, 1.56, 0.64, 1),
+              background-color 160ms ease,
+              border-color 160ms ease,
+              color 160ms ease,
+              box-shadow 160ms ease;
+  will-change: transform;
+}
+
+.btn-batch-action:active:not(:disabled) {
+  transform: scale(0.96);
+  transition-duration: 70ms;
+}
+
+.btn-batch-action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+/* Light Mode: Base Inactive */
+html.light .btn-batch-action {
+  background-color: #ffffff;
+  border-color: #e4e4e7;
+  color: #27272a;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+html.light .btn-batch-action:hover:not(:disabled) {
+  background-color: #f4f4f5;
+  border-color: #d4d4d8;
+  color: #09090b;
+}
+
+/* Dark Mode: Base Inactive */
+html.dark .btn-batch-action {
+  background-color: #18181b;
+  border-color: #27272a;
+  color: #e4e4e7;
+}
+html.dark .btn-batch-action:hover:not(:disabled) {
+  background-color: #27272a;
+  border-color: #3f3f46;
+  color: #ffffff;
+}
+
+/* Light Mode: Star Active State (批量取消收藏) */
+html.light .btn-batch-star.is-active {
+  background-color: #fffbeb;
+  border-color: #fcd34d;
+  color: #92400e;
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(245, 158, 11, 0.15);
+}
+html.light .btn-batch-star.is-active:hover:not(:disabled) {
+  background-color: #fef3c7;
+  border-color: #fbbf24;
+}
+
+/* Dark Mode: Star Active State (批量取消收藏) */
+html.dark .btn-batch-star.is-active {
+  background-color: rgba(245, 158, 11, 0.15);
+  border-color: rgba(251, 191, 36, 0.35);
+  color: #fef08a;
+  font-weight: 600;
+}
+html.dark .btn-batch-star.is-active:hover:not(:disabled) {
+  background-color: rgba(245, 158, 11, 0.22);
+  border-color: rgba(251, 191, 36, 0.55);
+}
+
+/* Light Mode: Archive Active State (批量取消归档) */
+html.light .btn-batch-archive.is-active {
+  background-color: #f0f9ff;
+  border-color: #7dd3fc;
+  color: #0369a1;
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(14, 165, 233, 0.15);
+}
+html.light .btn-batch-archive.is-active:hover:not(:disabled) {
+  background-color: #e0f2fe;
+  border-color: #38bdf8;
+}
+
+/* Dark Mode: Archive Active State (批量取消归档) */
+html.dark .btn-batch-archive.is-active {
+  background-color: rgba(14, 165, 233, 0.15);
+  border-color: rgba(56, 189, 248, 0.35);
+  color: #bae6fd;
+  font-weight: 600;
+}
+html.dark .btn-batch-archive.is-active:hover:not(:disabled) {
+  background-color: rgba(14, 165, 233, 0.22);
+  border-color: rgba(56, 189, 248, 0.55);
+}
+
+/* Button Text Transition */
+.batch-btn-label {
+  display: inline-block;
+  will-change: transform, opacity;
+  white-space: nowrap;
+}
+
+.batch-btn-text-enter-active,
+.batch-btn-text-leave-active {
+  transition: opacity 0.16s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.batch-btn-text-enter-from {
+  opacity: 0;
+  transform: translateY(3px) scale(0.96);
+}
+
+.batch-btn-text-leave-to {
+  opacity: 0;
+  transform: translateY(-3px) scale(0.96);
+}
+
+/* Action Icons */
+.btn-batch-icon {
+  flex-shrink: 0;
+  transform-origin: 50% 50%;
+  transition: transform 0.26s cubic-bezier(0.34, 1.56, 0.64, 1),
+              color 0.2s ease,
+              stroke 0.2s ease,
+              filter 0.2s ease;
+  will-change: transform;
+}
+
+/* Star Icon Colors */
+html.light .btn-batch-icon-star {
+  color: #71717a;
+  stroke: #71717a;
+}
+html.light .btn-batch-star:hover:not(:disabled) .btn-batch-icon-star {
+  color: #d97706;
+  stroke: #d97706;
+}
+html.light .btn-batch-icon-star.is-active {
+  color: #f59e0b !important;
+  stroke: #f59e0b !important;
+  filter: drop-shadow(0 1px 2px rgba(245, 158, 11, 0.45));
+}
+
+html.dark .btn-batch-icon-star {
+  color: #a1a1aa;
+  stroke: #a1a1aa;
+}
+html.dark .btn-batch-star:hover:not(:disabled) .btn-batch-icon-star {
+  color: #facc15;
+  stroke: #facc15;
+}
+html.dark .btn-batch-icon-star.is-active {
+  color: #facc15 !important;
+  stroke: #facc15 !important;
+  filter: drop-shadow(0 1px 2px rgba(250, 204, 21, 0.45));
+}
+
+.btn-batch-icon-star.is-animating {
+  animation: star-spring-bounce 0.46s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* Archive Icon Colors */
+html.light .btn-batch-icon-archive {
+  color: #71717a;
+  stroke: #71717a;
+}
+html.light .btn-batch-archive:hover:not(:disabled) .btn-batch-icon-archive {
+  color: #0284c7;
+  stroke: #0284c7;
+}
+html.light .btn-batch-icon-archive.is-active {
+  color: #0284c7 !important;
+  stroke: #0284c7 !important;
+  filter: drop-shadow(0 1px 2px rgba(2, 132, 199, 0.45));
+}
+
+html.dark .btn-batch-icon-archive {
+  color: #a1a1aa;
+  stroke: #a1a1aa;
+}
+html.dark .btn-batch-archive:hover:not(:disabled) .btn-batch-icon-archive {
+  color: #38bdf8;
+  stroke: #38bdf8;
+}
+html.dark .btn-batch-icon-archive.is-active {
+  color: #38bdf8 !important;
+  stroke: #38bdf8 !important;
+  filter: drop-shadow(0 1px 2px rgba(56, 189, 248, 0.45));
+}
+
+.btn-batch-icon-archive.is-animating {
+  animation: archive-spring-bounce 0.42s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes star-spring-bounce {
+  0% { transform: scale(0.76) rotate(-14deg); }
+  42% { transform: scale(1.32) rotate(6deg); }
+  72% { transform: scale(0.93) rotate(-2deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+
+@keyframes archive-spring-bounce {
+  0% { transform: scale(0.85) translateY(1.5px); }
+  42% { transform: scale(1.24) translateY(-2px); }
+  72% { transform: scale(0.95) translateY(0.5px); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-batch-icon-star.is-animating,
+  .btn-batch-icon-archive.is-animating {
+    animation: none !important;
+  }
+  .btn-batch-icon,
+  .btn-batch-action,
+  .batch-btn-text-enter-active,
+  .batch-btn-text-leave-active {
+    transition: none !important;
+  }
 }
 
 </style>
