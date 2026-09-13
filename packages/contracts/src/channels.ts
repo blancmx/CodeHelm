@@ -1,4 +1,7 @@
 export const IpcChannels = {
+  DIAGNOSTIC_BUNDLE_PREVIEW: 'diagnostic-bundle:preview',
+  DIAGNOSTIC_BUNDLE_EXPORT: 'diagnostic-bundle:export',
+  DIAGNOSTIC_BUNDLE_CANCEL: 'diagnostic-bundle:cancel',
   PROJECTS_GIT_SUMMARY: 'codehelm:projects:git-summary',
   BACKUPS_LIST:'backups:list', BACKUPS_CREATE:'backups:create', BACKUPS_PIN:'backups:pin',
   BACKUPS_POLICY:'backups:policy', BACKUPS_PREPARE:'backups:prepare', BACKUPS_RESTORE:'backups:restore', BACKUPS_OPEN:'backups:open',

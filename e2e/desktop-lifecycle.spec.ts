@@ -185,7 +185,7 @@ test('shows local Git summary and refreshes without changing repository files', 
 // eslint-disable-next-line no-empty-pattern
 test('imports a portable profile template through reviewed UI and retains it across restart', async ({}, testInfo) => {
   const project = await page!.evaluate(rootPath => window.codehelm.projects.import({ rootPath, name: '模板验收', tags: [] }), path.join(fixtureRoot, 'fixture-project'));
-  await page!.evaluate(id => { location.hash = `/projects/${id}`; }, project.id);
+  await page!.evaluate(id => { location.hash = `/projects/${id}?tab=config`; }, project.id);
   await app!.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setBounds({ width: 960, height: 600 }));
   await page!.getByRole('button', { name: '导入 / 导出模板' }).click();
   await page!.getByRole('button', { name: '使用 Node 通用模板' }).click();
@@ -919,8 +919,9 @@ test('invalidates edited approvals and preserves the effective profile and histo
   expect(state.activeSessions[0].services[0].pid).toBe(run.services[0].pid);
   await page!.evaluate(id => { location.hash = `/projects/${id}?tab=services`; }, profile.projectId);
   await expect(page!.getByText('本次会话配置快照：', { exact: false })).toBeVisible();
-  await expect(page!.getByRole('button', { name: '删除方案', exact: true })).toBeDisabled();
   await page!.screenshot({ path: testInfo.outputPath('effective-profile.png'), animations: 'disabled' });
+  await page!.evaluate(id => { location.hash = `/projects/${id}?tab=config`; }, profile.projectId);
+  await expect(page!.getByRole('button', { name: '删除方案', exact: true })).toBeDisabled();
   const opened = app!.waitForEvent('window');
   const cancelled = page!.evaluate(id => window.codehelm.runner.restartService(id).then(() => '').catch(e => String(e)), run.services[0].id);
   const review = await opened;
@@ -1113,6 +1114,57 @@ test('rechecks a fixed port after approval without stopping the process that occ
 });
 
 // eslint-disable-next-line no-empty-pattern
+test('previews a redacted diagnostic bundle, excludes entries and saves only reviewed bytes', async ({}, testInfo) => {
+  let profile = await createMultiProfileFixture();
+  const secret = 'BUNDLE_KNOWN_ENV_SECRET', customPath = 'C:\\Users\\bundle-private-person\\private-file.txt';
+  await fs.writeFile(path.join(fixtureRoot, 'fixture-project', 'controlled.cjs'),
+    `console.log('BUNDLE_VISIBLE_MESSAGE'); console.log('BUNDLE_EXCLUDE_ME'); console.log(process.env.BUNDLE_VALUE); console.log(${JSON.stringify(customPath)}); console.error('password=UNMARKED_PASSWORD_SECRET'); setTimeout(() => process.exit(7), 250);`);
+  profile = await page!.evaluate(({ input, secret }) => window.codehelm.profiles.save({ ...input,
+    services: input.services.map(service => ({ ...service, env: [{ key: 'BUNDLE_VALUE', value: secret, isSecret: false }] })) }), { input: profile, secret });
+  const opened = app!.waitForEvent('window');
+  const pending = page!.evaluate(id => window.codehelm.runner.confirmExecution(id, 'start'), profile.id);
+  await (await opened).getByRole('button', { name: '确认并启动' }).click();
+  const token = await pending;
+  await page!.evaluate(({ id, token }) => window.codehelm.runner.start(id, token).catch(() => null), { id: profile.id, token });
+  const state = await waitForRunnerState(state => state.history.some(run => run.runProfileId === profile.id && run.status === 'FAILED'));
+  const run = state.history.find(run => run.runProfileId === profile.id)!;
+  await page!.evaluate(() => { location.hash = '/settings'; });
+  const panel = page!.getByRole('region', { name: '脱敏诊断包', exact: true });
+  await panel.getByLabel('诊断包运行会话').selectOption(run.id);
+  await panel.getByRole('button', { name: '生成诊断包预览' }).click();
+  await expect(panel.getByRole('heading', { name: '诊断包预览' })).toBeVisible();
+  const previewText = (await panel.locator('pre').allTextContents()).join('\n');
+  expect(previewText).toContain('BUNDLE_VISIBLE_MESSAGE');
+  for (const value of [secret, 'UNMARKED_PASSWORD_SECRET', customPath, 'bundle-private-person', 'controlled.cjs', fixtureRoot]) expect(previewText).not.toContain(value);
+  await expect(panel.getByRole('button', { name: /保存诊断包/ })).toBeDisabled();
+  await panel.locator('.bundle-entry').filter({ hasText: 'BUNDLE_EXCLUDE_ME' }).getByRole('checkbox').uncheck();
+  await panel.getByRole('checkbox', { name: /我已检查所选条目/ }).check();
+  const destination = path.join(fixtureRoot, 'diagnostic-bundle.json');
+  await app!.evaluate(({ dialog }, filePath) => { dialog.showSaveDialog = async () => ({ canceled: true, filePath }); }, destination);
+  await panel.getByRole('button', { name: /保存诊断包/ }).click();
+  await expect(panel.getByRole('status')).toHaveText('已取消保存，未导出诊断包。');
+  await expect(fs.stat(destination)).rejects.toThrow();
+  await app!.evaluate(({ dialog }, filePath) => { dialog.showSaveDialog = async () => ({ canceled: false, filePath }); }, destination);
+  await panel.getByRole('button', { name: /保存诊断包/ }).click();
+  await expect(panel.getByRole('status')).toHaveText('诊断包已保存到本地，未上传。');
+  const exported = await fs.readFile(destination, 'utf8');
+  expect(exported).toContain('BUNDLE_VISIBLE_MESSAGE'); expect(exported).not.toContain('BUNDLE_EXCLUDE_ME');
+  for (const value of [secret, 'UNMARKED_PASSWORD_SECRET', customPath, fixtureRoot]) expect(exported).not.toContain(value);
+  expect(Buffer.byteLength(exported)).toBeLessThanOrEqual(1024 * 1024);
+  expect(JSON.parse(exported).manifest.excludedIds).toHaveLength(1);
+  await panel.getByRole('button', { name: '生成诊断包预览' }).click();
+  await expect(panel.getByRole('heading', { name: '诊断包预览' })).toBeVisible();
+  await app!.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setBounds({ width: 960, height: 600 }));
+  await panel.getByRole('heading', { name: '诊断包预览' }).scrollIntoViewIfNeeded();
+  await page!.screenshot({ path: testInfo.outputPath('diagnostic-bundle-dark.png') });
+  await panel.getByRole('button', { name: '取消诊断包' }).click();
+  await expect(panel.getByRole('heading', { name: '诊断包预览' })).toHaveCount(0);
+  await page!.getByRole('button', { name: '明亮模式' }).click();
+  await panel.scrollIntoViewIfNeeded();
+  await page!.screenshot({ path: testInfo.outputPath('diagnostic-bundle-light.png') });
+});
+
+// eslint-disable-next-line no-empty-pattern
 test('opts into the native tray, preserves a running service and quits through its menu', async ({}, testInfo) => {
   await page!.evaluate(() => { location.hash = '/settings'; });
   const checkbox = page!.getByRole('checkbox', { name: '关闭到托盘' });
@@ -1197,6 +1249,9 @@ test('opts into the native tray, preserves a running service and quits through i
   expect((await page.evaluate(() => window.codehelm.runner.getState())).activeSessions).toHaveLength(0);
   await page.evaluate(() => window.codehelm.window.close());
   expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isVisible())).toBe(false);
+  // A user restores the window before changing settings; avoid CDP work in a suspended hidden renderer.
+  await app.evaluate(({ app }) => { app.emit('second-instance', {}, [], '', {}); });
+  expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isVisible())).toBe(true);
   await page.evaluate(() => window.codehelm.settings.update({ closeToTray: false }));
   expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isVisible())).toBe(true);
   const defaultClosed = app.waitForEvent('close');

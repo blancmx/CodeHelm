@@ -29,6 +29,7 @@
     <!-- Settings Content with Balanced Full-Width Grid -->
     <div class="flex-1 overflow-y-auto pt-5 space-y-5 pb-8 relative z-10">
       <BackupManagement />
+      <DiagnosticBundle />
       <!-- Section 0: 外观与主题切换 (Theme & Appearance) with Vector Icons -->
       <div
         class="border rounded-xl p-5 space-y-3.5 transition-all duration-200 relative z-20"
@@ -252,6 +253,7 @@
 
 <script setup lang="ts">
 import BackupManagement from '../components/BackupManagement.vue';
+import DiagnosticBundle from '../components/DiagnosticBundle.vue';
 import { reactive, ref, onMounted, onUnmounted } from 'vue';
 import type { LogStorageStatusDto } from '@codehelm/contracts';
 import { message, dialog } from '../utils/discrete.js';

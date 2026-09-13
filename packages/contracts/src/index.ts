@@ -10,3 +10,4 @@ export * from './dto/settings.js';
 export * from './dto/diagnostics.js';
 export * from './dto/history.js';
 export * from './dto/backups.js';
+export * from './dto/diagnostic-bundle.js';

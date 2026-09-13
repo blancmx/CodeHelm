@@ -18,7 +18,7 @@ export function registerHistoryHandlers(handle: RegisterIpcHandler, db: Database
     const result = sessions.query(HistoryQuerySchema.parse(raw));
     return { ...result, sessions: result.sessions.map(session => RunSessionDtoSchema.parse(session)) };
   });
-  handle(IpcChannels.HISTORY_LOGS, async (event, raw): Promise<StoredLogPage> => {
+  const readLogs = async (event: Electron.IpcMainInvokeEvent, raw: unknown): Promise<StoredLogPage> => {
     const query = StoredLogQuerySchema.parse(raw), run = sessions.findById(query.runSessionId,1);
     if (!run) throw new Error('运行记录不存在。');
     if (query.serviceSessionId && !db.prepare('SELECT 1 FROM service_sessions WHERE id=? AND run_session_id=?').get(query.serviceSessionId,run.id)) throw new Error('服务不属于此会话。');
@@ -72,5 +72,7 @@ export function registerHistoryHandlers(handle: RegisterIpcHandler, db: Database
         }
       }
     }
-  });
+  };
+  handle(IpcChannels.HISTORY_LOGS, readLogs);
+  return readLogs;
 }

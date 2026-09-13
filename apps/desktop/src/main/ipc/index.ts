@@ -10,6 +10,7 @@ import { registerAnalysisHandlers } from './analysis-handlers.js';
 import { registerRunnerHandlers, assertProfileRemovable, invalidateProfileApproval } from './runner-handlers.js';
 import { registerSettingsHandlers } from './settings-handlers.js';
 import { registerHistoryHandlers } from './history-handlers.js';
+import { registerDiagnosticBundleHandlers } from './diagnostic-bundle-handlers.js';
 import { app } from 'electron';
 import { getAppSettings } from './app-settings.js';
 import { LogStorage } from './log-storage.js';
@@ -51,6 +52,7 @@ export async function registerAllIpcHandlers(db: DatabaseInstance, handle: Regis
   registerAnalysisHandlers(handle, db);
   await registerRunnerHandlers(handle, db, logs);
   registerSettingsHandlers(handle, db, logs, applyCloseToTray);
-  registerHistoryHandlers(handle, db, logs);
+  const readLogs = registerHistoryHandlers(handle, db, logs);
+  registerDiagnosticBundleHandlers(handle, db, readLogs);
   logs.start();
 }

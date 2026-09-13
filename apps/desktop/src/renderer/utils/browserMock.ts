@@ -664,6 +664,11 @@ export function setupBrowserMock() {
   const logListeners = new Set<(batch: LogBatchDto) => void>();
 
   const mockApi: CodeHelmApi = {
+    diagnosticBundle: {
+      async preview() { throw new Error('诊断包仅在桌面端可用。'); },
+      async export() { throw new Error('诊断包仅在桌面端可用。'); },
+      async cancel() {},
+    },
     projects: {
       async gitSummary() { return { status: 'git_unavailable' as const, checkedAt: new Date().toISOString(), message: '请在桌面应用中读取本地 Git 状态。' }; },
       async previewRelocation() { throw new Error('路径修复需要在桌面端核对真实目录'); },

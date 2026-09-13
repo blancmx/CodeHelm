@@ -4,6 +4,11 @@ import type { CodeHelmApi } from '@codehelm/contracts';
 import { toIpcPayload } from './ipc-payload.js';
 
 const api: CodeHelmApi = {
+  diagnosticBundle: {
+    preview: input => ipcRenderer.invoke(IpcChannels.DIAGNOSTIC_BUNDLE_PREVIEW, toIpcPayload(input)),
+    export: (token, selectedIds) => ipcRenderer.invoke(IpcChannels.DIAGNOSTIC_BUNDLE_EXPORT, { token, selectedIds }),
+    cancel: () => ipcRenderer.invoke(IpcChannels.DIAGNOSTIC_BUNDLE_CANCEL),
+  },
   projects: {
     gitSummary: projectId => ipcRenderer.invoke(IpcChannels.PROJECTS_GIT_SUMMARY, projectId),
     workspaces: () => ipcRenderer.invoke(IpcChannels.PROJECTS_WORKSPACES),

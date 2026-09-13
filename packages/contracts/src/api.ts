@@ -1,5 +1,6 @@
 import type { RuntimeFamily, RuntimeProbeDto } from './dto/diagnostics.js';
 import type { GitSummaryDto } from './dto/git.js';
+import type { DiagnosticBundleInput, DiagnosticBundlePreview } from './dto/diagnostic-bundle.js';
 import type { ProfileTemplateInspection, ProfileImportInput, ProfileImportPreview } from './dto/profile-transfer.js';
 import type {
   ImportProjectInput,
@@ -41,6 +42,11 @@ export type Unsubscribe = () => void;
 import type { HistoryQuery, HistoryPage, StoredLogQuery, StoredLogPage } from './dto/history.js';
 
 export interface CodeHelmApi {
+  diagnosticBundle: {
+    preview(input: DiagnosticBundleInput): Promise<DiagnosticBundlePreview>;
+    export(token: string, selectedIds: string[]): Promise<boolean>;
+    cancel(): Promise<void>;
+  };
   projects: {
     gitSummary(projectId: string): Promise<GitSummaryDto>;
     workspaces(): Promise<SavedWorkspace[]>;
