@@ -1416,8 +1416,8 @@ function statusBadgeClass(status?: string) {
 }
 
 .tab-crossfade-leave-active {
-  transition: opacity 120ms ease-out;
-  will-change: opacity;
+  /* out-in must release the old results immediately; retain the incoming feedback. */
+  transition: none;
 }
 
 .tab-crossfade-enter-from {
