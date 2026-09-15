@@ -549,7 +549,7 @@
       <!-- View Mode 1: Project Cards Grid (Monochrome) -->
       <div
         v-else-if="viewMode === 'grid'"
-        :key="'grid-' + activeFilter + '-' + (onlyRunning ? '1' : '0')"
+        key="project-grid"
         class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-6"
       >
         <div
@@ -678,7 +678,7 @@
       <!-- View Mode 2: Project Table / List View (Monochrome) -->
       <div
         v-else-if="viewMode === 'list'"
-        :key="'list-' + activeFilter + '-' + (onlyRunning ? '1' : '0')"
+        key="project-list"
         class="border rounded-xl overflow-x-auto pb-6 mb-4"
         :class="themeStore.isDark ? 'bg-[#121216] border-[#27272a]' : 'bg-white border-zinc-200 shadow-sm'"
       >
@@ -1411,8 +1411,8 @@ function statusBadgeClass(status?: string) {
 
 /* Clean Ghost-Free Tab & View Crossfade Transition */
 .tab-crossfade-enter-active {
-  transition: opacity 160ms cubic-bezier(0.16, 1, 0.3, 1), transform 160ms cubic-bezier(0.16, 1, 0.3, 1);
-  will-change: opacity, transform;
+  transition: opacity 100ms ease-out;
+  will-change: opacity;
 }
 
 .tab-crossfade-leave-active {
@@ -1422,7 +1422,6 @@ function statusBadgeClass(status?: string) {
 
 .tab-crossfade-enter-from {
   opacity: 0;
-  transform: translateY(6px);
 }
 
 .tab-crossfade-leave-to {
