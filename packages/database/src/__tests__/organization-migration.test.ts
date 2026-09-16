@@ -13,11 +13,14 @@ it('upgrades a v3 database without losing tags/history and persists organization
   const file = path.join(root,'fixture.sqlite');
   let db = new Database(file);
   try {
-    db.exec(SCHEMA_SQL.replace('  favorite INTEGER NOT NULL DEFAULT 0,','').replace('  archived INTEGER NOT NULL DEFAULT 0,','').replace('  project_root_path TEXT,',''));
-    db.pragma('user_version=3');
-    db.prepare('INSERT INTO projects(id,name,root_path,tags,created_at,updated_at) VALUES (?,?,?,?,?,?)').run('p','P','/original','["work"]','old','old');
-    db.prepare('INSERT INTO run_profiles(id,project_id,name,created_at,updated_at) VALUES (?,?,?,?,?)').run('profile','p','manual','old','old');
-    db.prepare('INSERT INTO run_sessions(id,project_id,run_profile_id,status,started_at) VALUES (?,?,?,?,?)').run('run','p','profile','STOPPED','old');
+    // Seed one committed legacy database, avoiding a disk flush per statement.
+    db.transaction(() => {
+      db.exec(SCHEMA_SQL.replace('  favorite INTEGER NOT NULL DEFAULT 0,','').replace('  archived INTEGER NOT NULL DEFAULT 0,','').replace('  project_root_path TEXT,',''));
+      db.pragma('user_version=3');
+      db.prepare('INSERT INTO projects(id,name,root_path,tags,created_at,updated_at) VALUES (?,?,?,?,?,?)').run('p','P','/original','["work"]','old','old');
+      db.prepare('INSERT INTO run_profiles(id,project_id,name,created_at,updated_at) VALUES (?,?,?,?,?)').run('profile','p','manual','old','old');
+      db.prepare('INSERT INTO run_sessions(id,project_id,run_profile_id,status,started_at) VALUES (?,?,?,?,?)').run('run','p','profile','STOPPED','old');
+    })();
     db.close(); db=createDatabase(file);
     expect(db.pragma('user_version',{simple:true})).toBe(DATABASE_SCHEMA_VERSION);
     expect(new ProjectRepository(db).findById('p')).toMatchObject({favorite:false,archived:false,tags:['work']});

@@ -37,13 +37,16 @@ describe('protected database startup with real SQLite files', () => {
   }
   function seed(file = databasePath, legacy = false) {
     const db = open(file);
-    db.exec(legacy ? SCHEMA_SQL.replace("  port_mode TEXT NOT NULL DEFAULT 'auto',\n", '') : SCHEMA_SQL);
-    db.exec(`INSERT INTO projects (id,name,root_path,created_at,updated_at)
+    // Commit the fixture once; per-statement autocommit adds unrelated disk flushes.
+    db.transaction(() => {
+      db.exec(legacy ? SCHEMA_SQL.replace("  port_mode TEXT NOT NULL DEFAULT 'auto',\n", '') : SCHEMA_SQL);
+      db.exec(`INSERT INTO projects (id,name,root_path,created_at,updated_at)
       VALUES ('p1','保留项目','C:/项目 with spaces','before','before');
       INSERT INTO run_profiles (id,project_id,name,created_at,updated_at)
       VALUES ('r1','p1','原方案','before','before');
       INSERT INTO service_configs (id,run_profile_id,name,type,module_relative_path,executable,cwd_relative,args_json)
       VALUES ('s1','r1','原服务','frontend','.','node','.','["start.js","--port","3017"]');`);
+    })();
     return db;
   }
   function digest(file = databasePath) {
@@ -96,8 +99,6 @@ describe('protected database startup with real SQLite files', () => {
     expect(fs.readFileSync(result.backup.manifestPath, 'utf8')).not.toContain('private-test-value');
   });
 
-  // Two durable startup snapshots plus migration; this is an integrity test,
-  // not the separate desktop startup/performance acceptance measurement.
   it('backs up the old schema before migrating, retains previous backups on later startups', async () => {
     seed(databasePath, true).close();
     const first = await start();
@@ -112,7 +113,7 @@ describe('protected database startup with real SQLite files', () => {
     expect(second.backup.databasePath).not.toBe(first.backup.databasePath);
     expect(digest(first.backup.databasePath)).toBe(originalBackupHash);
     expect(second.db.prepare('SELECT name FROM projects').pluck().get()).toBe('保留项目');
-  }, 30_000);
+  });
 
   it('refuses a backup before creating pending files when the volume cannot retain safety headroom', async () => {
     seed().close();
@@ -136,7 +137,6 @@ describe('protected database startup with real SQLite files', () => {
     expect(fs.existsSync(backupDirectory) ? fs.readdirSync(backupDirectory) : []).toEqual([]);
   });
 
-  // Six real snapshots each flush data and manifests to disk before pruning.
   it('prunes only the oldest strict verified snapshots after publishing a replacement', async () => {
     seed().close();
     const policy = { maxBackups: 3, minRetainedBackups: 2, maxTotalBytes: 1024 * 1024 * 1024 };
@@ -170,7 +170,7 @@ describe('protected database startup with real SQLite files', () => {
     expect(fs.readFileSync(path.join(unknownDirectory, 'keep.txt'), 'utf8')).toBe('do not delete');
     expect(fs.readFileSync(path.join(pendingDirectory, 'partial.sqlite'), 'utf8')).toBe('keep pending evidence');
     result.db.close();
-  }, 30_000);
+  });
 
   it('reports an unsatisfied size limit instead of deleting below the recovery-point floor', async () => {
     seed().close();
