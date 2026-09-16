@@ -168,7 +168,9 @@ export class ProcessManager {
       }
     };
 
-    if (pid && isOwnedChild()) {
+    if (pid) {
+      // killProcessTree checks current ownership immediately before dispatch.
+      // Avoid a duplicate synchronous OS lookup here (a PowerShell launch on Windows).
       await killProcessTree(
         pid,
         'SIGTERM',

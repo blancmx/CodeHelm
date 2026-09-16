@@ -1,5 +1,6 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { ProcessManager } from '../process/process-manager.js';
+import { ProcessVerifier } from '../process/process-verifier.js';
 import { HealthChecker } from '../health/health-checker.js';
 import net from 'node:net';
 import type { ServiceConfig } from '@codehelm/domain';
@@ -120,7 +121,12 @@ describe('ProcessManager & HealthChecker', () => {
     expect(session.pid).toBeDefined();
     expect(pm.getActiveCount()).toBe(1);
 
-    await pm.stopService(session.id);
+    const identityCheck = vi.spyOn(ProcessVerifier, 'isFingerprintCurrent');
+    try {
+      await pm.stopService(session.id);
+      expect(identityCheck).toHaveBeenCalledTimes(1);
+      expect(identityCheck).toHaveBeenCalledWith(session.pid, session.fingerprint);
+    } finally { identityCheck.mockRestore(); }
     expect(pm.getActiveCount()).toBe(0);
   });
 
