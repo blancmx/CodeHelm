@@ -1247,11 +1247,21 @@ test('opts into the native tray, preserves a running service and quits through i
   page = await app.firstWindow(); await page.waitForLoadState('domcontentloaded');
   expect((await page.evaluate(() => window.codehelm.settings.get())).closeToTray).toBe(true);
   expect((await page.evaluate(() => window.codehelm.runner.getState())).activeSessions).toHaveLength(0);
+  // Record the real hide event and restore from the main event loop. With no
+  // running services, a hidden Electron window can suspend the inspector round
+  // trip used by app.evaluate; inspect the captured state after it is visible.
+  await app.evaluate(({ app, BrowserWindow }) => {
+    const window = BrowserWindow.getAllWindows()[0];
+    (globalThis as any).__trayRestartHidden = undefined;
+    window.once('hide', () => {
+      (globalThis as any).__trayRestartHidden = { id: window.id, visible: window.isVisible() };
+      setImmediate(() => app.emit('second-instance', {}, [], '', {}));
+    });
+  });
+  const restartedWindowId = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].id);
   await page.evaluate(() => window.codehelm.window.close());
-  expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isVisible())).toBe(false);
-  // A user restores the window before changing settings; avoid CDP work in a suspended hidden renderer.
-  await app.evaluate(({ app }) => { app.emit('second-instance', {}, [], '', {}); });
-  expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isVisible())).toBe(true);
+  expect(await app.evaluate(() => (globalThis as any).__trayRestartHidden)).toEqual({ id: restartedWindowId, visible: false });
+  await expect.poll(() => app!.evaluate(({ BrowserWindow }) => ({ id: BrowserWindow.getAllWindows()[0].id, visible: BrowserWindow.getAllWindows()[0].isVisible() }))).toEqual({ id: restartedWindowId, visible: true });
   await page.evaluate(() => window.codehelm.settings.update({ closeToTray: false }));
   expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isVisible())).toBe(true);
   const defaultClosed = app.waitForEvent('close');
